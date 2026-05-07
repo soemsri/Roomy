@@ -10,6 +10,24 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .pulse {
+            animation: pulse 1.5s infinite;
+            display: inline-block;
+        }
+        .nav-badge {
+            background: var(--danger);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 0.7em;
+            margin-left: 5px;
+            font-weight: bold;
+        }
         :root {
             --primary: #0078d4;
             --primary-dark: #005a9e;
@@ -24,6 +42,38 @@
             --border: #edf2f7;
             --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
             --sidebar-width: 260px;
+        }
+
+        .building-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            overflow-x: auto;
+            padding-bottom: 5px;
+            border-bottom: 1px solid var(--border);
+        }
+        .building-tab {
+            padding: 10px 25px;
+            background: #f8f9fa;
+            border-radius: 8px 8px 0 0;
+            cursor: pointer;
+            white-space: nowrap;
+            font-size: 0.95em;
+            transition: all 0.2s;
+            border: 1px solid var(--border);
+            border-bottom: none;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+        .building-tab.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+            font-weight: 600;
+        }
+        .building-tab:hover:not(.active) {
+            background: #edf2f7;
+            color: var(--text-main);
         }
 
         * { box-sizing: border-box; }
@@ -46,22 +96,32 @@
             display: flex;
             flex-direction: column;
             z-index: 100;
+            transition: all 0.3s;
         }
         .sidebar-header {
             padding: 25px;
             font-weight: 700;
             font-size: 1.2em;
             color: var(--primary);
-            display: flex; align-items: center; gap: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
             border-bottom: 1px solid var(--border);
         }
-        .sidebar-menu { padding: 20px 0; flex: 1; overflow-y: auto; }
+        .sidebar-menu {
+            padding: 20px 0;
+            flex: 1;
+            overflow-y: auto;
+        }
         .menu-item {
             padding: 12px 25px;
-            display: flex; align-items: center; gap: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
             color: var(--secondary);
             text-decoration: none;
             font-weight: 500;
+            transition: all 0.2s;
             cursor: pointer;
         }
         .menu-item:hover, .menu-item.active {
@@ -69,6 +129,7 @@
             background: #f0f7ff;
             border-right: 4px solid var(--primary);
         }
+        .menu-item i { width: 20px; text-align: center; }
 
         /* Main Content */
         .main-wrapper {
@@ -77,6 +138,51 @@
             padding: 30px;
             width: calc(100% - var(--sidebar-width));
         }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: white;
+            padding: 8px 15px;
+            border-radius: 30px;
+            box-shadow: var(--shadow);
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+
+        /* Stats Grid */
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 25px; margin-bottom: 40px; }
+        .stat-card { 
+            background: white; 
+            padding: 25px; 
+            border-radius: 12px; 
+            box-shadow: var(--shadow); 
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .stat-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5em;
+        }
+        .icon-blue { background: #e0f2ff; color: #0078d4; }
+        .icon-green { background: #e6fffa; color: #27ae60; }
+        .icon-orange { background: #fffaf0; color: #f39c12; }
+        .icon-red { background: #fff5f5; color: #e74c3c; }
+
+        .stat-info h3 { margin: 0; font-size: 0.85em; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+        .stat-info p { margin: 5px 0 0; font-size: 1.6em; font-weight: 700; }
 
         /* Sections & Cards */
         .section-card {
@@ -87,162 +193,472 @@
             margin-bottom: 30px;
         }
         .section-header {
-            display: flex; justify-content: space-between; align-items: center;
-            margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 15px;
         }
-
-        /* Forms & Buttons */
-        .form-group { margin-bottom: 15px; }
-        label { display: block; font-size: 0.85em; font-weight: 600; margin-bottom: 8px; }
-        input, select, textarea {
-            width: 100%; padding: 10px 15px; border: 1px solid var(--border); border-radius: 8px; outline: none;
-        }
-        .btn { 
-            padding: 8px 16px; border: none; border-radius: 8px; cursor: pointer; 
-            font-size: 0.85em; font-weight: 600; display: inline-flex; align-items: center; gap: 8px;
-        }
-        .btn-primary { background: var(--primary); color: white; }
-        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--secondary); }
-        .btn-danger { background: #fff5f5; color: var(--danger); border: 1px solid #fed7d7; }
+        .section-header h2 { margin: 0; font-size: 1.1em; font-weight: 700; color: #34495e; display: flex; align-items: center; gap: 10px; }
 
         /* Tables */
         .table-container { overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; }
-        th { text-align: left; padding: 15px; border-bottom: 2px solid var(--border); color: var(--text-muted); font-size: 0.85em; }
-        td { padding: 15px; border-bottom: 1px solid var(--border); }
+        table { width: 100%; border-collapse: collapse; min-width: 700px; }
+        th { text-align: left; padding: 15px; border-bottom: 2px solid var(--border); color: var(--text-muted); font-size: 0.85em; text-transform: uppercase; font-weight: 600; }
+        td { padding: 15px; border-bottom: 1px solid var(--border); font-size: 0.95em; vertical-align: middle; }
+        tr:hover { background: #fcfdfe; }
 
-        /* Modals */
-        .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:1000; overflow-y: auto; }
-        .modal-content { background:white; max-width:600px; margin: 50px auto; border-radius:15px; overflow: hidden; }
-        .modal-header { padding: 20px 25px; background: #f8f9fa; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; }
-        .modal-body { padding: 25px; }
-
+        /* Badges & Buttons */
         .badge { padding: 6px 12px; border-radius: 20px; font-size: 0.75em; font-weight: 700; }
         .badge-success { background: #dcfce7; color: #166534; }
         .badge-warning { background: #fef3c7; color: #92400e; }
+        .badge-danger { background: #fee2e2; color: #991b1b; }
+        .badge-info { background: #e0f2ff; color: #075985; }
 
-        .stat-card { background: white; padding: 20px; border-radius: 12px; box-shadow: var(--shadow); display: flex; align-items: center; gap: 15px; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .btn { 
+            padding: 8px 16px; 
+            border: none; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-size: 0.85em; 
+            font-weight: 600; 
+            display: inline-flex; 
+            align-items: center; 
+            gap: 8px;
+            transition: all 0.2s;
+        }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--secondary); }
+        .btn-outline:hover { background: #f8f9fa; border-color: #cbd5e0; }
+        .btn-danger { background: #fff5f5; color: var(--danger); border: 1px solid #fed7d7; }
+        .btn-danger:hover { background: var(--danger); color: white; }
+
+        /* Forms */
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-size: 0.85em; font-weight: 600; margin-bottom: 8px; color: var(--text-main); }
+        input, select, textarea {
+            width: 100%;
+            padding: 10px 15px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.95em;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        input:focus, select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(0, 120, 212, 0.1); }
+
+        /* Modals */
+        .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:1000; overflow-y: auto; backdrop-filter: blur(2px); }
+        .modal-content { background:white; max-width:800px; margin: 50px auto; padding:0; border-radius:15px; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+        .modal-header { padding: 20px 25px; background: #f8f9fa; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .modal-body { padding: 25px; }
+        .modal-footer { padding: 15px 25px; background: #f8f9fa; border-top: 1px solid var(--border); text-align: right; }
+
+        .tabs { display: flex; background: #f8f9fa; padding: 5px; border-radius: 10px; margin-bottom: 25px; }
+        .tab { flex: 1; padding: 10px; text-align: center; cursor: pointer; border-radius: 8px; font-weight: 600; font-size: 0.9em; color: var(--secondary); transition: all 0.2s; }
+        .tab.active { background: white; color: var(--primary); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Responsive */
+        @media (max-width: 992px) {
+            .sidebar { transform: translateX(-100%); }
+            .main-wrapper { margin-left: 0; width: 100%; }
+            .sidebar.active { transform: translateX(0); }
+        }
     </style>
 </head>
 <body>
+    <!-- Sidebar -->
     <aside class="sidebar">
-        <div class="sidebar-header"><i class="fa-solid fa-city"></i><span>SukAnan Admin</span></div>
+        <div class="sidebar-header">
+            <i class="fa-solid fa-city"></i>
+            <span>SukAnan Admin</span>
+        </div>
         <nav class="sidebar-menu">
-            <a onclick="showSection('overview')" class="menu-item active" id="menu-overview"><i class="fa-solid fa-chart-line"></i> ภาพรวม</a>
-            <a onclick="showSection('meterSection')" class="menu-item"><i class="fa-solid fa-gauge-high"></i> จดมิเตอร์</a>
-            <a onclick="showSection('buildingSection')" class="menu-item"><i class="fa-solid fa-city"></i> จัดการอาคาร</a>
-            <a onclick="showSection('roomSection')" class="menu-item"><i class="fa-solid fa-door-open"></i> จัดการห้อง</a>
-            <a onclick="showSection('billSection')" class="menu-item"><i class="fa-solid fa-file-invoice-dollar"></i> บิลล่าสุด</a>
-            <a onclick="showSection('repairSection')" class="menu-item"><i class="fa-solid fa-screwdriver-wrench"></i> แจ้งซ่อม</a>
-            <a onclick="showSection('settingsSection')" class="menu-item"><i class="fa-solid fa-gears"></i> ตั้งค่าระบบ</a>
-            <a href="/admin/logout" class="menu-item" style="color: var(--danger);"><i class="fa-solid fa-right-from-bracket"></i> ออกจากระบบ</a>
+            <a href="#overview" class="menu-item active"><i class="fa-solid fa-chart-line"></i> ภาพรวมระบบ</a>
+            <a href="#meterSection" class="menu-item"><i class="fa-solid fa-gauge-high"></i> จดมิเตอร์น้ำไฟ</a>
+            <a href="#pendingSection" class="menu-item">
+                <i class="fa-solid fa-user-clock"></i> รอการอนุมัติ
+                {% if pending_registrations|length > 0 %}
+                <span class="nav-badge pulse">NEW</span>
+                {% endif %}
+            </a>
+            <a href="#roomSection" class="menu-item"><i class="fa-solid fa-door-open"></i> จัดการห้องพัก</a>
+            <a href="#leaseSection" class="menu-item"><i class="fa-solid fa-file-contract"></i> จัดการสัญญา</a>
+            <a href="#billSection" class="menu-item">
+                <i class="fa-solid fa-file-invoice-dollar"></i> บิลล่าสุด
+                {% if stats.pending_verification > 0 %}
+                <span class="nav-badge pulse">NEW</span>
+                {% endif %}
+            </a>
+            <a href="#meterHistorySection" class="menu-item">
+                <i class="fa-solid fa-faucet-drip"></i> ประวัติมิเตอร์
+            </a>
+            <a href="#repairSection" class="menu-item">
+                <i class="fa-solid fa-screwdriver-wrench"></i> แจ้งซ่อม
+                {% if stats.pending_repairs > 0 %}
+                <span class="nav-badge pulse">NEW</span>
+                {% endif %}
+            </a>
+            <a href="#tenantSection" class="menu-item"><i class="fa-solid fa-users"></i> ผู้เช่าปัจจุบัน</a>
+            <a href="#settingsSection" class="menu-item"><i class="fa-solid fa-gears"></i> ตั้งค่าระบบ</a>
+            <a href="/admin/logout" class="menu-item" style="margin-top: auto; color: var(--danger);"><i class="fa-solid fa-right-from-bracket"></i> ออกจากระบบ</a>
         </nav>
     </aside>
 
+    <!-- Main Content -->
     <div class="main-wrapper">
-        <div id="overview" class="grid">
-            <div class="stat-card"><h3>อาคารทั้งหมด</h3><p>{{ stats.total_buildings }}</p></div>
-            <div class="stat-card"><h3>ห้องทั้งหมด</h3><p>{{ stats.total_rooms }}</p></div>
-            <div class="stat-card"><h3>ว่าง</h3><p>{{ stats.vacant_rooms }}</p></div>
-            <div class="stat-card"><h3>บิลค้าง</h3><p>{{ stats.unpaid_invoices }}</p></div>
-        </div>
-
-        <!-- Meter Recording -->
-        <div class="section-card" id="meterSection" style="display:none;">
-            <div class="section-header"><h2>บันทึกมิเตอร์</h2></div>
-            <form id="meterForm">
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap:15px;">
-                    <div class="form-group"><label>ห้อง</label>
-                        <select id="room_id" required>
-                            {% for r in all_rooms %}<option value="{{ r.id }}">{{ r.room_number }} ({{ r.building.name if r.building else 'อาคารหลัก' }})</option>{% endfor %}
-                        </select>
-                    </div>
-                    <div class="form-group"><label>มิเตอร์ไฟ</label><input type="number" step="0.1" id="elec" required></div>
-                    <div class="form-group"><label>มิเตอร์น้ำ</label><input type="number" step="0.1" id="water" required></div>
-                </div>
-                <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">บันทึกและออกบิล</button>
-            </form>
-        </div>
-
-        <!-- Building Management -->
-        <div class="section-card" id="buildingSection" style="display:none;">
-            <div class="section-header">
-                <h2><i class="fa-solid fa-city"></i> จัดการอาคาร</h2>
-                <button class="btn btn-primary" onclick="toggleForm('addBuildingForm')">+ เพิ่มอาคาร</button>
+        <header>
+            <h1 style="font-size: 1.5em; font-weight: 700;">ยินดีต้อนรับ, {{ owner.display_name if owner else 'เจ้าของหอพัก' }}</h1>
+            <div class="user-profile">
+                <i class="fa-solid fa-circle-user" style="color: var(--primary); font-size: 1.2em;"></i>
+                <span>แอดมินระบบ</span>
             </div>
-            
-            <div id="addBuildingForm" style="display: none; background: #f8f9fa; padding: 20px; border-radius: 12px; margin-bottom: 25px; border: 1px solid var(--border);">
-                <form id="newBuildingForm" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                    <div class="form-group"><label>ชื่ออาคาร</label><input type="text" id="nb_name" required placeholder="เช่น อาคาร A"></div>
-                    <div class="form-group"><label>คำอธิบาย</label><input type="text" id="nb_desc" placeholder="เช่น อาคารด้านหน้า"></div>
-                    <div style="grid-column: 1 / -1; display: flex; gap: 10px; margin-top: 10px;">
-                        <button type="submit" class="btn btn-primary" style="flex: 1; justify-content: center; height: 45px;">บันทึกอาคาร</button>
-                        <button type="button" class="btn btn-outline" onclick="toggleForm('addBuildingForm')" style="flex: 1; justify-content: center;">ยกเลิก</button>
+        </header>
+
+        <!-- Stats Overview -->
+        <div class="grid" id="overview">
+            <div class="stat-card">
+                <div class="stat-icon icon-blue"><i class="fa-solid fa-building"></i></div>
+                <div class="stat-info">
+                    <h3>ห้องทั้งหมด</h3>
+                    <p>{{ stats.total_rooms }}</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon icon-green"><i class="fa-solid fa-check-circle"></i></div>
+                <div class="stat-info">
+                    <h3>ห้องว่าง</h3>
+                    <p>{{ stats.vacant_rooms }}</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon icon-red"><i class="fa-solid fa-clock-rotate-left"></i></div>
+                <div class="stat-info">
+                    <h3>บิลค้างชำระ</h3>
+                    <p>{{ stats.unpaid_invoices }}</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon icon-orange"><i class="fa-solid fa-wrench"></i></div>
+                <div class="stat-info">
+                    <h3>แจ้งซ่อมค้าง</h3>
+                    <p>{{ stats.pending_repairs }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid" style="grid-template-columns: 2fr 1fr;">
+            <!-- Report Export Card -->
+            <div class="section-card">
+                <div class="section-header">
+                    <h2><i class="fa-solid fa-file-export"></i> ออกรายงานรายได้ (Export Report)</h2>
+                </div>
+                <div style="display: flex; gap: 15px; align-items: flex-end;">
+                    <div style="flex: 1;">
+                        <label>เดือน</label>
+                        <input type="number" id="report_month" value="{{ current_month }}" min="1" max="12">
                     </div>
+                    <div style="flex: 1;">
+                        <label>ปี</label>
+                        <input type="number" id="report_year" value="{{ current_year }}">
+                    </div>
+                    <button class="btn btn-primary" onclick="exportReport()" style="padding: 12px 25px;">
+                        <i class="fa-solid fa-download"></i> ดาวน์โหลด CSV
+                    </button>
+                </div>
+            </div>
+
+            <!-- Broadcast Card -->
+            <div class="section-card">
+                <div class="section-header">
+                    <h2><i class="fa-solid fa-bullhorn"></i> ประกาศด่วน (LINE)</h2>
+                </div>
+                <form id="broadcastForm">
+                    <textarea id="broadcast_message" placeholder="ข้อความที่ต้องการประกาศ..." style="height: 60px; margin-bottom: 10px;"></textarea>
+                    <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; background: #e67e22;">
+                        <i class="fa-brands fa-line"></i> ส่งประกาศ
+                    </button>
                 </form>
             </div>
+        </div>
 
+        <!-- Pending Registrations -->
+        <div class="section-card" id="pendingSection" style="{% if pending_registrations|length == 0 %}display:none;{% endif %} border-top: 4px solid var(--warning);">
+            <div class="section-header">
+                <h2><i class="fa-solid fa-user-plus" style="color: var(--warning);"></i> การอนุมัติลงทะเบียนใหม่</h2>
+            </div>
             <div class="table-container">
                 <table>
-                    <thead><tr><th>ชื่ออาคาร</th><th>คำอธิบาย</th><th>จำนวนห้อง</th><th>การจัดการ</th></tr></thead>
-                    <tbody>
-                        {% for b in all_buildings %}
+                    <thead>
                         <tr>
-                            <td style="font-weight: 700;">{{ b.name }}</td>
-                            <td>{{ b.description or '-' }}</td>
-                            <td>{{ b.rooms | length }} ห้อง</td>
+                            <th>ชื่อ-นามสกุล</th>
+                            <th>เบอร์โทร</th>
+                            <th>ขอจองห้อง</th>
+                            <th>จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in pending_registrations %}
+                        <tr>
+                            <td style="font-weight: 600;">{{ p.full_name or 'N/A' }}</td>
+                            <td>{{ p.phone_number or 'N/A' }}</td>
+                            <td><span class="badge badge-info">{{ p.room.room_number if p.room else 'N/A' }}</span></td>
                             <td>
-                                <button class="btn btn-danger" onclick="deleteBuilding({{ b.id }}, '{{ b.name }}')"><i class="fa-solid fa-trash"></i> ลบ</button>
+                                <button class="btn btn-primary" style="background: var(--success);" onclick="approveReg({{ p.id }})">อนุมัติ</button>
+                                <button class="btn btn-danger" onclick="rejectReg({{ p.id }})">ปฏิเสธ</button>
                             </td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
+            </div>
+        </div>
+
+        <!-- Meter Recording -->
+        <div class="section-card" id="meterSection">
+            <div class="section-header">
+                <h2><i class="fa-solid fa-gauge-high"></i> บันทึกมิเตอร์ & ออกบิล</h2>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <div id="edit_indicator" style="display:none; color: var(--warning); font-size: 0.9em; font-weight: 600;">
+                        <i class="fa-solid fa-edit"></i> กำลังแก้ไขข้อมูลเดิม
+                    </div>
+                    <div class="tabs" style="margin-bottom: 0; padding: 3px;">
+                        <div class="tab active" id="tab_single_meter" onclick="switchMeterMode('single')" style="padding: 5px 15px; font-size: 0.8em;">จดทีละห้อง</div>
+                        <div class="tab" id="tab_bulk_meter" onclick="switchMeterMode('bulk')" style="padding: 5px 15px; font-size: 0.8em;">จดแบบรายอาคาร</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Single Mode -->
+            <form id="meterForm">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                    <div>
+                        <label>เดือน/ปี</label>
+                        <div style="display: flex; gap: 5px;">
+                            <input type="number" id="month" value="{{ current_month }}" min="1" max="12" required onchange="loadCurrentRoomMeter()">
+                            <input type="number" id="year" value="{{ current_year }}" required onchange="loadCurrentRoomMeter()">
+                        </div>
+                    </div>
+                    <div>
+                        <label>เลือกตึก</label>
+                        <select id="meter_building_id" onchange="filterMeterRooms(this.value)">
+                            <option value="all">ทั้งหมด</option>
+                            {% for b in all_buildings %}
+                            <option value="{{ b.id }}">{{ b.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label>ห้อง</label>
+                        <select id="room_id" required onchange="loadCurrentRoomMeter()">
+                            <option value="">-- เลือกห้อง --</option>
+                            {% for room in all_rooms %}
+                            <option value="{{ room.id }}" class="meter-room-opt" data-building-id="{{ room.building_id }}">{{ room.room_number }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label>มิเตอร์ไฟ</label>
+                        <input type="number" step="0.1" id="elec" required placeholder="0.0">
+                    </div>
+                    <div>
+                        <label>มิเตอร์น้ำ</label>
+                        <input type="number" step="0.1" id="water" required placeholder="0.0">
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <label>ค่าใช้จ่ายส่วนกลาง/คงที่ (ตั้งค่าที่หน้าจัดการห้องพัก)</label>
+                    <div id="recurring_charges_container" style="margin-top: 10px; background: #f1f3f5; border-radius: 8px; padding: 10px;">
+                        <!-- Read-only recurring charges will be shown here -->
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <label style="display: flex; justify-content: space-between; align-items: center;">
+                        <span>ค่าใช้จ่ายอื่นๆ (เพิ่มเติมเฉพาะบิลนี้)</span>
+                        <button type="button" class="btn btn-outline" style="padding: 2px 10px; font-size: 0.8em;" onclick="addOtherChargeRow()">+ เพิ่มรายการ</button>
+                    </label>
+                    <div id="other_charges_container" style="margin-top: 10px;">
+                        <!-- Rows added here -->
+                    </div>
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                    <button type="button" class="btn btn-outline" onclick="previewMeterBill()" style="flex: 1; justify-content: center; height: 45px; border-color: var(--primary); color: var(--primary);">
+                        <i class="fa-solid fa-magnifying-glass-dollar"></i> Preview บิล
+                    </button>
+                    <button type="button" class="btn btn-outline" onclick="submitMeter(false)" style="flex: 1; justify-content: center; height: 45px;">
+                        <i class="fa-solid fa-save"></i> บันทึกร่าง
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="submitMeter(true)" style="flex: 2; justify-content: center; height: 45px; font-size: 1em;">
+                        <i class="fa-solid fa-paper-plane"></i> บันทึกและออกบิลจริง
+                    </button>
+                    <button type="button" id="cancelEditBtn" class="btn btn-outline" style="display:none; flex: 1;" onclick="resetMeterForm()">
+                        ยกเลิก
+                    </button>
+                </div>
+            </form>
+
+            <!-- Bulk Mode -->
+            <div id="bulkMeterContainer" style="display: none;">
+                <div style="display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 20px; align-items: flex-end;">
+                    <div style="width: 130px; flex-shrink: 0;">
+                        <label>เดือน/ปี</label>
+                        <div style="display: flex; gap: 5px;">
+                            <input type="number" id="bulk_month" value="{{ current_month }}" min="1" max="12" onchange="renderBulkGrid(document.getElementById('bulk_building_id').value)" style="padding: 10px 5px; text-align: center;">
+                            <input type="number" id="bulk_year" value="{{ current_year }}" onchange="renderBulkGrid(document.getElementById('bulk_building_id').value)" style="padding: 10px 5px; text-align: center;">
+                        </div>
+                    </div>
+                    <div style="flex: 1; min-width: 200px;">
+                        <label>เลือกตึก</label>
+                        <select id="bulk_building_id" onchange="renderBulkGrid(this.value)">
+                            <option value="">-- เลือกอาคาร --</option>
+                            {% for b in all_buildings %}
+                            <option value="{{ b.id }}">{{ b.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div style="display: flex; gap: 10px; flex-shrink: 0;">
+                        <button class="btn btn-outline" onclick="saveBulkMeters(false)" style="padding: 12px 15px;">
+                            <i class="fa-solid fa-save"></i> บันทึกร่าง
+                        </button>
+                        <button class="btn btn-primary" onclick="saveBulkMeters(true)" style="padding: 12px 15px;">
+                            <i class="fa-solid fa-paper-plane"></i> ออกบิล
+                        </button>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 150px;">ห้อง</th>
+                                <th>มิเตอร์ไฟ (Electricity)</th>
+                                <th>มิเตอร์น้ำ (Water)</th>
+                                <th style="width: 120px;">สถานะ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bulkMeterGrid">
+                            <tr><td colspan="4" style="text-align: center; color: var(--text-muted);">กรุณาเลือกอาคารเพื่อเริ่มกรอกข้อมูล</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
         <!-- Room Management -->
-        <div class="section-card" id="roomSection" style="display:none;">
+        <div class="section-card" id="roomSection">
             <div class="section-header">
-                <h2><i class="fa-solid fa-door-open"></i> จัดการห้องพัก</h2>
-                <button class="btn btn-primary" onclick="toggleForm('addRoomForm')">+ เพิ่มห้องพัก</button>
+                <h2><i class="fa-solid fa-door-closed"></i> จัดการห้องพัก</h2>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-outline" onclick="openBulkRecurringModal()"><i class="fa-solid fa-layer-group"></i> ตั้งค่าส่วนกลางทุกห้อง</button>
+                    <button class="btn btn-primary" onclick="toggleForm('roomFormContainer')"><i class="fa-solid fa-plus"></i> เพิ่มห้องใหม่</button>
+                </div>
             </div>
 
-            <!-- Add Room Form (Initially Hidden) -->
-            <div id="addRoomForm" style="display: none; background: #f8f9fa; padding: 20px; border-radius: 12px; margin-bottom: 25px; border: 1px solid var(--border);">
-                <form id="newRoomForm" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px;">
-                    <div class="form-group">
-                        <label>อาคาร</label>
-                        <select id="nr_building" required>
-                            {% for b in all_buildings %}<option value="{{ b.id }}">{{ b.name }}</option>{% endfor %}
-                        </select>
+            <!-- Building Tabs -->
+            <div class="building-tabs">
+                <div class="building-tab active" onclick="filterRoomsByBuilding('all', this)">ทั้งหมด</div>
+                {% for b in all_buildings %}
+                <div class="building-tab" onclick="filterRoomsByBuilding({{ b.id }}, this)">{{ b.name }}</div>
+                {% endfor %}
+            </div>
+            
+            <div id="roomFormContainer" style="display:none; background: #f8f9fa; padding: 20px; border-radius: 12px; margin-bottom: 25px;">
+                <form id="roomForm" method="POST">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 15px;">
+                        <div><label>ตึก</label>
+                            <select id="building_id" required>
+                                {% for b in all_buildings %}
+                                <option value="{{ b.id }}">{{ b.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div><label>เลขห้อง</label><input type="text" id="room_number" required></div>
+                        <div><label>ชั้น</label><input type="number" id="floor" required></div>
+                        <div><label>ค่าเช่าฐาน</label><input type="number" id="base_rent" required></div>
+                        <div><label>เรทไฟ/น้ำ</label>
+                            <div style="display: flex; gap: 5px;">
+                                <input type="number" id="elec_rate" value="8" required>
+                                <input type="number" id="water_rate" value="18" required>
+                            </div>
+                        </div>
+                        <div>
+                            <label>พร้อมเพย์ที่ใช้</label>
+                            <select id="room_promptpay_id">
+                                <option value="">(ค่าเริ่มต้น)</option>
+                                {% if owner and owner.promptpay_config %}
+                                    {% set pp_list = owner.promptpay_config | from_json %}
+                                    {% for pp in pp_list %}
+                                        <option value="{{ pp.id if pp is mapping else pp }}">{{ pp.name if pp is mapping else pp }}</option>
+                                    {% endfor %}
+                                {% endif %}
+                            </select>
+                        </div>
                     </div>
-                    <div class="form-group"><label>เลขห้อง</label><input type="text" id="nr_number" required placeholder="เช่น 101"></div>
-                    <div class="form-group"><label>ชั้น</label><input type="number" id="nr_floor" required value="1"></div>
-                    <div class="form-group"><label>ค่าเช่าหลัก</label><input type="number" id="nr_rent" required value="3500"></div>
-                    <div class="form-group"><label>เรทค่าไฟ</label><input type="number" step="0.1" id="nr_elec" required value="8"></div>
-                    <div class="form-group"><label>เรทค่าน้ำ</label><input type="number" step="0.1" id="nr_water" required value="18"></div>
-                    <div style="grid-column: 1 / -1; display: flex; gap: 10px; margin-top: 10px;">
-                        <button type="submit" class="btn btn-primary" style="flex: 1; justify-content: center; height: 45px;">บันทึก</button>
-                        <button type="button" class="btn btn-outline" onclick="toggleForm('addRoomForm')" style="flex: 1; justify-content: center;">ยกเลิก</button>
+                    
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: flex; justify-content: space-between;">
+                            <span>ค่าใช้จ่ายประจำเดือน (Recurring Charges)</span>
+                            <button type="button" class="btn btn-outline" style="padding: 2px 10px; font-size: 0.8em;" onclick="addRecurringRow('room_recurring_container')">+ เพิ่มรายการ</button>
+                        </label>
+                        <div id="room_recurring_container" style="margin-top: 10px; border: 1px solid var(--border); padding: 10px; border-radius: 8px; background: #fff;">
+                            <!-- Individual charges added here -->
+                        </div>
                     </div>
+
+                    <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; height: 45px;">
+                        <i class="fa-solid fa-plus-circle"></i> เพิ่มห้องพัก
+                    </button>
                 </form>
             </div>
 
             <div class="table-container">
-                <table>
-                    <thead><tr><th>อาคาร</th><th>ห้อง</th><th>ชั้น</th><th>สถานะ</th><th>ค่าเช่า</th><th>การจัดการ</th></tr></thead>
-                    <tbody>
-                        {% for r in all_rooms %}
+                <table id="roomTable">
+                    <thead>
                         <tr>
-                            <td>{{ r.building.name if r.building else 'อาคารหลัก' }}</td>
-                            <td style="font-weight: 700;">{{ r.room_number }}</td>
-                            <td>{{ r.floor }}</td>
-                            <td><span class="badge {{ 'badge-success' if r.status=='Vacant' else 'badge-warning' }}">{{ r.status }}</span></td>
-                            <td>{{ "{:,.0f}".format(r.base_rent) }}</td>
+                            <th>เลขห้อง</th>
+                            <th>ชั้น</th>
+                            <th>สถานะ</th>
+                            <th>ค่าเช่า</th>
+                            <th>พร้อมเพย์</th>
+                            <th>จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for room in all_rooms %}
+                        <tr class="room-row" data-building-id="{{ room.building_id }}">
+                            <td style="font-weight: 700;">{{ room.room_number }}</td>
+                            <td>{{ room.floor }}</td>
                             <td>
-                                <button class="btn btn-outline" onclick="viewRoomDetails({{ r.id }}, '{{ r.room_number }}')"><i class="fa-solid fa-eye"></i> ดูข้อมูล</button>
+                                <span class="badge {% if room.status == 'Vacant' %}badge-success{% elif room.status == 'Occupied' %}badge-warning{% else %}badge-danger{% endif %}">
+                                    {{ 'ว่าง' if room.status == 'Vacant' else ('มีผู้เช่า' if room.status == 'Occupied' else room.status) }}
+                                </span>
+                            </td>
+                            <td style="font-weight: 600;">{{ "{:,.2f}".format(room.base_rent) }}</td>
+                            <td style="font-size: 0.85em; color: var(--text-muted);">{{ room.promptpay_id or 'ค่าเริ่มต้น' }}</td>
+                            <td>
+                                <button class="btn btn-outline edit-room-btn" 
+                                    data-id="{{ room.id }}"
+                                    data-number="{{ room.room_number }}"
+                                    data-floor="{{ room.floor }}"
+                                    data-rent="{{ room.base_rent }}"
+                                    data-elec="{{ room.electricity_rate }}"
+                                    data-water="{{ room.water_rate }}"
+                                    data-ppid="{{ room.promptpay_id or '' }}"
+                                    data-recurring='{{ room.recurring_charges or "[]" }}'
+                                    data-building="{{ room.building_id or 'null' }}"
+                                    onclick="openEditRoom(this)">
+                                    <i class="fa-solid fa-edit"></i>
+                                </button>
+                                <button class="btn btn-primary" style="padding: 5px 10px; background: #2980b9;" onclick="viewRoomDetails({{ room.id }}, '{{ room.room_number }}')">
+                                    <i class="fa-solid fa-circle-info"></i> รายละเอียด
+                                </button>
                             </td>
                         </tr>
                         {% endfor %}
@@ -251,357 +667,1667 @@
             </div>
         </div>
 
-        <!-- Settings Section -->
-        <div class="section-card" id="settingsSection" style="display:none;">
-            <div class="section-header"><h2><i class="fa-solid fa-gears"></i> ตั้งค่าระบบ</h2></div>
-            <form id="settingsForm">
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 25px;">
-                    <div class="form-group">
-                        <label>ชื่อหอพัก (แสดงในบิล)</label>
-                        <input type="text" id="display_name" value="{{ owner.display_name if owner else '' }}" placeholder="เช่น สุขอนันต์ อพาร์ทเม้นท์">
-                    </div>
-                    <div class="form-group">
-                        <label>วันครบกำหนดชำระ (ของทุกเดือน)</label>
-                        <input type="number" id="due_day" value="{{ owner.due_day if owner else 5 }}" min="1" max="31">
-                    </div>
-                    <div class="form-group">
-                        <label>ค่าปรับจ่ายช้า (บาท/วัน)</label>
-                        <input type="number" id="late_fee_per_day" value="{{ owner.late_fee_per_day if owner else 50 }}" step="1">
-                    </div>
-                    <div class="form-group" style="display: flex; align-items: flex-end; padding-bottom: 10px;">
-                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 0;">
-                            <input type="checkbox" id="late_fee_enabled" style="width: 18px; height: 18px;" {% if owner and owner.late_fee_enabled %}checked{% endif %}>
-                            <span>เปิดใช้งานระบบค่าปรับอัตโนมัติ</span>
-                        </label>
-                    </div>
-                </div>
-                
-                <div style="background: #f8f9fa; padding: 20px; border-radius: 12px; border: 1px solid var(--border); margin-bottom:20px;">
-                    <label style="color:var(--primary); font-weight:bold; margin-bottom:15px;">ช่องทางการชำระเงิน</label>
-                    
-                    <div style="margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:10px;">
-                        <label style="display:flex; align-items:center; gap:8px;">
-                            <input type="checkbox" id="cash_enabled" style="width:18px; height:18px;" {% if owner and owner.qr_payment_enabled == 1 %}checked{% endif %}>
-                            <span>1. เงินสด (Cash)</span>
-                        </label>
-                    </div>
-
-                    <div style="margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:10px;">
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <label>2. พร้อมเพย์ (PromptPay)</label>
-                            <button type="button" class="btn btn-outline" onclick="addPPRow()">+ เพิ่ม</button>
-                        </div>
-                        <div id="pp_list"></div>
-                    </div>
-
-                    <div>
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <label>3. โอนธนาคาร (Bank Transfer)</label>
-                            <button type="button" class="btn btn-outline" onclick="addBankRow()">+ เพิ่ม</button>
-                        </div>
-                        <div id="bank_list"></div>
-                    </div>
-                </div>
-
-                <button type="submit" class="btn btn-primary" style="width:100%; padding:15px;">บันทึกการตั้งค่า</button>
-            </form>
+        <!-- Invoices & Billing -->
+        <div class="section-card" id="billSection">
+            <div class="section-header">
+                <h2><i class="fa-solid fa-file-invoice"></i> บิลล่าสุด (เดือน {{ current_month }}/{{ current_year }})</h2>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ห้อง</th>
+                            <th>ผู้เช่า</th>
+                            <th>เดือน</th>
+                            <th>ยอดรวม</th>
+                            <th>สถานะ</th>
+                            <th>จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for inv in recent_invoices %}
+                        <tr>
+                            <td style="font-weight: 700;">{{ inv.room.room_number if inv.room else 'N/A' }}</td>
+                            <td>{{ inv.tenant.full_name if inv.tenant else '-' }}</td>
+                            <td>{{ inv.billing_month }}/{{ inv.billing_year }}</td>
+                            <td style="font-weight: 700; color: var(--primary);">{{ "{:,.2f}".format(inv.total_amount) }}</td>
+                            <td>
+                                <span class="badge {% if inv.status == 'Paid' %}badge-success{% elif inv.status == 'Pending Verification' %}badge-danger{% else %}badge-warning{% endif %}">
+                                    {{ inv.status }}
+                                </span>
+                            </td>
+                            <td>
+                                <button class="btn btn-outline" style="padding: 5px 10px;" onclick="viewInvoiceDetails({{ inv.id }})">
+                                    <i class="fa-solid fa-eye"></i>
+                                </button>
+                                {% if inv.status != 'Paid' %}
+                                <button class="btn btn-danger" style="padding: 5px 10px;" onclick="cancelInvoice({{ inv.id }})">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                                {% endif %}
+                                {% if inv.status == 'Unpaid' %}
+                                <button class="btn btn-outline" onclick="confirmCash({{ inv.id }})"><i class="fa-solid fa-money-bill"></i> เงินสด</button>
+                                <button class="btn btn-primary" style="background: #27ae60;" onclick="sendLine({{ inv.id }})"><i class="fa-brands fa-line"></i> ส่ง LINE</button>
+                                {% elif inv.status == 'Pending Verification' %}
+                                <a href="{{ inv.payment_receipt_img }}" target="_blank" class="btn btn-outline" style="color: var(--primary);"><i class="fa-solid fa-image"></i> ดูสลิป</a>
+                                <button class="btn btn-primary" style="background: var(--success);" onclick="approveInvoice({{ inv.id }})">อนุมัติ</button>
+                                <button class="btn btn-danger" onclick="rejectInvoice({{ inv.id }})">ปฏิเสธ</button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
 
-        <div class="section-card" id="billSection" style="display:none;"><h2>บิลล่าสุด</h2><div id="billList">โหลดข้อมูล...</div></div>
-        <div class="section-card" id="repairSection" style="display:none;"><h2>แจ้งซ่อม</h2><div id="repairList">โหลดข้อมูล...</div></div>
+        <!-- Meter History Section -->
+        <div class="section-card" id="meterHistorySection" style="margin-top: 30px;">
+            <div class="section-header">
+                <h2><i class="fa-solid fa-faucet-drip"></i> ประวัติมิเตอร์</h2>
+                <div style="display:flex; gap:5px;">
+                    <select id="history_room_filter" onchange="loadMeterHistory()" style="width: 100px; padding: 5px;">
+                        <option value="">ทั้งหมด</option>
+                        {% for room in all_rooms %}
+                        <option value="{{ room.id }}">{{ room.room_number }}</option>
+                        {% endfor %}
+                    </select>
+                    <button class="btn btn-outline" onclick="loadMeterHistory()" style="padding: 5px 10px;">ดู</button>
+                </div>
+            </div>
+            <div class="table-container" style="max-height: 400px;">
+                <table id="meterHistoryTable">
+                    <tbody id="meterHistoryList">
+                        <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">เลือกห้องเพื่อดูประวัติ</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Repair Section -->
+        <div class="section-card" id="repairSection" style="margin-top: 30px;">
+            <div class="section-header">
+                <h2><i class="fa-solid fa-screwdriver-wrench"></i> แจ้งซ่อม</h2>
+                <div style="display:flex; gap:5px;">
+                    <select id="repair_room_filter" onchange="loadRepairHistory()" style="width: 100px; padding: 5px;">
+                        <option value="">ทั้งหมด</option>
+                        {% for room in all_rooms %}
+                        <option value="{{ room.id }}">{{ room.room_number }}</option>
+                        {% endfor %}
+                    </select>
+                    <button class="btn btn-outline" onclick="loadRepairHistory()" style="padding: 5px 10px;">ดู</button>
+                </div>
+            </div>
+            <div class="table-container" style="max-height: 400px;">
+                <table id="repairHistoryTable">
+                    <tbody id="repairHistoryList">
+                        <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">เลือกห้องเพื่อดูประวัติ</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tenants & Residents -->
+        <div class="section-card" id="tenantSection" style="margin-top: 30px;">
+            <div class="section-header">
+                <h2><i class="fa-solid fa-user-group"></i> ผู้เช่าปัจจุบัน (Active Tenants)</h2>
+                <div style="width: 300px;">
+                    <div style="position: relative;">
+                        <input type="text" id="search_query" placeholder="ค้นหาชื่อ/เบอร์โทร/สถานที่ทำงาน..." onkeyup="if(event.key==='Enter')doSearch()" style="padding-right: 40px;">
+                        <i class="fa-solid fa-search" onclick="doSearch()" style="position: absolute; right: 15px; top: 12px; cursor: pointer; color: var(--text-muted);"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="searchResultArea" style="display: none; margin-bottom: 20px; background: #fffdf0; padding: 20px; border: 1px solid #f9ebbe; border-radius: 12px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <h4 style="margin:0;">ผลการค้นหา</h4>
+                    <button class="btn btn-outline" style="padding: 2px 8px;" onclick="document.getElementById('searchResultArea').style.display='none'">ปิด</button>
+                </div>
+                <div class="table-container">
+                    <table id="searchResultTable">
+                        <thead>
+                            <tr><th>สถานะ</th><th>ห้อง</th><th>ชื่อ-สกุล</th><th>เบอร์โทร</th><th>ช่วงเวลา</th></tr>
+                        </thead>
+                        <tbody id="searchResultList"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ห้อง</th>
+                            <th>ผู้อยู่อาศัยหลัก/ร่วม</th>
+                            <th>จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for t in active_tenants %}
+                        <tr>
+                            <td style="font-weight: 700; color: var(--primary);">{{ t.room.room_number if t.room else 'N/A' }}</td>
+                            <td>
+                                <div style="font-weight: 600;">{{ t.full_name }}</div>
+                                <div style="font-size: 0.85em; color: var(--text-muted);">
+                                    {% for r in t.residents %}
+                                        {{ r.nickname }}{% if not loop.last %}, {% endif %}
+                                    {% endfor %}
+                                </div>
+                            </td>
+                            <td>
+                                <button class="btn btn-outline" onclick="manageResidents({{ t.id }}, '{{ t.room.room_number if t.room else 'N/A' }}')">
+                                    <i class="fa-solid fa-users-gear"></i> จัดการรายชื่อ
+                                </button>
+                                <button class="btn btn-danger" onclick="unmapTenant({{ t.id }})">
+                                    <i class="fa-solid fa-door-open"></i> ย้ายออก
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- System Settings -->
+        <div class="section-card" id="settingsSection">
+            <div class="section-header">
+                <h2><i class="fa-solid fa-sliders"></i> ตั้งค่าระบบ (System Settings)</h2>
+            </div>
+            <form id="settingsForm" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px;">
+                <div class="left-col">
+                    <div class="form-group">
+                        <label>ชื่อหอพัก / เจ้าของ</label>
+                        <input type="text" id="display_name" value="{{ owner.display_name if owner else '' }}">
+                    </div>
+                    <div class="form-group" style="background: #f8f9fa; padding: 20px; border-radius: 12px; border: 1px solid var(--border);">
+                        <label><i class="fa-solid fa-wallet"></i> บัญชีพร้อมเพย์</label>
+                        <div id="pp_container"></div>
+                        <button type="button" class="btn btn-outline" style="margin-top: 15px; width: 100%; border-style: dashed;" onclick="addPPField('', '')">+ เพิ่มบัญชี</button>
+                        <input type="hidden" id="promptpay_config">
+                    </div>
+                </div>
+                <div class="right-col">
+                    <div class="form-group">
+                        <label>เปิดรับชำระผ่าน QR Code</label>
+                        <select id="qr_enabled">
+                            <option value="1" {% if owner and owner.qr_payment_enabled == 1 %}selected{% endif %}>เปิดการใช้งาน</option>
+                            <option value="0" {% if owner and owner.qr_payment_enabled == 0 %}selected{% endif %}>ปิดการใช้งาน</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="background: #fff5f5; padding: 20px; border-radius: 12px; border: 1px solid #fed7d7;">
+                        <label style="color: var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i> การตั้งค่าค่าปรับ (Late Fee)</label>
+                        <div style="margin-bottom: 10px; display:flex; align-items:center; gap:8px;">
+                            <input type="checkbox" id="late_fee_enabled" style="width: 18px; height: 18px;" {% if owner and owner.late_fee_enabled == 1 %}checked{% endif %}>
+                            <span style="font-size: 0.9em; font-weight: 600;">เปิดใช้งานค่าปรับ</span>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                            <div>
+                                <label>ครบกำหนดวันที่</label>
+                                <input type="number" id="due_day" value="{{ owner.due_day if owner else 5 }}" min="1" max="28">
+                            </div>
+                            <div>
+                                <label>ค่าปรับ (บาท/วัน)</label>
+                                <input type="number" id="late_fee_per_day" value="{{ owner.late_fee_per_day if owner else 50 }}">
+                            </div>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width: 100%; padding: 15px; margin-top: 10px; font-size: 1em;">
+                        <i class="fa-solid fa-cloud-arrow-up"></i> บันทึกการตั้งค่าทั้งหมด
+                    </button>
+                </div>
+            </form>
+
+            <!-- Building Management -->
+            <div style="margin-top: 30px; border-top: 2px solid var(--border); padding-top: 30px;">
+                <div class="section-header">
+                    <h2><i class="fa-solid fa-building-circle-check"></i> จัดการตึก/อาคาร (Buildings)</h2>
+                    <button class="btn btn-outline" onclick="openBuildingModal()"><i class="fa-solid fa-plus"></i> เพิ่มตึกใหม่</button>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>ชื่ออาคาร</th><th>คำอธิบาย</th><th>จัดการ</th></tr></thead>
+                        <tbody>
+                            {% for b in all_buildings %}
+                            <tr>
+                                <td><strong>{{ b.name }}</strong></td>
+                                <td style="font-size: 0.85em; color: var(--text-muted);">{{ b.description or '-' }}</td>
+                                <td>
+                                    <button class="btn btn-outline" style="padding: 5px 10px;" onclick="editBuilding({{ b.id }}, '{{ b.name }}', '{{ b.description or '' }}')"><i class="fa-solid fa-edit"></i></button>
+                                    <button class="btn btn-danger" style="padding: 5px 10px;" onclick="deleteBuilding({{ b.id }})"><i class="fa-solid fa-trash"></i></button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Lease Template Editor -->
+            <div style="margin-top: 30px; border-top: 2px solid var(--border); padding-top: 30px;">
+                <div class="section-header">
+                    <h2><i class="fa-solid fa-file-pen"></i> แก้ไขต้นฉบับสัญญาเช่า (Lease Template)</h2>
+                    <button class="btn btn-primary" onclick="saveLeaseTemplate()"><i class="fa-solid fa-save"></i> บันทึกเทมเพลต</button>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div>
+                        <label>Placeholders ที่ใช้ได้:</label>
+                        <div style="font-size: 0.8em; color: var(--text-muted); background: #f8f9fa; padding: 10px; border-radius: 8px;">
+                            {tenant_name}, {room_number}, {floor}, {base_rent}, {start_date}
+                        </div>
+                        <textarea id="lease_template_editor" style="height: 400px; margin-top: 10px; font-family: monospace;">{{ owner.lease_template if owner and owner.lease_template else '' }}</textarea>
+                    </div>
+                    <div>
+                        <label>ตัวอย่าง (Preview):</label>
+                        <div id="lease_preview" style="height: 400px; border: 1px solid var(--border); border-radius: 8px; padding: 20px; overflow-y: auto; background: white;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Move-in Fees Configuration -->
+            <div style="margin-top: 30px; border-top: 2px solid var(--border); padding-top: 30px;">
+                <div class="section-header">
+                    <h2><i class="fa-solid fa-hand-holding-dollar"></i> ตั้งค่าเงินแรกเข้า (Move-in Fees)</h2>
+                    <button class="btn btn-outline" onclick="addFeeField()"><i class="fa-solid fa-plus"></i> เพิ่มรายการ</button>
+                </div>
+                <div id="fee_container" style="max-width: 700px;">
+                    <!-- Filled by JS -->
+                </div>
+                <button class="btn btn-primary" style="margin-top: 20px;" onclick="saveMoveInFees()"><i class="fa-solid fa-save"></i> บันทึกรายการเงินแรกเข้า</button>
+            </div>
+        </div>
+
+        <!-- Lease Management Section -->
+        <div class="section-card" id="leaseSection" style="display:none;">
+            <div class="section-header">
+                <h2><i class="fa-solid fa-file-contract"></i> จัดการสัญญาเช่า (Leases)</h2>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ห้อง</th>
+                            <th>ผู้เช่า</th>
+                            <th>เริ่มสัญญา</th>
+                            <th>สถานะ</th>
+                            <th>จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leaseList">
+                        <!-- Filled via JS or Jinja -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
+    <!-- Modals (Abstracted for brevity in this response, but fully implemented in the file) -->
+    
     <!-- Room Details Modal -->
-    <div id="roomModal" class="modal">
+    <div id="roomDetailModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 id="modalRoomTitle">ข้อมูลห้อง</h2>
-                <span style="cursor:pointer; font-size: 24px;" onclick="closeModal('roomModal')">&times;</span>
-            </div>
-            <div class="modal-body" id="roomModalBody">
-                <!-- Content loaded via JS -->
-            </div>
-        </div>
-    </div>
-
-    <!-- Move Out Modal -->
-    <div id="moveOutModal" class="modal">
-        <div class="modal-content" style="max-width: 450px;">
-            <div class="modal-header">
-                <h2>แจ้งย้ายออก & เคลียร์บิล</h2>
-                <span style="cursor:pointer; font-size: 24px;" onclick="closeModal('moveOutModal')">&times;</span>
+                <h3 id="detailModalTitle" style="margin:0; font-weight:700;">รายละเอียดห้องพัก</h3>
+                <button class="btn btn-outline" style="padding:5px 10px;" onclick="document.getElementById('roomDetailModal').style.display='none'"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="modal-body">
-                <form id="moveOutForm">
-                    <input type="hidden" id="mo_tenant_id">
-                    <div class="form-group">
-                        <label>วันที่ย้ายออก</label>
-                        <input type="date" id="mo_date" required>
+                <div class="tabs">
+                    <div class="tab active" onclick="switchTab(event, 'tab-tenant')">ผู้เช่า</div>
+                    <div class="tab" onclick="switchTab(event, 'tab-recurring')">ค่าใช้จ่ายประจำ</div>
+                    <div class="tab" onclick="switchTab(event, 'tab-meters')">มิเตอร์</div>
+                    <div class="tab" onclick="switchTab(event, 'tab-payments')">การเงิน</div>
+                    <div class="tab" onclick="switchTab(event, 'tab-assets')">ทรัพย์สิน</div>
+                </div>
+                <div id="tab-tenant" class="tab-content active">
+                    <div style="background: #f0f7ff; padding: 20px; border-radius: 12px; margin-bottom: 20px;">
+                        <div style="margin-bottom:10px;"><strong>ผู้เช่าหลัก:</strong> <span id="dt-tenant-name">-</span></div>
+                        <div><strong>เบอร์โทร:</strong> <span id="dt-tenant-phone">-</span></div>
                     </div>
-                    <div class="form-group">
-                        <label>มิเตอร์ไฟสุดท้าย (ก่อนย้ายออก)</label>
-                        <input type="number" step="0.1" id="mo_elec" required placeholder="เลขมิเตอร์ไฟล่าสุด">
+                    <h4><i class="fa-solid fa-users"></i> ผู้พักอาศัยร่วม</h4>
+                    <ul id="dt-residents-list" style="padding-left: 20px; line-height: 1.8;"></ul>
+                </div>
+                <div id="tab-recurring" class="tab-content">
+                    <div style="margin-bottom: 20px;">
+                        <h4 style="color: var(--primary);"><i class="fa-solid fa-layer-group"></i> ค่าใช้จ่ายส่วนกลาง (ทุกห้อง)</h4>
+                        <div class="table-container">
+                            <table>
+                                <thead><tr><th>รายการ</th><th style="text-align:right;">จำนวนเงิน</th></tr></thead>
+                                <tbody id="dt-global-recurring-list"></tbody>
+                            </table>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label>มิเตอร์น้ำสุดท้าย (ก่อนย้ายออก)</label>
-                        <input type="number" step="0.1" id="mo_water" required placeholder="เลขมิเตอร์น้ำล่าสุด">
+                    <div>
+                        <h4 style="color: var(--secondary);"><i class="fa-solid fa-door-open"></i> ค่าใช้จ่ายประจำเฉพาะห้อง</h4>
+                        <div class="table-container">
+                            <table>
+                                <thead><tr><th>รายการ</th><th style="text-align:right;">จำนวนเงิน</th></tr></thead>
+                                <tbody id="dt-room-recurring-list"></tbody>
+                            </table>
+                        </div>
                     </div>
-                    <div style="margin-top: 20px; display: flex; gap: 10px;">
-                        <button type="submit" class="btn btn-danger" style="flex: 1; justify-content: center;">ยืนยันการย้ายออกและออกบิล</button>
+                </div>
+                <div id="tab-meters" class="tab-content">
+                    <div class="table-container">
+                        <table>
+                            <thead><tr><th>เดือน/ปี</th><th>ไฟ</th><th>น้ำ</th><th>วันที่บันทึก</th></tr></thead>
+                            <tbody id="dt-meters-list"></tbody>
+                        </table>
                     </div>
-                </form>
+                </div>
+                <div id="tab-payments" class="tab-content">
+                    <div class="table-container">
+                        <table>
+                            <thead><tr><th>เดือน/ปี</th><th>ยอดรวม</th><th>สถานะ</th><th>วันที่จ่าย</th></tr></thead>
+                            <tbody id="dt-payments-list"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div id="tab-assets" class="tab-content">
+                    <form id="assetForm" style="display: flex; gap: 10px; margin-bottom: 20px; background: #f8f9fa; padding: 15px; border-radius: 12px; align-items: center;">
+                        <input type="hidden" id="asset_room_id">
+                        <input type="text" id="asset_name" placeholder="ชื่อรายการ..." required style="flex:2;">
+                        <input type="number" id="asset_qty" value="1" style="width: 80px;">
+                        <label style="display:flex; align-items:center; gap:5px; margin:0; cursor:pointer; font-size:0.8em;">
+                            <input type="checkbox" id="asset_to_all" style="width:16px; height:16px;"> ทั้งอาคาร
+                        </label>
+                        <button type="submit" class="btn btn-primary">เพิ่ม</button>
+                    </form>
+                    <div class="table-container">
+                        <table>
+                            <thead><tr><th>รายการ</th><th>จำนวน</th><th>จัดการ</th></tr></thead>
+                            <tbody id="dt-assets-list"></tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
-    <script id="raw_config" type="application/json">{{ (owner.promptpay_config if owner and owner.promptpay_config else "{}") | safe }}</script>
+    <!-- Edit Room Modal -->
+    <div id="roomModal" class="modal">
+        <div class="modal-content" style="max-width: 450px;">
+            <div class="modal-header"><h3>แก้ไขข้อมูลห้อง</h3></div>
+            <form id="editRoomForm">
+                <div class="modal-body">
+                    <input type="hidden" id="edit_room_id">
+                    <div class="form-group">
+                        <label>ตึก</label>
+                        <select id="edit_building_id" required>
+                            {% for b in all_buildings %}
+                            <option value="{{ b.id }}">{{ b.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>เลขห้อง</label>
+                        <input type="text" id="edit_room_number" required>
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
+                        <div class="form-group"><label>ชั้น</label><input type="number" id="edit_floor" required></div>
+                        <div class="form-group"><label>ค่าเช่าฐาน</label><input type="number" id="edit_base_rent" required></div>
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
+                        <div class="form-group"><label>เรทไฟ</label><input type="number" id="edit_elec_rate" required></div>
+                        <div class="form-group"><label>เรทน้ำ</label><input type="number" id="edit_water_rate" required></div>
+                    </div>
+                    <div class="form-group">
+                        <label>พร้อมเพย์เฉพาะห้อง</label>
+                        <select id="edit_room_promptpay_id">
+                            <option value="">(ค่าเริ่มต้น)</option>
+                            {% if owner and owner.promptpay_config %}
+                                {% set pp_list = owner.promptpay_config | from_json %}
+                                {% for pp in pp_list %}
+                                    <option value="{{ pp.id if pp is mapping else pp }}">{{ pp.name if pp is mapping else pp }}</option>
+                                {% endfor %}
+                            {% endif %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label style="display: flex; justify-content: space-between;">
+                            <span>ค่าใช้จ่ายประจำเดือน</span>
+                            <button type="button" class="btn btn-outline" style="padding: 2px 10px; font-size: 0.8em;" onclick="addRecurringRow('edit_room_recurring_container')">+ เพิ่ม</button>
+                        </label>
+                        <div id="edit_room_recurring_container" style="margin-top: 10px;"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="document.getElementById('roomModal').style.display='none'">ยกเลิก</button>
+                    <button type="submit" class="btn btn-primary">บันทึกการแก้ไข</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Building Modal -->
+    <div id="buildingModal" class="modal">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header"><h3 id="buildingModalTitle">จัดการข้อมูลอาคาร</h3></div>
+            <form id="buildingForm">
+                <div class="modal-body">
+                    <input type="hidden" id="building_id_hidden">
+                    <div class="form-group">
+                        <label>ชื่ออาคาร</label>
+                        <input type="text" id="building_name" required placeholder="เช่น อาคาร A">
+                    </div>
+                    <div class="form-group">
+                        <label>คำอธิบาย</label>
+                        <textarea id="building_desc" placeholder="ข้อมูลเพิ่มเติม..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="document.getElementById('buildingModal').style.display='none'">ยกเลิก</button>
+                    <button type="submit" class="btn btn-primary">บันทึก</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Resident Modal -->
+    <div id="residentModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header"><h3 id="modalTitle">จัดการรายชื่อผู้พักอาศัย</h3></div>
+            <div class="modal-body">
+                <form id="residentForm" style="background:#f8f9fa; padding:20px; border-radius:12px; margin-bottom:25px;">
+                    <input type="hidden" id="current_tenant_id">
+                    <input type="hidden" id="current_resident_id">
+                    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:15px; margin-bottom:15px;">
+                        <div><label>ชื่อจริง</label><input type="text" id="res_first_name"></div>
+                        <div><label>นามสกุล</label><input type="text" id="res_last_name"></div>
+                        <div><label>ชื่อเล่น *</label><input type="text" id="res_nickname" required></div>
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
+                        <div><label>เบอร์โทร</label><input type="text" id="res_phone"></div>
+                        <div><label>สถานที่ทำงาน</label><input type="text" id="res_workplace"></div>
+                    </div>
+                    <button type="submit" id="resSubmitBtn" class="btn btn-primary" style="margin-top:20px; width:100%; justify-content:center;">บันทึกรายชื่อ</button>
+                </form>
+                <div class="table-container">
+                    <table id="residentTable">
+                        <thead><tr><th>ชื่อ-นามสกุล (ชื่อเล่น)</th><th>เบอร์โทร</th><th>จัดการ</th></tr></thead>
+                        <tbody id="residentList"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="closeModal()">เสร็จสิ้น</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- QR Preview Modal -->
+    <div id="qrPreviewModal" class="modal">
+        <div class="modal-content" style="max-width:320px; text-align:center;">
+            <div class="modal-header"><h3 id="qrPreviewTitle">QR Preview</h3></div>
+            <div class="modal-body">
+                <div id="qrPreviewContainer" style="padding:10px; border:1px solid var(--border); border-radius:10px;">
+                    <img id="qrPreviewImage" style="width:200px; height:200px; display:none;">
+                    <div id="qrPreviewLoading"><i class="fa-solid fa-spinner fa-spin"></i> กำลังสร้าง...</div>
+                </div>
+            </div>
+            <div class="modal-footer"><button class="btn btn-primary" onclick="document.getElementById('qrPreviewModal').style.display='none'">ปิด</button></div>
+        </div>
+    </div>
+
+    <!-- Invoice Detail Modal -->
+    <div id="invoiceDetailModal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3 id="invModalTitle" style="margin:0; font-weight:700;">รายละเอียดใบแจ้งหนี้</h3>
+                <button class="btn btn-outline" style="padding:5px 10px;" onclick="document.getElementById('invoiceDetailModal').style.display='none'"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body" id="invDetailBody">
+                <!-- Data filled by JS -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="document.getElementById('invoiceDetailModal').style.display='none'">ปิด</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Repair Detail Modal -->
+    <div id="repairDetailModal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3 id="repairModalTitle" style="margin:0; font-weight:700;">รายละเอียดการแจ้งซ่อม</h3>
+                <button class="btn btn-outline" style="padding:5px 10px;" onclick="document.getElementById('repairDetailModal').style.display='none'"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body" id="repairDetailBody">
+                <!-- Content loaded via JS -->
+            </div>
+            <div class="modal-footer">
+                <div style="display:flex; gap:10px; width:100%; align-items:center;">
+                    <input type="hidden" id="current_repair_id">
+                    <select id="update_repair_status" class="form-control" style="flex:1; padding: 10px; border-radius: 8px; border: 1px solid var(--border);">
+                        <option value="Pending">Pending (รอรับเรื่อง)</option>
+                        <option value="In Progress">In Progress (กำลังดำเนินการ)</option>
+                        <option value="Fixed">Fixed (ซ่อมเสร็จสิ้น)</option>
+                        <option value="Cancelled">Cancelled (ยกเลิก)</option>
+                    </select>
+                    <button class="btn btn-primary" onclick="saveRepairStatus()">บันทึกสถานะ</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script id="pp_data_raw" type="application/json">
+        {{ (owner.promptpay_config if owner and owner.promptpay_config else "[]") | safe }}
+    </script>
+    <script id="bulk_recurring_raw" type="application/json">
+        {{ (owner.default_recurring_charges if owner and owner.default_recurring_charges else "[]") | safe }}
+    </script>
 
     <script>
+        // Sidebar Navigation
+        function showSection(sectionId) {
+            const sections = document.querySelectorAll('.section-card, .grid');
+            sections.forEach(s => {
+                s.style.display = 'none';
+            });
+            
+            // Re-show selected
+            const target = document.getElementById(sectionId);
+            if (target) {
+                target.style.display = (sectionId === 'overview' || target.classList.contains('grid')) ? 'grid' : 'block';
+            }
+            
+            // Special handling for dependent sections
+            if (sectionId === 'overview') {
+                 document.getElementById('overview').style.display = 'grid';
+                 // Show export and broadcast grid
+                 const extraGrid = document.querySelector('.grid[style*="grid-template-columns: 2fr 1fr;"]');
+                 if (extraGrid) extraGrid.style.display = 'grid';
+            }
+
+            // Update Active Menu
+            document.querySelectorAll('.menu-item').forEach(m => {
+                m.classList.remove('active');
+                if (m.getAttribute('href') === '#' + sectionId || (sectionId === 'overview' && m.getAttribute('href') === '#overview')) {
+                    m.classList.add('active');
+                }
+            });
+        }
+
+        // Initialize Section Visibility (Default Hash or Overview)
+        window.addEventListener('DOMContentLoaded', () => {
+            const hash = window.location.hash.replace('#', '');
+            if (hash) showSection(hash);
+            else showSection('overview');
+            
+            // Add click listeners to menu items to prevent default hash behavior if desired
+            document.querySelectorAll('.menu-item').forEach(m => {
+                if (m.getAttribute('href').startsWith('#')) {
+                    m.onclick = (e) => {
+                        e.preventDefault();
+                        const id = m.getAttribute('href').replace('#', '');
+                        showSection(id);
+                        window.location.hash = id;
+                    }
+                }
+            });
+        });
+
+        // Lease Template Logic
+        const leaseEditor = document.getElementById('lease_template_editor');
+        const leasePreview = document.getElementById('lease_preview');
+
+        function updateLeasePreview() {
+            let content = leaseEditor.value;
+            const mockData = {
+                '{tenant_name}': 'สมชาย สายเสมอ',
+                '{room_number}': 'A101',
+                '{floor}': '1',
+                '{base_rent}': '3,500',
+                '{start_date}': new Date().toLocaleDateString('th-TH'),
+                '{initial_fees}': '<ul><li>ค่าเช่าล่วงหน้า: 3,500 บาท</li><li>ค่าประกัน: 5,000 บาท</li></ul>'
+            };
+            for (const [k, v] of Object.entries(mockData)) {
+                content = content.replaceAll(k, `<span style="color:var(--primary); font-weight:700;">${v}</span>`);
+            }
+            leasePreview.innerHTML = content || '<p style="color:var(--text-muted); text-align:center; margin-top:50px;">ไม่มีข้อมูลเทมเพลต</p>';
+        }
+
+        leaseEditor.oninput = updateLeasePreview;
+        updateLeasePreview();
+
+        async function saveLeaseTemplate() {
+            const formData = new FormData();
+            // Reuse settings save endpoint but only with template
+            // We need to send ALL required fields of the settings form or update the backend
+            // For simplicity, let's just trigger the main settings form submit after updating a hidden field
+            const fullFormData = new FormData(document.getElementById('settingsForm'));
+            // Manually add other fields since they are not in the 'name' attribute but IDs
+            fullFormData.append('display_name', document.getElementById('display_name').value);
+            fullFormData.append('qr_enabled', document.getElementById('qr_enabled').value);
+            fullFormData.append('late_fee_enabled', document.getElementById('late_fee_enabled').checked ? 1 : 0);
+            fullFormData.append('due_day', document.getElementById('due_day').value);
+            fullFormData.append('late_fee_per_day', document.getElementById('late_fee_per_day').value);
+            
+            // Add the pairs from the container
+            const pairs = [];
+            document.querySelectorAll('.pp-pair').forEach(div => {
+                const id = div.querySelector('.pp-id').value.trim();
+                const name = div.querySelector('.pp-name').value.trim();
+                if (id) pairs.push({ id, name });
+            });
+            fullFormData.append('promptpay_config', JSON.stringify(pairs));
+            fullFormData.append('lease_template', leaseEditor.value);
+
+            const res = await fetch('/admin/settings/save', { method: 'POST', body: fullFormData });
+            if (res.ok) alert('บันทึกเทมเพลตสัญญาเช่าเรียบร้อยแล้ว');
+        }
+
+        async function loadLeases() {
+            const res = await fetch('/admin/leases/list');
+            const data = await res.json();
+            const list = document.getElementById('leaseList');
+            list.innerHTML = data.map(l => `
+                <tr>
+                    <td style="font-weight:700;">${l.room_number}</td>
+                    <td>${l.tenant_name}</td>
+                    <td>${l.start_date}</td>
+                    <td><span class="badge ${l.status==='Active'?'badge-success':'badge-secondary'}">${l.status}</span></td>
+                    <td>
+                        <button class="btn btn-outline" onclick="viewLease(${l.id})"><i class="fa-solid fa-eye"></i> ดูสัญญา</button>
+                        ${l.status === 'Active' ? `<button class="btn btn-danger" onclick="unmapTenant(${l.tenant_id})">ย้ายออก</button>` : ''}
+                    </td>
+                </tr>
+            `).join('') || '<tr><td colspan="5" style="text-align:center;">ไม่พบข้อมูลสัญญา</td></tr>';
+        }
+
+        // Initialize Leases tab
+        document.querySelector('a[href="#leaseSection"]').addEventListener('click', loadLeases);
+
+        function viewLease(id) {
+            window.open(`/admin/leases/${id}/view`, '_blank');
+        }
+
+        // Move-in Fee Logic
+        function addFeeField(name = '', value = 0, isMultiplier = false) {
+            const container = document.getElementById('fee_container');
+            const div = document.createElement('div');
+            div.className = 'fee-row';
+            div.style.display = 'flex';
+            div.style.gap = '10px';
+            div.style.marginBottom = '10px';
+            div.style.alignItems = 'center';
+            div.innerHTML = `
+                <input type="text" placeholder="ชื่อค่าใช้จ่าย (เช่น ค่าประกัน)" value="${name}" class="fee-name" style="flex:2;">
+                <input type="number" step="0.01" placeholder="จำนวน" value="${value}" class="fee-value" style="flex:1;">
+                <select class="fee-type" style="flex:1.5;">
+                    <option value="fixed" ${!isMultiplier?'selected':''}>บาท (คงที่)</option>
+                    <option value="multiplier" ${isMultiplier?'selected':''}>เท่า (ของค่าเช่า)</option>
+                </select>
+                <button type="button" class="btn btn-danger" onclick="this.parentElement.remove()"><i class="fa-solid fa-trash"></i></button>
+            `;
+            container.appendChild(div);
+        }
+
+        async function saveMoveInFees() {
+            const fees = [];
+            document.querySelectorAll('.fee-row').forEach(row => {
+                const name = row.querySelector('.fee-name').value.trim();
+                const value = parseFloat(row.querySelector('.fee-value').value) || 0;
+                const type = row.querySelector('.fee-type').value;
+                if (name) {
+                    fees.push({ name, value, is_multiplier: type === 'multiplier' });
+                }
+            });
+
+            // We need to send this to the backend. Let's reuse settings/save.
+            const formData = new FormData();
+            // Get existing values to avoid overwriting with empty
+            formData.append('display_name', document.getElementById('display_name').value);
+            formData.append('qr_enabled', document.getElementById('qr_enabled').value);
+            formData.append('late_fee_enabled', document.getElementById('late_fee_enabled').checked ? 1 : 0);
+            formData.append('due_day', document.getElementById('due_day').value);
+            formData.append('late_fee_per_day', document.getElementById('late_fee_per_day').value);
+            
+            const pairs = [];
+            document.querySelectorAll('.pp-pair').forEach(div => {
+                const id = div.querySelector('.pp-id').value.trim();
+                const name = div.querySelector('.pp-name').value.trim();
+                if (id) pairs.push({ id, name });
+            });
+            formData.append('promptpay_config', JSON.stringify(pairs));
+            formData.append('lease_template', leaseEditor.value);
+            formData.append('move_in_fees_config', JSON.stringify(fees));
+
+            const res = await fetch('/admin/settings/save', { method: 'POST', body: formData });
+            if (res.ok) alert('บันทึกการตั้งค่าเงินแรกเข้าเรียบร้อยแล้ว');
+        }
+
+        // Init Fees
+        (function initFees() {
+            try {
+                const raw = `{{ owner.move_in_fees_config | safe if owner and owner.move_in_fees_config else '[]' }}`;
+                const list = JSON.parse(raw);
+                if (list.length > 0) {
+                    list.forEach(f => addFeeField(f.name, f.value, f.is_multiplier));
+                } else {
+                    addFeeField('ค่าเช่าล่วงหน้า 1 เดือน', 1, true);
+                    addFeeField('ค่าประกันทรัพย์สิน', 5000, false);
+                }
+            } catch(e) { console.error(e); }
+        })();
+
+        // UI Helpers
         function toggleForm(id) {
             const el = document.getElementById(id);
             el.style.display = el.style.display === 'none' ? 'block' : 'none';
         }
 
-        function closeModal(id) {
-            document.getElementById(id).style.display = 'none';
+        function switchTab(evt, tabId) {
+            const contents = document.getElementsByClassName("tab-content");
+            for (let i = 0; i < contents.length; i++) contents[i].classList.remove("active");
+            const tabs = document.getElementsByClassName("tab");
+            for (let i = 0; i < tabs.length; i++) tabs[i].classList.remove("active");
+            document.getElementById(tabId).classList.add("active");
+            evt.currentTarget.classList.add("active");
         }
 
+        // Room Details
         async function viewRoomDetails(roomId, roomNumber) {
-            document.getElementById('modalRoomTitle').innerText = 'ข้อมูลห้อง ' + roomNumber;
-            const body = document.getElementById('roomModalBody');
-            body.innerHTML = '<p>กำลังโหลด...</p>';
-            document.getElementById('roomModal').style.display = 'block';
-
-            try {
-                const res = await fetch(`/admin/rooms/${roomId}/details`);
-                const data = await res.json();
-                
-                let html = `
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                        <div>
-                            <label style="color: var(--primary);">ผู้เช่าปัจจุบัน</label>
-                            <p><strong>${data.tenant.full_name || 'ไม่มี (ว่าง)'}</strong></p>
-                            <p style="font-size: 0.9em; color: var(--text-muted);">${data.tenant.phone_number || '-'}</p>
-                            
-                            ${data.tenant.full_name ? `
-                                <button class="btn btn-danger" onclick="openMoveOut('${data.room.id}', '${data.tenant.full_name}')" style="margin-top: 10px;">
-                                    <i class="fa-solid fa-person-walking-arrow-right"></i> ย้ายออก
-                                </button>
-                            ` : ''}
-                        </div>
-                        <div>
-                            <label style="color: var(--primary);">สถานะห้อง</label>
-                            <span class="badge ${data.room.status === 'Vacant' ? 'badge-success' : 'badge-warning'}">${data.room.status}</span>
-                            <p style="margin-top: 10px;">ค่าเช่า: ${data.room.base_rent.toLocaleString()} บาท</p>
-                        </div>
-                    </div>
-                    <hr style="margin: 20px 0; border: 0; border-top: 1px solid var(--border);">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                        <div>
-                            <label><i class="fa-solid fa-gauge-high"></i> ประวัติมิเตอร์ (ล่าสุด)</label>
-                            <table style="font-size: 0.85em;">
-                                <thead><tr><th>เดือน/ปี</th><th>ไฟ</th><th>น้ำ</th></tr></thead>
-                                <tbody>
-                                    ${data.meters.map(m => `<tr><td>${m.month}/${m.year}</td><td>${m.elec}</td><td>${m.water}</td></tr>`).join('')}
-                                </tbody>
-                            </table>
-                        </div>
-                        <div>
-                            <label><i class="fa-solid fa-file-invoice-dollar"></i> บิลล่าสุด</label>
-                            <table style="font-size: 0.85em;">
-                                <thead><tr><th>เดือน/ปี</th><th>ยอด</th><th>สถานะ</th></tr></thead>
-                                <tbody>
-                                    ${data.payments.map(p => `<tr><td>${p.month}/${p.year}</td><td>${p.total.toLocaleString()}</td><td>${p.status}</td></tr>`).join('')}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                `;
-                body.innerHTML = html;
-            } catch (e) {
-                body.innerHTML = '<p style="color:red;">เกิดข้อผิดพลาดในการโหลดข้อมูล</p>';
-            }
+            document.getElementById('detailModalTitle').innerText = `ห้อง ${roomNumber} - ข้อมูลโดยละเอียด`;
+            document.getElementById('asset_room_id').value = roomId;
+            document.getElementById('roomDetailModal').style.display = 'block';
+            await loadRoomDetails(roomId);
         }
 
-        async function openMoveOut(roomId, tenantName) {
+        async function loadRoomDetails(roomId) {
             const res = await fetch(`/admin/rooms/${roomId}/details`);
             const data = await res.json();
-            
-            if (!data.tenant.id) {
-                alert('ไม่พบผู้เช่าในห้องนี้');
-                return;
-            }
-            
-            document.getElementById('mo_tenant_id').value = data.tenant.id;
-            document.getElementById('mo_date').value = new Date().toISOString().split('T')[0];
-            
-            // Pre-fill with last readings if available to help user
-            if (data.meters && data.meters.length > 0) {
-                document.getElementById('mo_elec').placeholder = 'ล่าสุด: ' + data.meters[0].elec;
-                document.getElementById('mo_water').placeholder = 'ล่าสุด: ' + data.meters[0].water;
-            }
-            
-            document.getElementById('moveOutModal').style.display = 'block';
-        }
 
-        document.getElementById('moveOutForm').onsubmit = async (e) => {
-            e.preventDefault();
-            if (!confirm('ยืนยันการแจ้งย้ายออก? ระบบจะออกบิลสุดท้ายและยกเลิกสถานะผู้เช่าทันที')) return;
-            
-            const tenantId = document.getElementById('mo_tenant_id').value;
-            const formData = new FormData();
-            formData.append('move_out_date', document.getElementById('mo_date').value);
-            formData.append('final_elec', document.getElementById('mo_elec').value);
-            formData.append('final_water', document.getElementById('mo_water').value);
-            
-            const res = await fetch(`/admin/unmap/${tenantId}`, { method: 'POST', body: formData });
-            if (res.ok) {
-                alert('ดำเนินการย้ายออกและออกบิลเรียบร้อย');
-                location.reload();
-            } else {
-                const err = await res.json();
-                alert('เกิดข้อผิดพลาด: ' + (err.detail || JSON.stringify(err)));
-            }
-        };
-
-        document.getElementById('newBuildingForm').onsubmit = async (e) => {
-            e.preventDefault();
-            const formData = new FormData();
-            formData.append('name', document.getElementById('nb_name').value);
-            formData.append('description', document.getElementById('nb_desc').value);
-            
-            const res = await fetch('/admin/buildings/add', { method: 'POST', body: formData });
-            if (res.ok) {
-                alert('เพิ่มอาคารเรียบร้อย');
-                location.reload();
-            } else {
-                alert('เกิดข้อผิดพลาด');
-            }
-        };
-
-        async function deleteBuilding(id, name) {
-            if (!confirm(`ยืนยันการลบอาคาร ${name}? (อาคารต้องไม่มีห้องอยู่ภายในจึงจะลบได้)`)) return;
-            const res = await fetch(`/admin/buildings/${id}/delete`, { method: 'POST' });
-            if (res.ok) {
-                alert('ลบอาคารเรียบร้อย');
-                location.reload();
-            } else {
-                const err = await res.json();
-                alert('เกิดข้อผิดพลาด: ' + (err.detail || 'ไม่สามารถลบได้'));
-            }
-        }
-
-        document.getElementById('newRoomForm').onsubmit = async (e) => {
-            e.preventDefault();
-            const formData = new FormData();
-            formData.append('building_id', document.getElementById('nr_building').value);
-            formData.append('room_number', document.getElementById('nr_number').value);
-            formData.append('floor', document.getElementById('nr_floor').value);
-            formData.append('base_rent', document.getElementById('nr_rent').value);
-            formData.append('electricity_rate', document.getElementById('nr_elec').value);
-            formData.append('water_rate', document.getElementById('nr_water').value);
-            
-            const res = await fetch('/admin/rooms/add', { method: 'POST', body: formData });
-            if (res.ok) {
-                alert('เพิ่มห้องเรียบร้อย');
-                location.reload();
-            } else {
-                const err = await res.json();
-                alert('เกิดข้อผิดพลาด: ' + (err.detail || 'ไม่สามารถเพิ่มห้องได้'));
-            }
-        };
-
-        function showSection(id) {
-            document.querySelectorAll('.section-card, .grid').forEach(s => s.style.display = 'none');
-            const target = document.getElementById(id);
-            if(target) target.style.display = (id === 'overview') ? 'grid' : 'block';
-            document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active'));
-            // In a real app we'd match the ID to the menu item
-        }
-
-        function addPPRow(id='', name='') {
-            const div = document.createElement('div');
-            div.className = 'pp-item';
-            div.style = 'display:flex; gap:10px; margin-top:10px;';
-            div.innerHTML = `
-                <input type="text" placeholder="เบอร์โทร" value="${id}" class="pp-id">
-                <input type="text" placeholder="ชื่อ" value="${name}" class="pp-name">
-                <button type="button" class="btn btn-danger" onclick="this.parentElement.remove()">X</button>
-            `;
-            document.getElementById('pp_list').appendChild(div);
-        }
-
-        function addBankRow(bank='', acc='', name='') {
-            const div = document.createElement('div');
-            div.className = 'bank-item';
-            div.style = 'margin-top:10px; border:1px solid #eee; padding:10px; border-radius:8px;';
-            div.innerHTML = `
-                <div style="display:flex; gap:10px; margin-bottom:5px;">
-                    <input type="text" placeholder="ธนาคาร" value="${bank}" class="b-name">
-                    <input type="text" placeholder="เลขบัญชี" value="${acc}" class="b-acc">
-                </div>
-                <div style="display:flex; gap:10px;">
-                    <input type="text" placeholder="ชื่อบัญชี" value="${name}" class="b-owner" style="flex:1;">
-                    <button type="button" class="btn btn-danger" onclick="this.parentElement.parentElement.remove()">ลบ</button>
-                </div>
-            `;
-            document.getElementById('bank_list').appendChild(div);
-        }
-
-        function getPaymentConfig() {
-            const config = {
-                cash: document.getElementById('cash_enabled').checked,
-                promptpay: [],
-                bank_transfer: []
-            };
-            document.querySelectorAll('.pp-item').forEach(el => {
-                const id = el.querySelector('.pp-id').value.trim();
-                const name = el.querySelector('.pp-name').value.trim();
-                if(id) config.promptpay.push({id, name});
+            // Tenant Info
+            document.getElementById('dt-tenant-name').innerText = data.tenant.full_name || 'ไม่มีผู้เช่าปัจจุบัน';
+            document.getElementById('dt-tenant-phone').innerText = data.tenant.phone_number || '-';
+            const resList = document.getElementById('dt-residents-list');
+            resList.innerHTML = '';
+            data.tenant.residents.forEach(r => {
+                const li = document.createElement('li');
+                li.innerHTML = `<strong>${r.nickname}</strong>: ${r.full_name}`;
+                resList.appendChild(li);
             });
-            document.querySelectorAll('.bank-item').forEach(el => {
-                const b = el.querySelector('.b-name').value.trim();
-                const a = el.querySelector('.b-acc').value.trim();
-                const n = el.querySelector('.b-owner').value.trim();
-                if(a) config.bank_transfer.push({bank_name:b, bank_account:a, name:n});
+
+            // Recurring Charges
+            const globalList = document.getElementById('dt-global-recurring-list');
+            globalList.innerHTML = data.room.global_recurring.map(c => `
+                <tr><td>${c.description}</td><td style="text-align:right;">${parseFloat(c.amount).toLocaleString()} บาท</td></tr>
+            `).join('') || '<tr><td colspan="2" style="text-align:center;">ไม่มีรายการ</td></tr>';
+
+            const roomList = document.getElementById('dt-room-recurring-list');
+            roomList.innerHTML = data.room.room_recurring.map(c => `
+                <tr><td>${c.description}</td><td style="text-align:right;">${parseFloat(c.amount).toLocaleString()} บาท</td></tr>
+            `).join('') || '<tr><td colspan="2" style="text-align:center;">ไม่มีรายการ</td></tr>';
+
+            // Meters
+            const meterList = document.getElementById('dt-meters-list');
+            meterList.innerHTML = '';
+            data.meters.forEach(m => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${m.month}/${m.year}</td><td>${m.elec}</td><td>${m.water}</td><td>${m.date}</td>`;
+                meterList.appendChild(tr);
             });
-            return JSON.stringify(config);
+
+            // Payments
+            const payList = document.getElementById('dt-payments-list');
+            payList.innerHTML = '';
+            data.payments.forEach(p => {
+                const tr = document.createElement('tr');
+                const statusClass = p.status === 'Paid' ? 'badge-success' : 'badge-warning';
+                tr.innerHTML = `<td>${p.month}/${p.year}</td><td>${p.total}</td><td><span class="badge ${statusClass}">${p.status}</span></td><td>${p.date}</td>`;
+                payList.appendChild(tr);
+            });
+
+            // Assets
+            const assetList = document.getElementById('dt-assets-list');
+            assetList.innerHTML = '';
+            data.assets.forEach(a => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${a.name}</td><td>${a.quantity}</td><td><button class="btn btn-danger" style="padding:2px 8px;" onclick="deleteAsset(${a.id})"><i class="fa-solid fa-trash"></i></button></td>`;
+                assetList.appendChild(tr);
+            });
         }
+
+        document.getElementById('assetForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const roomId = document.getElementById('asset_room_id').value;
+            const toAll = document.getElementById('asset_to_all').checked;
+            const formData = new FormData();
+            formData.append('name', document.getElementById('asset_name').value);
+            formData.append('quantity', document.getElementById('asset_qty').value);
+            formData.append('to_all', toAll);
+            const res = await fetch(`/admin/rooms/${roomId}/assets/add`, { method: 'POST', body: formData });
+            if (res.ok) {
+                if (toAll) alert('เพิ่มทรัพย์สินเข้าทุกห้องเรียบร้อยแล้ว');
+                document.getElementById('asset_name').value = '';
+                document.getElementById('asset_qty').value = '1';
+                document.getElementById('asset_to_all').checked = false;
+                loadRoomDetails(roomId);
+            }
+        };
+
+        async function deleteAsset(assetId) {
+            if (confirm('ยืนยันการลบทรัพย์สิน?')) {
+                const res = await fetch(`/admin/assets/${assetId}/delete`, { method: 'POST' });
+                if (res.ok) loadRoomDetails(document.getElementById('asset_room_id').value);
+            }
+        }
+
+        // Logic (Same as before but with UI updates)
+        function addPPField(id = '', name = '') {
+            const container = document.getElementById('pp_container');
+            const div = document.createElement('div');
+            div.className = 'pp-pair';
+            div.style.display = 'flex';
+            div.style.gap = '8px';
+            div.style.marginBottom = '8px';
+            div.innerHTML = `
+                <input type="text" placeholder="เบอร์โทร/เลขบัตร" value="${id}" class="pp-id" style="flex:1;">
+                <input type="text" placeholder="ชื่อบัญชี" value="${name}" class="pp-name" style="flex:1;">
+                <button type="button" class="btn btn-outline" style="padding: 10px;" onclick="previewPP(this)"><i class="fa-solid fa-qrcode"></i></button>
+                <button type="button" class="btn btn-danger" onclick="this.parentElement.remove()" style="padding: 10px;"><i class="fa-solid fa-xmark"></i></button>
+            `;
+            container.appendChild(div);
+        }
+
+        async function previewPP(btn) {
+            const row = btn.parentElement;
+            const ppId = row.querySelector('.pp-id').value.trim();
+            if (!ppId) return alert('กรุณากรอกเบอร์โทรหรือเลขบัตร');
+
+            const modal = document.getElementById('qrPreviewModal');
+            const img = document.getElementById('qrPreviewImage');
+            const loading = document.getElementById('qrPreviewLoading');
+            modal.style.display = 'block';
+            img.style.display = 'none';
+            loading.style.display = 'block';
+
+            try {
+                const res = await fetch(`/admin/promptpay/preview?pp_id=${encodeURIComponent(ppId)}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    img.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(data.payload)}`;
+                    img.onload = () => { loading.style.display = 'none'; img.style.display = 'inline-block'; };
+                }
+            } catch (err) { alert('Error: ' + err); modal.style.display = 'none'; }
+        }
+
+        // Init PromptPay
+        (function initPP() {
+            try {
+                const rawConfig = document.getElementById('pp_data_raw').textContent.trim();
+                let list = JSON.parse(rawConfig);
+                const container = document.getElementById('pp_container');
+                container.innerHTML = '';
+                if (Array.isArray(list) && list.length > 0) {
+                    list.forEach(item => addPPField(item.id || item, item.name || ''));
+                } else { addPPField('', ''); }
+            } catch(e) { addPPField('', ''); }
+        })();
+
+        // Core Actions
+        function exportReport() {
+            window.location.href = `/admin/report/export?month=${document.getElementById('report_month').value}&year=${document.getElementById('report_year').value}`;
+        }
+
+        document.getElementById('broadcastForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const formData = new FormData();
+            formData.append('message', document.getElementById('broadcast_message').value);
+            const res = await fetch('/admin/broadcast', { method: 'POST', body: formData });
+            if (res.ok) { alert('ส่งประกาศเรียบร้อย'); document.getElementById('broadcast_message').value = ''; }
+        };
 
         document.getElementById('settingsForm').onsubmit = async (e) => {
             e.preventDefault();
+            const pairs = [];
+            document.querySelectorAll('.pp-pair').forEach(div => {
+                const id = div.querySelector('.pp-id').value.trim();
+                const name = div.querySelector('.pp-name').value.trim();
+                if (id) pairs.push({ id, name });
+            });
             const formData = new FormData();
             formData.append('display_name', document.getElementById('display_name').value);
-            formData.append('promptpay_config', getPaymentConfig());
+            formData.append('promptpay_config', JSON.stringify(pairs));
+            formData.append('qr_enabled', document.getElementById('qr_enabled').value);
+            formData.append('late_fee_enabled', document.getElementById('late_fee_enabled').checked ? 1 : 0);
+            formData.append('due_day', document.getElementById('due_day').value);
+            formData.append('late_fee_per_day', document.getElementById('late_fee_per_day').value);
+            const res = await fetch('/admin/settings/save', { method: 'POST', body: formData });
+            if (res.ok) { alert('บันทึกเรียบร้อย'); location.reload(); }
+        };
+
+        function addRecurringRow(containerId, desc = '', amt = '') {
+            const container = document.getElementById(containerId);
+            const div = document.createElement('div');
+            div.className = 'recurring-charge-row';
+            div.style.display = 'flex';
+            div.style.gap = '10px';
+            div.style.marginBottom = '10px';
+            div.innerHTML = `
+                <input type="text" placeholder="คำอธิบาย (เช่น ค่าจอดรถ)" value="${desc}" class="rc-desc" style="flex: 2;">
+                <input type="number" placeholder="จำนวนเงิน" value="${amt}" class="rc-amt" style="flex: 1;">
+                <button type="button" class="btn btn-danger" onclick="this.parentElement.remove()" style="padding: 10px;"><i class="fa-solid fa-trash"></i></button>
+            `;
+            container.appendChild(div);
+        }
+
+        // Add Bulk Recurring Modal to Body
+        const bulkModalHtml = `
+            <div id="bulkRecurringModal" class="modal">
+                <div class="modal-content" style="max-width: 500px;">
+                    <div class="modal-header"><h3>ตั้งค่าค่าใช้จ่ายส่วนกลางทุกห้อง</h3></div>
+                    <div class="modal-body">
+                        <p style="font-size: 0.85em; color: var(--text-muted); margin-bottom: 20px;">
+                            * รายการที่ตั้งค่าที่นี่จะถูกนำไปแทนที่หรือเพิ่มให้กับทุกห้องในอาคาร
+                        </p>
+                        <div id="bulk_recurring_container"></div>
+                        <button type="button" class="btn btn-outline" style="width: 100%; margin-top: 10px;" onclick="addRecurringRow('bulk_recurring_container')">+ เพิ่มรายการ</button>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-outline" onclick="document.getElementById('bulkRecurringModal').style.display='none'">ยกเลิก</button>
+                        <button class="btn btn-primary" onclick="applyBulkRecurring()">บันทึก</button>
+                    </div>
+                    </div>
+                    </div>
+                    `;
+                    document.body.insertAdjacentHTML('beforeend', bulkModalHtml);
+
+                    function openBulkRecurringModal() {
+                    const container = document.getElementById('bulk_recurring_container');
+                    container.innerHTML = '';
+
+                    try {
+                    const raw = document.getElementById('bulk_recurring_raw').textContent.trim();
+                    const list = JSON.parse(raw);
+                    if (Array.isArray(list) && list.length > 0) {
+                    list.forEach(c => addRecurringRow('bulk_recurring_container', c.description, c.amount));
+                    }
+                    } catch(e) {
+                    console.error("Error loading bulk recurring template:", e);
+                    }
+
+                    document.getElementById('bulkRecurringModal').style.display = 'block';
+                    }
+
+                    async function applyBulkRecurring() {
+                    const charges = [];
+                    document.querySelectorAll('#bulk_recurring_container .recurring-charge-row').forEach(row => {
+                    const desc = row.querySelector('.rc-desc').value.trim();
+                    const amt = row.querySelector('.rc-amt').value;
+                    if (desc && amt) charges.push({ description: desc, amount: parseFloat(amt) });
+                    });
+
+                    if (confirm('ยืนยันการบันทึกค่าใช้จ่ายส่วนกลาง? (ข้อมูลนี้จะถูกนำไปใช้เมื่อออกบิลใหม่)')) {
+                    const formData = new FormData();
+                    formData.append('charges_json', JSON.stringify(charges));
+                    const res = await fetch('/admin/rooms/bulk-recurring', { method: 'POST', body: formData });
+                    if (res.ok) { alert('บันทึกเรียบร้อยแล้ว'); location.reload(); }
+                    }
+                    }
+        document.getElementById('roomForm').onsubmit = async (e) => {
+            e.preventDefault();
+            try {
+                const charges = [];
+                document.querySelectorAll('#room_recurring_container .recurring-charge-row').forEach(row => {
+                    const desc = row.querySelector('.rc-desc').value.trim();
+                    const amt = row.querySelector('.rc-amt').value;
+                    if (desc && amt) charges.push({ description: desc, amount: parseFloat(amt) });
+                });
+
+                const formData = new FormData();
+                formData.append('room_number', document.getElementById('room_number').value);
+                formData.append('floor', document.getElementById('floor').value);
+                formData.append('base_rent', document.getElementById('base_rent').value);
+                formData.append('electricity_rate', document.getElementById('elec_rate').value);
+                formData.append('water_rate', document.getElementById('water_rate').value);
+                formData.append('building_id', document.getElementById('building_id').value);
+                formData.append('promptpay_id', document.getElementById('room_promptpay_id').value);
+                formData.append('recurring_charges', JSON.stringify(charges));
+                
+                const res = await fetch('/admin/rooms/add', { method: 'POST', body: formData });
+                if (res.ok) {
+                    location.reload();
+                } else {
+                    const err = await res.json();
+                    alert('Error: ' + (err.detail || 'Unknown error'));
+                }
+            } catch (err) {
+                console.error(err);
+                alert('JS Error: ' + err.message);
+            }
+        };
+
+        function editRoom(id, number, floor, rent, elec, water, ppId, recurringJson = '[]', buildingId = null) {
+            document.getElementById('edit_room_id').value = id;
+            document.getElementById('edit_room_number').value = number;
+            document.getElementById('edit_floor').value = floor;
+            document.getElementById('edit_base_rent').value = rent;
+            document.getElementById('edit_elec_rate').value = elec;
+            document.getElementById('edit_water_rate').value = water;
+            document.getElementById('edit_room_promptpay_id').value = ppId;
+            if(buildingId) document.getElementById('edit_building_id').value = buildingId;
             
-            // Add required fields with fallback defaults if elements don't exist in the new minimalist UI yet
-            formData.append('qr_enabled', document.getElementById('cash_enabled').checked ? 1 : 1); // Mocking since qr_enabled is legacy
-            formData.append('late_fee_enabled', 0);
-            formData.append('due_day', 5);
-            formData.append('late_fee_per_day', 50.0);
+            // Handle Recurring Charges in Edit Modal
+            const container = document.getElementById('edit_room_recurring_container');
+            container.innerHTML = '';
+            try {
+                // Robust parsing: handle if it's already an object or a string
+                const charges = (typeof recurringJson === 'string') ? JSON.parse(recurringJson) : recurringJson;
+                if (Array.isArray(charges)) {
+                    charges.forEach(c => addRecurringRow('edit_room_recurring_container', c.description, c.amount));
+                }
+            } catch(e) {
+                console.error("Error loading recurring charges:", e);
+            }
             
-            const res = await fetch('/admin/settings/save', { method:'POST', body:formData });
-            if(res.ok) {
-                alert('บันทึกเรียบร้อย');
-                location.reload();
+            document.getElementById('roomModal').style.display = 'block';
+        }
+
+        function openEditRoom(btn) {
+            const d = btn.dataset;
+            editRoom(
+                parseInt(d.id),
+                d.number,
+                parseInt(d.floor),
+                parseFloat(d.rent),
+                parseFloat(d.elec),
+                parseFloat(d.water),
+                d.ppid,
+                d.recurring,
+                d.building === 'null' ? null : parseInt(d.building)
+            );
+        }
+
+        document.getElementById('editRoomForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('edit_room_id').value;
+            const charges = [];
+            document.querySelectorAll('#edit_room_recurring_container .recurring-charge-row').forEach(row => {
+                const desc = row.querySelector('.rc-desc').value.trim();
+                const amt = row.querySelector('.rc-amt').value;
+                if (desc && amt) charges.push({ description: desc, amount: parseFloat(amt) });
+            });
+
+            const formData = new FormData();
+            formData.append('room_number', document.getElementById('edit_room_number').value);
+            formData.append('floor', document.getElementById('edit_floor').value);
+            formData.append('base_rent', document.getElementById('edit_base_rent').value);
+            formData.append('electricity_rate', document.getElementById('edit_elec_rate').value);
+            formData.append('water_rate', document.getElementById('edit_water_rate').value);
+            formData.append('promptpay_id', document.getElementById('edit_room_promptpay_id').value);
+            formData.append('building_id', document.getElementById('edit_building_id').value);
+            formData.append('recurring_charges', JSON.stringify(charges));
+            
+            const res = await fetch(`/admin/rooms/${id}/edit`, { method: 'POST', body: formData });
+            if (res.ok) location.reload();
+        };
+
+        // --- REFINED METER LOGIC ---
+
+        function switchMeterMode(mode) {
+            const singleTab = document.getElementById('tab_single_meter');
+            const bulkTab = document.getElementById('tab_bulk_meter');
+            const singleForm = document.getElementById('meterForm');
+            const bulkContainer = document.getElementById('bulkMeterContainer');
+
+            if (mode === 'single') {
+                singleTab.classList.add('active');
+                bulkTab.classList.remove('active');
+                singleForm.style.display = 'block';
+                bulkContainer.style.display = 'none';
             } else {
-                const err = await res.json();
-                alert('เกิดข้อผิดพลาด: ' + JSON.stringify(err.detail));
+                singleTab.classList.remove('active');
+                bulkTab.classList.add('active');
+                singleForm.style.display = 'none';
+                bulkContainer.style.display = 'block';
             }
         }
 
-        // Init
-        (function init(){
-            try {
-                const raw = document.getElementById('raw_config').textContent.trim();
-                const config = JSON.parse(raw);
-                if(config.cash !== undefined) {
-                    document.getElementById('cash_enabled').checked = config.cash;
-                    if(config.promptpay) config.promptpay.forEach(p => addPPRow(p.id, p.name));
-                    if(config.bank_transfer) config.bank_transfer.forEach(b => addBankRow(b.bank_name, b.bank_account, b.name));
+        function filterMeterRooms(buildingId) {
+            const opts = document.querySelectorAll('.meter-room-opt');
+            let firstVisible = null;
+            opts.forEach(opt => {
+                const bid = opt.getAttribute('data-building-id');
+                if (buildingId === 'all' || bid == buildingId) {
+                    opt.style.display = '';
+                    if (!firstVisible) firstVisible = opt.value;
+                } else {
+                    opt.style.display = 'none';
                 }
-            } catch(e){}
-        })();
+            });
+            if (firstVisible) document.getElementById('room_id').value = firstVisible;
+        }
+
+        function addOtherChargeRow(containerId = 'other_charges_container', desc = '', amt = '') {
+            const container = document.getElementById(containerId);
+            const div = document.createElement('div');
+            div.className = 'other-charge-row';
+            div.style.display = 'flex';
+            div.style.gap = '10px';
+            div.style.marginBottom = '8px';
+            div.innerHTML = `
+                <input type="text" placeholder="คำอธิบาย" value="${desc}" class="oc-desc" style="flex: 2; padding: 5px;">
+                <input type="number" placeholder="เงิน" value="${amt}" class="oc-amt" style="flex: 1; padding: 5px;">
+                <button type="button" class="btn btn-danger" onclick="this.parentElement.remove()" style="padding: 5px 10px;"><i class="fa-solid fa-xmark"></i></button>
+            `;
+            container.appendChild(div);
+        }
+
+        async function loadCurrentRoomMeter() {
+            const roomId = document.getElementById('room_id').value;
+            const month = document.getElementById('month').value;
+            const year = document.getElementById('year').value;
+            
+            if (!roomId) return;
+            
+            const res = await fetch(`/admin/meters/current?room_id=${roomId}&month=${month}&year=${year}`);
+            const data = await res.json();
+            
+            const otherContainer = document.getElementById('other_charges_container');
+            const recurringContainer = document.getElementById('recurring_charges_container');
+            
+            // Populate Recurring (Read-only)
+            recurringContainer.innerHTML = '';
+            const allRec = [...(data.global_recurring || []), ...(data.room_recurring || [])];
+            if (allRec.length > 0) {
+                allRec.forEach(c => {
+                    const div = document.createElement('div');
+                    div.style = 'display: flex; justify-content: space-between; font-size: 0.9em; margin-bottom: 5px; color: #495057;';
+                    div.innerHTML = `<span>${c.description}</span><strong>${parseFloat(c.amount).toLocaleString()} บาท</strong>`;
+                    recurringContainer.appendChild(div);
+                });
+            } else {
+                recurringContainer.innerHTML = '<div style="font-size:0.85em; color:var(--text-muted); text-align:center;">ไม่มีค่าใช้จ่ายรายเดือน</div>';
+            }
+
+            if (data.found) {
+                document.getElementById('elec').value = data.electricity;
+                document.getElementById('water').value = data.water;
+                document.getElementById('edit_indicator').style.display = 'block';
+                
+                // Load other charges (Manual)
+                otherContainer.innerHTML = '';
+                if (data.manual_charges) {
+                    data.manual_charges.forEach(c => addOtherChargeRow('other_charges_container', c.description, c.amount));
+                }
+            } else {
+                document.getElementById('elec').value = '';
+                document.getElementById('water').value = '';
+                document.getElementById('edit_indicator').style.display = 'none';
+                otherContainer.innerHTML = '';
+            }
+        }
+
+        async function previewMeterBill() {
+            const roomId = document.getElementById('room_id').value;
+            if (!roomId) return alert('กรุณาเลือกห้อง');
+            
+            const charges = [];
+            document.querySelectorAll('#other_charges_container .other-charge-row').forEach(row => {
+                const desc = row.querySelector('.oc-desc').value.trim();
+                const amt = row.querySelector('.oc-amt').value;
+                if (desc && amt) charges.push({ description: desc, amount: parseFloat(amt) });
+            });
+
+            const formData = new FormData();
+            formData.append('room_id', roomId);
+            formData.append('month', document.getElementById('month').value);
+            formData.append('year', document.getElementById('year').value);
+            formData.append('elec', document.getElementById('elec').value);
+            formData.append('water', document.getElementById('water').value);
+            formData.append('other_charges', JSON.stringify(charges));
+
+            try {
+                const res = await fetch('/admin/invoice/preview', { method: 'POST', body: formData });
+                if (!res.ok) throw new Error((await res.json()).detail);
+                const d = await res.json();
+                
+                // Show in the same detail modal
+                const modal = document.getElementById('invoiceDetailModal');
+                const body = document.getElementById('invDetailBody');
+                document.getElementById('invModalTitle').innerText = "Preview ใบแจ้งหนี้ (ยังไม่ได้บันทึก)";
+                modal.style.display = 'block';
+
+                const ocHtml = d.other_charges.map(c => `
+                    <div style="display:flex; justify-content:space-between; font-size:0.9em; margin-bottom:5px; color:var(--text-muted);">
+                        <span>${c.description}</span>
+                        <span>${parseFloat(c.amount).toLocaleString()} บาท</span>
+                    </div>
+                `).join('');
+
+                body.innerHTML = `
+                    <div style="background:#fff8e1; padding:20px; border-radius:12px; margin-bottom:20px; border:1px solid #ffe082;">
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
+                            <div><label>ห้อง</label><strong>${d.room_number}</strong></div>
+                            <div><label>ผู้เช่า</label><strong>${d.tenant_name}</strong></div>
+                            <div><label>รอบบิล</label><strong>${d.month}/${d.year}</strong></div>
+                            <div><label>สถานะ</label><span class="badge badge-info">PREVIEW</span></div>
+                        </div>
+                    </div>
+
+                    <div style="border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:15px;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                            <span>ค่าเช่าฐาน</span>
+                            <strong>${d.rent.toLocaleString()} บาท</strong>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                            <span>ค่าไฟ (${d.elec_units} หน่วย)</span>
+                            <strong>${d.elec_amount.toLocaleString()} บาท</strong>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                            <span>ค่าน้ำ (${d.water_units} หน่วย)</span>
+                            <strong>${d.water_amount.toLocaleString()} บาท</strong>
+                        </div>
+                        ${ocHtml}
+                        ${d.late_fee > 0 ? `
+                        <div style="display:flex; justify-content:space-between; margin-bottom:10px; color: var(--danger);">
+                            <span>ค่าปรับล่าช้า</span>
+                            <strong>${d.late_fee.toLocaleString()} บาท</strong>
+                        </div>` : ''}
+                    </div>
+
+                    <div style="display:flex; justify-content:space-between; font-size:1.2em; font-weight:700; color:var(--primary);">
+                        <span>ยอดรวมประมาณการ</span>
+                        <span>${d.total.toLocaleString()} บาท</span>
+                    </div>
+                    <p style="font-size:0.8em; color:var(--text-muted); margin-top:15px; text-align:center;">* ข้อมูลนี้เป็นการคำนวณเบื้องต้น ยังไม่มีการบันทึกลงระบบ</p>
+                `;
+            } catch (err) {
+                alert('Preview Error: ' + err.message);
+            }
+        }
+
+        async function submitMeter(isIssue) {
+            const roomId = document.getElementById('room_id').value;
+            if (!roomId) return alert('กรุณาเลือกห้อง');
+            
+            const charges = [];
+            document.querySelectorAll('#other_charges_container .other-charge-row').forEach(row => {
+                const desc = row.querySelector('.oc-desc').value.trim();
+                const amt = row.querySelector('.oc-amt').value;
+                if (desc && amt) charges.push({ description: desc, amount: parseFloat(amt) });
+            });
+
+            const formData = new FormData();
+            formData.append('room_id', roomId);
+            formData.append('month', document.getElementById('month').value);
+            formData.append('year', document.getElementById('year').value);
+            formData.append('elec', document.getElementById('elec').value);
+            formData.append('water', document.getElementById('water').value);
+            formData.append('other_charges', JSON.stringify(charges));
+            formData.append('issue_bill', isIssue ? 'true' : 'false');
+
+            const res = await fetch('/admin/meters/record', { method: 'POST', body: formData });
+            if (res.ok) {
+                alert(isIssue ? 'ออกบิลและแจ้งเตือนเรียบร้อยแล้ว' : 'บันทึกร่างเรียบร้อย');
+                location.reload();
+            } else {
+                const err = await res.json();
+                alert('Error: ' + err.detail);
+            }
+        }
+
+        async function renderBulkGrid(buildingId) {
+            const grid = document.getElementById('bulkMeterGrid');
+            const month = document.getElementById('bulk_month').value;
+            const year = document.getElementById('bulk_year').value;
+            
+            if (!buildingId) {
+                grid.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">กรุณาเลือกอาคารเพื่อเริ่มกรอกข้อมูล</td></tr>';
+                return;
+            }
+
+            const roomOpts = document.querySelectorAll(`.meter-room-opt[data-building-id="${buildingId}"]`);
+            if (roomOpts.length === 0) {
+                grid.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">ไม่พบห้องพักในอาคารนี้</td></tr>';
+                return;
+            }
+
+            grid.innerHTML = '<tr><td colspan="5" style="text-align: center;"><i class="fa-solid fa-spinner fa-spin"></i> กำลังโหลดข้อมูลเดิม...</td></tr>';
+
+            const rowsHtml = await Promise.all(Array.from(roomOpts).map(async opt => {
+                const res = await fetch(`/admin/meters/current?room_id=${opt.value}&month=${month}&year=${year}`);
+                const data = await res.json();
+                
+                const statusBadge = data.found ? 
+                    `<span class="badge ${data.invoice_status==='Paid'?'badge-success':'badge-warning'}">${data.invoice_status}</span>` : 
+                    '<span class="badge badge-info">ใหม่</span>';
+
+                return `
+                    <tr class="bulk-row" data-room-id="${opt.value}">
+                        <td style="font-weight: 700;">${opt.text}</td>
+                        <td><input type="number" step="0.1" class="bulk-elec" value="${data.electricity || ''}" placeholder="0.0"></td>
+                        <td><input type="number" step="0.1" class="bulk-water" value="${data.water || ''}" placeholder="0.0"></td>
+                        <td>${statusBadge}</td>
+                    </tr>
+                `;
+            }));
+
+            grid.innerHTML = rowsHtml.join('');
+        }
+
+        async function saveBulkMeters(isIssue) {
+            const rows = document.querySelectorAll('.bulk-row');
+            const month = document.getElementById('bulk_month').value;
+            const year = document.getElementById('bulk_year').value;
+            
+            const data = [];
+            rows.forEach(row => {
+                const rid = row.getAttribute('data-room-id');
+                const elec = row.querySelector('.bulk-elec').value;
+                const water = row.querySelector('.bulk-water').value;
+                
+                if (elec !== "" && water !== "") {
+                    // In bulk mode, we now send null for other_charges so the backend 
+                    // handles room defaults properly without UI-side charge editing.
+                    data.push({
+                        room_id: parseInt(rid),
+                        elec: parseFloat(elec),
+                        water: parseFloat(water),
+                        other_charges: null 
+                    });
+                }
+            });
+
+            if (data.length === 0) return alert('กรุณากรอกข้อมูลอย่างน้อย 1 ห้อง');
+            if (!confirm(`ยืนยันการ${isIssue ? 'ออกบิลจริง' : 'บันทึกร่าง'} ${data.length} ห้อง?`)) return;
+
+            const formData = new FormData();
+            formData.append('data', JSON.stringify(data));
+            formData.append('month', month);
+            formData.append('year', year);
+            formData.append('issue_bill', isIssue ? 'true' : 'false');
+
+            const res = await fetch('/admin/meters/bulk-record', { method: 'POST', body: formData });
+            if (res.ok) {
+                alert('ดำเนินการเรียบร้อยแล้ว!');
+                location.reload();
+            } else {
+                alert('เกิดข้อผิดพลาดในการบันทึก');
+            }
+        }
+
+        async function cancelInvoice(id) {
+            if (confirm('คุณต้องการยกเลิกบิลนี้ใช่หรือไม่? (ข้อมูลบิลจะถูกลบออก)')) {
+                const res = await fetch(`/admin/invoice/${id}/cancel`, { method: 'POST' });
+                if (res.ok) location.reload();
+                else alert('ไม่สามารถยกเลิกได้: ' + (await res.json()).detail);
+            }
+        }
+
+        async function approveReg(id) { if(confirm('อนุมัติ?')) { await fetch(`/admin/registration/${id}/approve`, {method:'POST'}); location.reload(); } }
+        async function rejectReg(id) { if(confirm('ปฏิเสธ?')) { await fetch(`/admin/registration/${id}/reject`, {method:'POST'}); location.reload(); } }
+        async function sendLine(id) { await fetch(`/admin/invoice/${id}/send-line`, {method:'POST'}); alert('ส่งเรียบร้อย'); }
+        async function approveInvoice(id) { await fetch(`/admin/invoice/${id}/approve`, {method:'POST'}); location.reload(); }
+        async function rejectInvoice(id) { await fetch(`/admin/invoice/${id}/reject`, {method:'POST'}); location.reload(); }
+        async function unmapTenant(id) { if(confirm('ย้ายออก?')) { await fetch('/admin/unmap/'+id, {method:'POST'}); location.reload(); } }
+
+        async function confirmCash(id) {
+            const input = document.createElement('input'); input.type='file'; input.accept='image/*';
+            input.onchange = async (e) => {
+                const formData = new FormData(); formData.append('image', e.target.files[0]);
+                const res = await fetch(`/admin/invoice/${id}/confirm-cash`, { method:'POST', body:formData });
+                if(res.ok) location.reload();
+            };
+            input.click();
+        }
+
+        async function viewInvoiceDetails(id) {
+            const modal = document.getElementById('invoiceDetailModal');
+            const body = document.getElementById('invDetailBody');
+            modal.style.display = 'block';
+            body.innerHTML = '<p style="text-align:center;"><i class="fa-solid fa-spinner fa-spin"></i> กำลังโหลด...</p>';
+
+            try {
+                const res = await fetch(`/admin/invoice/${id}/details`);
+                const d = await res.json();
+                
+                const ocHtml = d.other_charges.map(c => `
+                    <div style="display:flex; justify-content:space-between; font-size:0.9em; margin-bottom:5px; color:var(--text-muted);">
+                        <span>${c.description}</span>
+                        <span>${parseFloat(c.amount).toLocaleString()} บาท</span>
+                    </div>
+                `).join('');
+
+                body.innerHTML = `
+                    <div style="background:#f8f9fa; padding:20px; border-radius:12px; margin-bottom:20px;">
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-bottom:15px;">
+                            <div><label>ห้อง</label><strong>${d.room_number}</strong></div>
+                            <div><label>ผู้เช่า</label><strong>${d.tenant_name}</strong></div>
+                            <div><label>รอบบิล</label><strong>${d.month}/${d.year}</strong></div>
+                            <div><label>สถานะ</label><span class="badge ${d.status==='Paid'?'badge-success':'badge-warning'}">${d.status}</span></div>
+                        </div>
+                    </div>
+
+                    <div style="border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:15px;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                            <span>ค่าเช่าฐาน</span>
+                            <strong>${d.rent.toLocaleString()} บาท</strong>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                            <span>ค่าไฟ (${d.prev_elec_reading} -> ${d.elec_reading})</span>
+                            <strong>${d.elec_amount.toLocaleString()} บาท</strong>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                            <span>ค่าน้ำ (${d.prev_water_reading} -> ${d.water_reading})</span>
+                            <strong>${d.water_amount.toLocaleString()} บาท</strong>
+                        </div>
+                        ${ocHtml}
+                        ${d.late_fee > 0 ? `
+                        <div style="display:flex; justify-content:space-between; margin-bottom:10px; color: var(--danger);">
+                            <span>ค่าปรับล่าช้า</span>
+                            <strong>${d.late_fee.toLocaleString()} บาท</strong>
+                        </div>` : ''}
+                    </div>
+
+                    <div style="display:flex; justify-content:space-between; font-size:1.2em; font-weight:700; color:var(--primary);">
+                        <span>ยอดรวมทั้งสิ้น</span>
+                        <span>${d.total.toLocaleString()} บาท</span>
+                    </div>
+
+                    ${d.paid_at ? `
+                        <div style="margin-top:20px; font-size:0.85em; color:var(--success); border-top:1px dashed var(--border); pt-15px; padding-top:15px;">
+                            <i class="fa-solid fa-check-circle"></i> ชำระเมื่อ: ${d.paid_at}
+                            ${d.receipt_img ? `<br><a href="${d.receipt_img}" target="_blank" style="color:var(--primary); text-decoration:underline;">[ ดูสลิปหลักฐาน ]</a>` : ''}
+                        </div>
+                    ` : ''}
+                `;
+            } catch (err) {
+                body.innerHTML = '<p style="color:var(--danger);">เกิดข้อผิดพลาดในการโหลดข้อมูล</p>';
+            }
+        }
+
+        // History & Search
+        async function loadMeterHistory() {
+            const res = await fetch(`/admin/meters/history${document.getElementById('history_room_filter').value ? '?room_id='+document.getElementById('history_room_filter').value : ''}`);
+            const data = await res.json();
+            const list = document.getElementById('meterHistoryList');
+            list.innerHTML = data.map(r => {
+                const statusBadge = `<span class="badge ${r.invoice_status === 'Paid' ? 'badge-success' : (r.invoice_status === 'Unpaid' ? 'badge-warning' : 'badge-info')}">${r.invoice_status}</span>`;
+                const editBtn = r.invoice_status === 'Unpaid' ? 
+                    `<button class="btn btn-outline" style="padding: 2px 8px; font-size: 0.8em;" onclick="editMeterReading(${r.room_id}, ${r.month}, ${r.year}, ${r.electricity}, ${r.water})"><i class="fa-solid fa-edit"></i> แก้ไข</button>` : '';
+                
+                return `<tr>
+                    <td>${r.room_number}</td>
+                    <td>${r.month}/${r.year}</td>
+                    <td>${r.electricity} / ${r.water}</td>
+                    <td>${statusBadge}</td>
+                    <td>${editBtn}</td>
+                </tr>`;
+            }).join('') || '<tr><td colspan="5" style="text-align:center;">ไม่พบข้อมูล</td></tr>';
+        }
+
+        function editMeterReading(roomId, month, year, elec, water) {
+            // Ensure section is visible
+            showSection('meterSection');
+            switchMeterMode('single');
+
+            document.getElementById('room_id').value = roomId;
+            document.getElementById('month').value = month;
+            document.getElementById('year').value = year;
+            
+            // Sync form data (including other charges) from server
+            loadCurrentRoomMeter();
+            
+            document.getElementById('edit_indicator').style.display = 'block';
+            document.getElementById('cancelEditBtn').style.display = 'inline-flex';
+            
+            // Scroll to form
+            document.getElementById('meterSection').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function resetMeterForm() {
+            document.getElementById('meterForm').reset();
+            document.getElementById('month').value = {{ current_month }};
+            document.getElementById('year').value = {{ current_year }};
+            document.getElementById('edit_indicator').style.display = 'none';
+            document.getElementById('cancelEditBtn').style.display = 'none';
+            document.getElementById('other_charges_container').innerHTML = '';
+        }
+
+        async function loadRepairHistory() {
+            const res = await fetch(`/admin/repair/history${document.getElementById('repair_room_filter').value ? '?room_id='+document.getElementById('repair_room_filter').value : ''}`);
+            const data = await res.json();
+            const list = document.getElementById('repairHistoryList');
+            list.innerHTML = data.map(r => `
+                <tr onclick='viewRepairDetails(${JSON.stringify(r)})' style="cursor:pointer;">
+                    <td>${r.room_number}</td>
+                    <td><strong>${r.title}</strong></td>
+                    <td><span class="badge ${r.status=='Fixed'?'badge-success':(r.status=='Pending'?'badge-warning':'badge-info')}">${r.status}</span></td>
+                    <td>${r.created_at}</td>
+                </tr>
+            `).join('') || '<tr><td colspan="5" style="text-align:center;">ไม่พบข้อมูล</td></tr>';
+        }
+
+        function viewRepairDetails(repair) {
+            document.getElementById('current_repair_id').value = repair.id;
+            document.getElementById('update_repair_status').value = repair.status;
+            
+            const body = document.getElementById('repairDetailBody');
+            body.innerHTML = `
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-bottom:20px; background:#f8f9fa; padding:15px; border-radius:12px;">
+                    <div><label>ห้อง</label><strong>${repair.room_number}</strong></div>
+                    <div><label>ผู้แจ้ง</label><strong>${repair.tenant_name}</strong></div>
+                    <div><label>วันที่แจ้ง</label><strong>${repair.created_at}</strong></div>
+                    <div><label>สถานะปัจจุบัน</label><span class="badge ${repair.status=='Fixed'?'badge-success':(repair.status=='Pending'?'badge-warning':'badge-info')}">${repair.status}</span></div>
+                </div>
+                <div style="margin-bottom:20px;">
+                    <label>เรื่องที่แจ้ง</label>
+                    <div style="font-weight:700; font-size:1.1em; margin-bottom:10px;">${repair.title}</div>
+                    <label>รายละเอียด</label>
+                    <div style="background:#fff; border:1px solid var(--border); padding:15px; border-radius:8px; min-height:60px;">${repair.description || 'ไม่มีรายละเอียดเพิ่มเติม'}</div>
+                </div>
+                ${repair.image_url ? `
+                <div style="margin-top:15px;">
+                    <label>รูปภาพแนบ</label>
+                    <a href="${repair.image_url}" target="_blank">
+                        <img src="${repair.image_url}" style="width:100%; max-height:300px; object-fit:contain; border-radius:8px; border:1px solid var(--border); margin-top:5px;">
+                    </a>
+                </div>
+                ` : ''}
+            `;
+            document.getElementById('repairDetailModal').style.display = 'block';
+        }
+
+        async function saveRepairStatus() {
+            const id = document.getElementById('current_repair_id').value;
+            const status = document.getElementById('update_repair_status').value;
+            
+            const formData = new FormData();
+            formData.append('status', status);
+            
+            const res = await fetch(`/admin/repair/${id}/status`, { method: 'POST', body: formData });
+            if (res.ok) {
+                alert('บันทึกสถานะเรียบร้อยแล้ว');
+                document.getElementById('repairDetailModal').style.display = 'none';
+                loadRepairHistory();
+            } else {
+                alert('เกิดข้อผิดพลาดในการบันทึก');
+            }
+        }
+
+        async function doSearch() {
+            const q = document.getElementById('search_query').value;
+            if(!q) return;
+            const res = await fetch(`/admin/tenants/search?q=${encodeURIComponent(q)}`);
+            const data = await res.json();
+            document.getElementById('searchResultArea').style.display = 'block';
+            document.getElementById('searchResultList').innerHTML = data.map(r => `<tr><td><span class="badge ${r.type=='Current'?'badge-success':'badge-danger'}">${r.type}</span></td><td>${r.room}</td><td>${r.name}</td><td>${r.phone}</td><td>${r.period}</td></tr>`).join('') || '<tr><td colspan="5">ไม่พบข้อมูล</td></tr>';
+        }
+
+        function manageResidents(tenantId, roomNumber) {
+            document.getElementById('current_tenant_id').value = tenantId;
+            document.getElementById('modalTitle').innerText = `ห้อง ${roomNumber} - รายชื่อผู้อยู่อาศัย`;
+            document.getElementById('residentModal').style.display = 'block';
+            loadResidents(tenantId);
+        }
+        function closeModal() { document.getElementById('residentModal').style.display='none'; location.reload(); }
+        async function loadResidents(tid) {
+            const res = await fetch(`/admin/tenants/${tid}/residents`);
+            const data = await res.json();
+            document.getElementById('residentList').innerHTML = data.map(r => `<tr><td>${r.first_name||''} ${r.last_name||''} (${r.nickname})</td><td>${r.phone_number||'-'}</td><td><button class="btn btn-outline" onclick='editResident(${JSON.stringify(r)})'>แก้ไข</button><button class="btn btn-danger" style="padding:2px 8px;" onclick="deleteResident(${r.id})">ลบ</button></td></tr>`).join('');
+        }
+        document.getElementById('residentForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const rid = document.getElementById('current_resident_id').value;
+            const tid = document.getElementById('current_tenant_id').value;
+            const formData = new FormData(e.target);
+            formData.append('nickname', document.getElementById('res_nickname').value);
+            formData.append('first_name', document.getElementById('res_first_name').value);
+            formData.append('last_name', document.getElementById('res_last_name').value);
+            formData.append('phone_number', document.getElementById('res_phone').value);
+            formData.append('workplace', document.getElementById('res_workplace').value);
+            const res = await fetch(rid ? `/admin/residents/${rid}/edit` : `/admin/tenants/${tid}/residents/add`, { method:'POST', body:formData });
+            if(res.ok) { e.target.reset(); document.getElementById('current_resident_id').value=''; loadResidents(tid); }
+        };
+        function editResident(r) {
+            document.getElementById('current_resident_id').value = r.id;
+            document.getElementById('res_first_name').value = r.first_name||'';
+            document.getElementById('res_last_name').value = r.last_name||'';
+            document.getElementById('res_nickname').value = r.nickname;
+            document.getElementById('res_phone').value = r.phone_number||'';
+            document.getElementById('res_workplace').value = r.workplace||'';
+        }
+
+        // Building Management JS
+        function openBuildingModal() {
+            document.getElementById('building_id_hidden').value = '';
+            document.getElementById('building_name').value = '';
+            document.getElementById('building_desc').value = '';
+            document.getElementById('buildingModalTitle').innerText = 'เพิ่มตึกใหม่';
+            document.getElementById('buildingModal').style.display = 'block';
+        }
+
+        function editBuilding(id, name, desc) {
+            document.getElementById('building_id_hidden').value = id;
+            document.getElementById('building_name').value = name;
+            document.getElementById('building_desc').value = desc;
+            document.getElementById('buildingModalTitle').innerText = 'แก้ไขข้อมูลอาคาร';
+            document.getElementById('buildingModal').style.display = 'block';
+        }
+
+        async function deleteBuilding(id) {
+            if (confirm('ยืนยันการลบอาคาร? (ต้องไม่มีห้องพักค้างอยู่ในอาคารนี้)')) {
+                const res = await fetch(`/admin/buildings/${id}/delete`, { method: 'POST' });
+                if (res.ok) location.reload();
+                else alert('ไม่สามารถลบได้: ' + (await res.json()).detail);
+            }
+        }
+
+        document.getElementById('buildingForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('building_id_hidden').value;
+            const formData = new FormData();
+            formData.append('name', document.getElementById('building_name').value);
+            formData.append('description', document.getElementById('building_desc').value);
+            
+            const url = id ? `/admin/buildings/${id}/edit` : '/admin/buildings/add';
+            const res = await fetch(url, { method: 'POST', body: formData });
+            if (res.ok) location.reload();
+        };
     </script>
 </body>
 </html>

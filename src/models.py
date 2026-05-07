@@ -8,10 +8,6 @@ class Owner(Base):
     __tablename__ = "owners"
     id = Column(Integer, primary_key=True, index=True)
     line_user_id = Column(String, unique=True, index=True, nullable=False)
-    admin_email = Column(String, unique=True)
-    password_hash = Column(String)
-    reset_token = Column(String)
-    reset_token_expiry = Column(DateTime)
     display_name = Column(String)
     promptpay_config = Column(Text, default='[]')
     promptpay_name = Column(String)
@@ -28,7 +24,6 @@ class Building(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
     description = Column(Text)
-    recurring_charges = Column(Text, default='[]') # JSON: [{"description": "...", "amount": 0}]
     
     rooms = relationship("Room", back_populates="building")
 
@@ -158,11 +153,3 @@ class MaintenanceRequest(Base):
     
     room = relationship("Room")
     tenant = relationship("Tenant")
-
-class LoginAttempt(Base):
-    __tablename__ = "login_attempts"
-    id = Column(Integer, primary_key=True, index=True)
-    ip_address = Column(String, unique=True, index=True)
-    attempts = Column(Integer, default=0)
-    lockout_until = Column(DateTime, nullable=True)
-    last_attempt = Column(DateTime, server_default=func.now(), onupdate=func.now())

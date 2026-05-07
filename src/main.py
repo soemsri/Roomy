@@ -407,27 +407,34 @@ async def view_bill(request: Request, invoice_uuid: str, db: Session = Depends(g
     
     if owner:
         qr_enabled = owner.qr_payment_enabled
-        promptpay_id = ""
-        promptpay_name = ""
-        bank_name = ""
-        bank_account = ""
-        
         # 1. Get room specific preference
         target_id = invoice.room.promptpay_id if invoice.room else None
         
-    # 2. Parse config
-    payment_config = {"cash": True, "promptpay": [], "bank_transfer": []}
+        # 2. Parse config
+        config_list = []
+        try:
+            config_list = json.loads(owner.promptpay_config)
+        except: pass
+        
+        if target_id and isinstance(config_list, list):
+            match = next((c for c in config_list if c.get('id') == target_id), None)
+            if match:
+                promptpay_id = match.get('id')
+                promptpay_name = match.get('name')
+        
+        # 3. Fallback
+        if not promptpay_id and isinstance(config_list, list) and len(config_list) > 0:
+            promptpay_id = config_list[0].get('id')
+            promptpay_name = config_list[0].get('name')
+
+    if not promptpay_id: promptpay_id = "0812345678"
+
     try:
-        raw_config = json.loads(owner.promptpay_config)
-        if isinstance(raw_config, dict) and "cash" in raw_config:
-            payment_config = raw_config
-        elif isinstance(raw_config, list):
-            # Migration logic if needed, but for now just pass as is or wrap
-            payment_config["promptpay"] = raw_config
-    except: pass
-    
-    # Check room specific if needed (optional for this specific requirement change)
-    
+        payload = promptpay.generate_promptpay_payload(promptpay_id, invoice.total_amount)
+    except Exception as e:
+        print(f"PromptPay Generation Error: {e}")
+        payload = ""
+
     return templates.TemplateResponse("bill.html", {
         "request": request,
         "invoice": invoice,
@@ -446,8 +453,9 @@ async def view_bill(request: Request, invoice_uuid: str, db: Session = Depends(g
         "late_fee": invoice.late_fee,
         "total_amount": invoice.total_amount,
         "status": invoice.status,
-        "payment_config": payment_config,
+        "promptpay_payload": payload,
         "qr_enabled": qr_enabled,
+        "promptpay_name": promptpay_name,
         "room": invoice.room
     })
 
@@ -500,174 +508,23 @@ async def view_history(request: Request, tenant_uuid: str, db: Session = Depends
     invoices = db.query(models.Invoice).filter(models.Invoice.tenant_id == tenant.id).order_by(models.Invoice.id.desc()).all()
     return templates.TemplateResponse("history.html", {"request": request, "tenant": tenant, "invoices": invoices})
 
-import bcrypt
-
-def verify_password(plain_password, hashed_password):
-    try:
-        return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
-    except Exception as e:
-        print(f"Password verification error: {e}")
-        return False
-
-def get_password_hash(password):
-    # bcrypt has a 72-character limit, but for normal passwords this is fine.
-    # We encode to utf-8 before hashing.
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-
 # Admin Security Dependency
-def get_admin(request: Request, db: Session = Depends(get_db)):
-    session_id = request.cookies.get("admin_session")
-    if not session_id:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-    
-    owner = db.query(models.Owner).first()
-    # Simple check: session_id matches the hash of current password (or we can use a dedicated session table)
-    # For now, let's keep it simple: the session cookie will store a signed value or just a secure token.
-    # To keep compatibility with existing structure but improved:
-    if not owner or session_id != str(owner.id): # Using owner.id as a simple session for now, ideally use a token
+def get_admin(request: Request):
+    if request.cookies.get("admin_session") != ADMIN_PASSWORD:
         raise HTTPException(status_code=401, detail="Unauthorized")
     return True
 
 @app.get("/admin/login", response_class=HTMLResponse)
-async def admin_login_page(request: Request, db: Session = Depends(get_db)):
-    owner = db.query(models.Owner).first()
-    first_run = owner is None or owner.admin_email is None
-    return templates.TemplateResponse("login.html", {"request": request, "first_run": first_run})
+async def admin_login_page(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request})
 
 @app.post("/admin/login")
-async def admin_login(request: Request, db: Session = Depends(get_db), password: str = Form(...), email: str = Form(None)):
-    client_ip = request.client.host
-    
-    # Check Lockout
-    attempt = db.query(models.LoginAttempt).filter(models.LoginAttempt.ip_address == client_ip).first()
-    if attempt and attempt.lockout_until and attempt.lockout_until > datetime.now():
-        wait_min = int((attempt.lockout_until - datetime.now()).total_seconds() / 60)
-        return RedirectResponse(url=f"/admin/login?error=locked&wait={wait_min}", status_code=303)
-
-    owner = db.query(models.Owner).first()
-    
-    # First run setup
-    if not owner or owner.admin_email is None:
-        if not email:
-            return RedirectResponse(url="/admin/login?error=email_required", status_code=303)
-        
-        if not owner:
-            owner = models.Owner(line_user_id="ADMIN_TEMP") # Placeholder
-            db.add(owner)
-        
-        owner.admin_email = email
-        owner.password_hash = get_password_hash(password)
-        db.commit()
-        
-        # Reset attempts on success
-        if attempt:
-            attempt.attempts = 0
-            attempt.lockout_until = None
-            db.commit()
-
+async def admin_login(password: str = Form(...)):
+    if password == ADMIN_PASSWORD:
         response = RedirectResponse(url="/admin/dashboard", status_code=303)
-        response.set_cookie(key="admin_session", value=str(owner.id), httponly=True)
+        response.set_cookie(key="admin_session", value=ADMIN_PASSWORD, httponly=True)
         return response
-
-    if verify_password(password, owner.password_hash):
-        # Reset attempts on success
-        if attempt:
-            attempt.attempts = 0
-            attempt.lockout_until = None
-            db.commit()
-            
-        response = RedirectResponse(url="/admin/dashboard", status_code=303)
-        response.set_cookie(key="admin_session", value=str(owner.id), httponly=True)
-        return response
-    
-    # Failed Attempt Logic
-    if not attempt:
-        attempt = models.LoginAttempt(ip_address=client_ip, attempts=1)
-        db.add(attempt)
-    else:
-        attempt.attempts += 1
-        if attempt.attempts >= 3:
-            attempt.lockout_until = datetime.now() + timedelta(hours=1)
-            db.commit()
-            return RedirectResponse(url="/admin/login?error=locked&wait=60", status_code=303)
-    
-    db.commit()
     return RedirectResponse(url="/admin/login?error=1", status_code=303)
-
-import smtplib
-from email.mime.text import MIMEText
-from datetime import timedelta
-
-SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USER = os.getenv("SMTP_USER", "")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
-
-def send_reset_email(email: str, token: str):
-    if not SMTP_USER or not SMTP_PASSWORD:
-        print(f"MOCK EMAIL to {email}: Reset link is {BASE_URL}/admin/reset-password?token={token}")
-        return
-    
-    msg = MIMEText(f"คลิกที่ลิงก์เพื่อรีเซ็ตรหัสผ่าน: {BASE_URL}/admin/reset-password?token={token}\n\nลิงก์จะหมดอายุใน 1 ชั่วโมง")
-    msg['Subject'] = "Reset Password - SukAnan Apartment"
-    msg['From'] = SMTP_USER
-    msg['To'] = email
-    
-    try:
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-            server.starttls()
-            server.login(SMTP_USER, SMTP_PASSWORD)
-            server.send_message(msg)
-    except Exception as e:
-        print(f"Email Error: {e}")
-
-@app.get("/admin/forgot-password", response_class=HTMLResponse)
-async def forgot_password_page(request: Request):
-    return templates.TemplateResponse("forgot_password.html", {"request": request})
-
-@app.post("/admin/forgot-password")
-async def forgot_password(db: Session = Depends(get_db), email: str = Form(...)):
-    owner = db.query(models.Owner).filter(models.Owner.admin_email == email).first()
-    if owner:
-        token = uuid.uuid4().hex
-        owner.reset_token = token
-        owner.reset_token_expiry = datetime.now() + timedelta(hours=1)
-        db.commit()
-        send_reset_email(email, token)
-        
-    # Always redirect to success to prevent email enumeration
-    return RedirectResponse(url="/admin/forgot-password?sent=1", status_code=303)
-
-@app.get("/admin/reset-password", response_class=HTMLResponse)
-async def reset_password_page(request: Request, token: str, db: Session = Depends(get_db)):
-    owner = db.query(models.Owner).filter(
-        models.Owner.reset_token == token,
-        models.Owner.reset_token_expiry > datetime.now()
-    ).first()
-    if not owner:
-        return HTMLResponse("ลิงก์รีเซ็ตรหัสผ่านไม่ถูกต้องหรือหมดอายุ", status_code=400)
-    return templates.TemplateResponse("reset_password.html", {"request": request, "token": token})
-
-@app.post("/admin/reset-password")
-async def reset_password(
-    token: str = Form(...), 
-    password: str = Form(...), 
-    db: Session = Depends(get_db)
-):
-    owner = db.query(models.Owner).filter(
-        models.Owner.reset_token == token,
-        models.Owner.reset_token_expiry > datetime.now()
-    ).first()
-    
-    if not owner:
-        return HTMLResponse("ลิงก์รีเซ็ตรหัสผ่านไม่ถูกต้องหรือหมดอายุ", status_code=400)
-    
-    owner.password_hash = get_password_hash(password)
-    owner.reset_token = None
-    owner.reset_token_expiry = None
-    db.commit()
-    
-    return RedirectResponse(url="/admin/login?reset=1", status_code=303)
 
 @app.get("/admin/logout")
 async def admin_logout():
@@ -681,7 +538,6 @@ async def admin_dashboard(request: Request, db: Session = Depends(get_db), admin
     from sqlalchemy.orm import joinedload
     stats = {
         "total_rooms": db.query(models.Room).count(),
-        "total_buildings": db.query(models.Building).count(),
         "vacant_rooms": db.query(models.Room).filter(models.Room.status == "Vacant").count(),
         "unpaid_invoices": db.query(models.Invoice).filter(models.Invoice.status == "Unpaid").count(),
         "pending_verification": db.query(models.Invoice).filter(models.Invoice.status == "Pending Verification").count(),
@@ -837,27 +693,12 @@ async def reject_registration(tenant_id: int, db: Session = Depends(get_db), adm
     return {"status": "Success"}
 
 @app.post("/admin/unmap/{tenant_id}")
-async def unmap_tenant(
-    tenant_id: int, 
-    final_elec: float = Form(None), 
-    final_water: float = Form(None), 
-    move_out_date: str = Form(None),
-    db: Session = Depends(get_db), 
-    admin: bool = Depends(get_admin)
-):
+async def unmap_tenant(tenant_id: int, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
     tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
         
     room = tenant.room
-    
-    # Generate final bill if readings are provided
-    if final_elec is not None and final_water is not None:
-        import billing
-        from datetime import datetime
-        mo_date = datetime.strptime(move_out_date, "%Y-%m-%d") if move_out_date else datetime.now()
-        billing.calculate_pro_rated_bill(db, room.id, mo_date, final_elec, final_water)
-
     if room:
         room.status = "Vacant"
     
@@ -892,32 +733,18 @@ async def list_buildings(db: Session = Depends(get_db), admin: bool = Depends(ge
     return [{"id": b.id, "name": b.name, "description": b.description} for b in buildings]
 
 @app.post("/admin/buildings/add")
-async def add_building(
-    name: str = Form(...), 
-    description: str = Form(None), 
-    recurring_charges: str = Form("[]"),
-    db: Session = Depends(get_db), 
-    admin: bool = Depends(get_admin)
-):
-    new_building = models.Building(name=name, description=description, recurring_charges=recurring_charges)
+async def add_building(name: str = Form(...), description: str = Form(None), db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+    new_building = models.Building(name=name, description=description)
     db.add(new_building)
     db.commit()
     return {"status": "Success", "id": new_building.id}
 
 @app.post("/admin/buildings/{building_id}/edit")
-async def edit_building(
-    building_id: int, 
-    name: str = Form(...), 
-    description: str = Form(None), 
-    recurring_charges: str = Form("[]"),
-    db: Session = Depends(get_db), 
-    admin: bool = Depends(get_admin)
-):
+async def edit_building(building_id: int, name: str = Form(...), description: str = Form(None), db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
     building = db.query(models.Building).filter(models.Building.id == building_id).first()
     if not building: raise HTTPException(status_code=404, detail="Building not found")
     building.name = name
     building.description = description
-    building.recurring_charges = recurring_charges
     db.commit()
     return {"status": "Success"}
 
@@ -1048,7 +875,6 @@ async def get_room_details(room_id: int, db: Session = Depends(get_db), admin: b
             "global_recurring": global_recurring
         },
         "tenant": {
-            "id": tenant.id if tenant else None,
             "full_name": tenant.full_name if tenant else None,
             "phone_number": tenant.phone_number if tenant else None,
             "residents": [{"nickname": r.nickname, "full_name": f"{r.first_name} {r.last_name}"} for r in tenant.residents] if tenant else []
@@ -1096,137 +922,6 @@ async def delete_room_asset(asset_id: int, db: Session = Depends(get_db), admin:
     return {"status": "Success"}
 
 
-def send_receipt_flex(tenant_line_id: str, invoice: models.Invoice, db: Session):
-    if not tenant_line_id or not tenant_bot_api:
-        return
-
-    from linebot.models import FlexSendMessage
-    import json
-    
-    room_number = invoice.room.room_number if invoice.room else "N/A"
-    billing_period = f"{invoice.billing_month}/{invoice.billing_year}"
-    total_str = f"{invoice.total_amount:,.2f}"
-    paid_date = invoice.paid_at.strftime("%d/%m/%Y %H:%M") if invoice.paid_at else datetime.now().strftime("%d/%m/%Y %H:%M")
-    
-    # Detailed charges for receipt
-    other_charges_list = []
-    if invoice.other_charges:
-        try:
-            other_charges_list = json.loads(invoice.other_charges)
-        except: pass
-
-    # Build charge rows for Flex
-    charge_rows = [
-        {
-            "type": "box",
-            "layout": "horizontal",
-            "contents": [
-                {"type": "text", "text": "ค่าเช่าห้อง", "size": "sm", "color": "#555555", "flex": 0},
-                {"type": "text", "text": f"{invoice.rent_amount:,.2f} ฿", "size": "sm", "color": "#111111", "align": "end"}
-            ]
-        },
-        {
-            "type": "box",
-            "layout": "horizontal",
-            "contents": [
-                {"type": "text", "text": "ค่าไฟ", "size": "sm", "color": "#555555", "flex": 0},
-                {"type": "text", "text": f"{invoice.electricity_amount:,.2f} ฿", "size": "sm", "color": "#111111", "align": "end"}
-            ]
-        },
-        {
-            "type": "box",
-            "layout": "horizontal",
-            "contents": [
-                {"type": "text", "text": "ค่าน้ำ", "size": "sm", "color": "#555555", "flex": 0},
-                {"type": "text", "text": f"{invoice.water_amount:,.2f} ฿", "size": "sm", "color": "#111111", "align": "end"}
-            ]
-        }
-    ]
-    
-    for c in other_charges_list:
-        charge_rows.append({
-            "type": "box",
-            "layout": "horizontal",
-            "contents": [
-                {"type": "text", "text": c.get('description', 'อื่นๆ'), "size": "sm", "color": "#555555", "flex": 0},
-                {"type": "text", "text": f"{float(c.get('amount', 0)):,.2f} ฿", "size": "sm", "color": "#111111", "align": "end"}
-            ]
-        })
-        
-    if invoice.late_fee > 0:
-        charge_rows.append({
-            "type": "box",
-            "layout": "horizontal",
-            "contents": [
-                {"type": "text", "text": "ค่าปรับจ่ายช้า", "size": "sm", "color": "#e74c3c", "flex": 0},
-                {"type": "text", "text": f"{invoice.late_fee:,.2f} ฿", "size": "sm", "color": "#e74c3c", "align": "end"}
-            ]
-        })
-
-    flex_contents = {
-      "type": "bubble",
-      "body": {
-        "type": "box",
-        "layout": "vertical",
-        "contents": [
-          {"type": "text", "text": "RECEIPT", "weight": "bold", "color": "#1DB446", "size": "sm"},
-          {"type": "text", "text": "สุขอนันต์ อพาร์ทเม้นท์", "weight": "bold", "size": "xxl", "margin": "md"},
-          {"type": "text", "text": f"ห้อง {room_number}", "size": "xs", "color": "#aaaaaa", "wrap": True},
-          {"type": "separator", "margin": "xxl"},
-          {
-            "type": "box",
-            "layout": "vertical",
-            "margin": "xxl",
-            "spacing": "sm",
-            "contents": charge_rows
-          },
-          {"type": "separator", "margin": "xxl"},
-          {
-            "type": "box",
-            "layout": "horizontal",
-            "margin": "md",
-            "contents": [
-              {"type": "text", "text": "รวมทั้งสิ้น", "size": "md", "color": "#555555", "flex": 0, "weight": "bold"},
-              {"type": "text", "text": f"{total_str} ฿", "size": "lg", "color": "#111111", "align": "end", "weight": "bold"}
-            ]
-          },
-          {
-            "type": "box",
-            "layout": "horizontal",
-            "margin": "md",
-            "contents": [
-              {"type": "text", "text": "วันที่ชำระ", "size": "xs", "color": "#aaaaaa", "flex": 0},
-              {"type": "text", "text": paid_date, "size": "xs", "color": "#aaaaaa", "align": "end"}
-            ]
-          }
-        ]
-      },
-      "footer": {
-        "type": "box",
-        "layout": "vertical",
-        "spacing": "sm",
-        "contents": [
-          {
-            "type": "button",
-            "style": "link",
-            "height": "sm",
-            "action": {
-              "type": "uri",
-              "label": "ดูรายละเอียดบิล",
-              "uri": f"{BASE_URL}/bill/{invoice.uuid}"
-            }
-          },
-          {"type": "spacer", "size": "sm"}
-        ],
-        "flex": 0
-      }
-    }
-    
-    try:
-        tenant_bot_api.push_message(tenant_line_id, FlexSendMessage(alt_text=f"ใบเสร็จรับเงิน ห้อง {room_number}", contents=flex_contents))
-    except Exception as e:
-        print(f"Flex Message Error: {e}")
-
 @app.post("/admin/invoice/{invoice_id}/confirm-cash")
 async def confirm_cash_payment(
     invoice_id: int, 
@@ -1248,11 +943,6 @@ async def confirm_cash_payment(
     invoice.payment_receipt_img = f"/uploads/{file_name}"
     invoice.paid_at = datetime.now()
     db.commit()
-    
-    # Notify tenant with Flex Receipt
-    if invoice.tenant and invoice.tenant.line_user_id:
-        send_receipt_flex(invoice.tenant.line_user_id, invoice, db)
-
     return {"status": "Success", "receipt": invoice.payment_receipt_img}
 
 @app.post("/admin/invoice/{invoice_id}/cancel")
@@ -1323,9 +1013,13 @@ async def approve_invoice(invoice_id: int, db: Session = Depends(get_db), admin:
         invoice.paid_at = datetime.now()
     db.commit()
     
-    # Notify tenant with Flex Receipt
-    if invoice.tenant and invoice.tenant.line_user_id:
-        send_receipt_flex(invoice.tenant.line_user_id, invoice, db)
+    # Notify tenant
+    tenant = invoice.tenant
+    if tenant and tenant.line_user_id and line_bot_api:
+        from linebot.models import TextSendMessage
+        try:
+            line_bot_api.push_message(tenant.line_user_id, TextSendMessage(text=f"✅ ชำระเงินเรียบร้อย! บิลเดือน {invoice.billing_month}/{invoice.billing_year} ได้รับการตรวจสอบแล้ว ขอบคุณครับ"))
+        except: pass
         
     return {"status": "Success"}
 
@@ -1361,10 +1055,6 @@ async def send_invoice_line(invoice_id: int, db: Session = Depends(get_db), admi
     if not tenant_bot_api:
         raise HTTPException(status_code=500, detail="LINE Bot API not configured")
 
-    if invoice.status == "Paid":
-        send_receipt_flex(tenant.line_user_id, invoice, db)
-        return {"status": "Success", "type": "receipt"}
-
     msg = f"📄 ใบแจ้งค่าเช่าเดือน {invoice.billing_month}/{invoice.billing_year}\n"
     msg += f"ห้อง {invoice.room.room_number if invoice.room else 'N/A'}\n"
     msg += f"ยอดรวม: {invoice.total_amount:,.2f} บาท\n\n"
@@ -1372,7 +1062,7 @@ async def send_invoice_line(invoice_id: int, db: Session = Depends(get_db), admi
     
     try:
         tenant_bot_api.push_message(tenant.line_user_id, TextSendMessage(text=msg))
-        return {"status": "Success", "type": "invoice"}
+        return {"status": "Success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"LINE Error: {str(e)}")
 
@@ -1707,12 +1397,10 @@ async def get_meter_history(room_id: int = None, db: Session = Depends(get_db), 
         })
     return results
 @app.get("/admin/repair/history")
-async def get_repair_history(room_id: int = None, exclude_fixed: bool = False, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+async def get_repair_history(room_id: int = None, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
     query = db.query(models.MaintenanceRequest).join(models.Room)
     if room_id:
         query = query.filter(models.MaintenanceRequest.room_id == room_id)
-    if exclude_fixed:
-        query = query.filter(models.MaintenanceRequest.status != 'Fixed')
     
     repairs = query.order_by(models.MaintenanceRequest.id.desc()).all()
     

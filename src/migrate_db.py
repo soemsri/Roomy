@@ -12,10 +12,6 @@ def migrate():
     
     commands = [
         # Owners table
-        "ALTER TABLE owners ADD COLUMN admin_email TEXT",
-        "ALTER TABLE owners ADD COLUMN password_hash TEXT",
-        "ALTER TABLE owners ADD COLUMN reset_token TEXT",
-        "ALTER TABLE owners ADD COLUMN reset_token_expiry DATETIME",
         "ALTER TABLE owners ADD COLUMN late_fee_enabled INTEGER DEFAULT 0",
         "ALTER TABLE owners ADD COLUMN due_day INTEGER DEFAULT 5",
         "ALTER TABLE owners ADD COLUMN late_fee_per_day REAL DEFAULT 50.0",
@@ -48,9 +44,6 @@ def migrate():
         # New: buildings table
         "CREATE TABLE IF NOT EXISTS buildings (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, description TEXT)",
         
-        # New: login_attempts table
-        "CREATE TABLE IF NOT EXISTS login_attempts (id INTEGER PRIMARY KEY AUTOINCREMENT, ip_address TEXT UNIQUE, attempts INTEGER DEFAULT 0, lockout_until DATETIME, last_attempt DATETIME DEFAULT CURRENT_TIMESTAMP)",
-
         # Room building_id
         "ALTER TABLE rooms ADD COLUMN building_id INTEGER REFERENCES buildings(id)",
 

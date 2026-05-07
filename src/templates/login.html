@@ -16,43 +16,15 @@
     <div class="login-card">
         <h2>Admin Login</h2>
         <form action="/admin/login" method="post">
-            {% if first_run %}
-            <div style="background: #e0f2ff; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 0.9em; color: #005a9e;">
-                <strong>ยินดีต้อนรับ!</strong> กรุณากำหนด Email และรหัสผ่านสำหรับเข้าใช้งานระบบครั้งแรก (Email นี้จะไม่สามารถเปลี่ยนได้ในภายหลัง)
-            </div>
-            <input type="email" name="email" placeholder="Admin Email (One-time setup)" required>
-            {% endif %}
             <input type="password" name="password" placeholder="Admin Password" required autofocus>
-            <button type="submit">{% if first_run %}Set Admin & Login{% else %}Login{% endif %}</button>
-            </form>
-            {% if not first_run %}
-            <div style="margin-top: 15px; font-size: 0.85em;">
-            <a href="/admin/forgot-password" style="color: var(--primary); text-decoration: none;">ลืมรหัสผ่าน?</a>
-            </div>
-            {% endif %}        <p id="error-msg" class="error" style="display:none;"></p>
-        <p id="success-msg" class="success" style="display:none; color: #27ae60; background: #eafaf1; padding: 10px; border-radius: 5px; margin-bottom: 20px; font-size: 0.9em;"></p>
+            <button type="submit">Login</button>
+        </form>
+        <p id="error-msg" class="error" style="display:none;">รหัสผ่านไม่ถูกต้อง</p>
     </div>
     <script>
         const urlParams = new URLSearchParams(window.location.search);
-        const error = urlParams.get('error');
-        const errorEl = document.getElementById('error-msg');
-        const successEl = document.getElementById('success-msg');
-
-        if (error) {
-            errorEl.style.display = 'block';
-            if (error === 'locked') {
-                const wait = urlParams.get('wait') || '60';
-                errorEl.innerText = `เครื่องนี้ถูกระงับการเข้าถึงชั่วคราวเนื่องจากรหัสผ่านผิดเกินกำหนด กรุณารอ ${wait} นาที`;
-            } else if (error === 'email_required') {
-                errorEl.innerText = 'กรุณากรอก Email สำหรับตั้งค่าแอดมิน';
-            } else {
-                errorEl.innerText = 'รหัสผ่านไม่ถูกต้อง';
-            }
-        }
-
-        if (urlParams.has('reset')) {
-            successEl.style.display = 'block';
-            successEl.innerText = 'รีเซ็ตรหัสผ่านเรียบร้อยแล้ว กรุณาเข้าสู่ระบบด้วยรหัสผ่านใหม่';
+        if (urlParams.has('error')) {
+            document.getElementById('error-msg').style.display = 'block';
         }
     </script>
 </body>
