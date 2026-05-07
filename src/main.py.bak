@@ -1,0 +1,945 @@
+import os
+import shutil
+import uuid
+import requests
+import csv
+import io
+import json
+from datetime import datetime
+from dotenv import load_dotenv
+from fastapi import FastAPI, Request, HTTPException, Depends, Form, File, UploadFile
+from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
+from sqlalchemy.orm import Session
+from linebot import LineBotApi, WebhookHandler
+from linebot.exceptions import InvalidSignatureError
+from linebot.models import MessageEvent, TextMessage, TextSendMessage
+
+from database import SessionLocal, engine, get_db
+import models
+import billing
+import promptpay
+
+# Load env from src/.env
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
+
+app = FastAPI()
+
+# Important: directory is relative to where you run uvicorn
+# If running from 'src' folder, directory="templates" is correct.
+templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "templates"))
+
+# Static files for images
+uploads_dir = os.path.join(os.path.dirname(__file__), "uploads")
+if not os.path.exists(uploads_dir):
+    os.makedirs(uploads_dir)
+app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
+
+# LINE Credentials
+LINE_ADMIN_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_ADMIN_CHANNEL_ACCESS_TOKEN")
+LINE_ADMIN_CHANNEL_SECRET = os.getenv("LINE_ADMIN_CHANNEL_SECRET")
+LINE_TENANT_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_TENANT_CHANNEL_ACCESS_TOKEN")
+LINE_TENANT_CHANNEL_SECRET = os.getenv("LINE_TENANT_CHANNEL_SECRET")
+
+LINE_NOTIFY_TOKEN = os.getenv("LINE_NOTIFY_TOKEN", "")
+BASE_URL = os.getenv("BASE_URL", "http://localhost:8000").rstrip("/")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin1234")
+
+# Admin Channel
+admin_bot_api = LineBotApi(LINE_ADMIN_CHANNEL_ACCESS_TOKEN) if LINE_ADMIN_CHANNEL_ACCESS_TOKEN else None
+admin_handler = WebhookHandler(LINE_ADMIN_CHANNEL_SECRET) if LINE_ADMIN_CHANNEL_SECRET else None
+
+# Tenant Channel
+tenant_bot_api = LineBotApi(LINE_TENANT_CHANNEL_ACCESS_TOKEN) if LINE_TENANT_CHANNEL_ACCESS_TOKEN else None
+tenant_handler = WebhookHandler(LINE_TENANT_CHANNEL_SECRET) if LINE_TENANT_CHANNEL_SECRET else None
+
+# Compatibility shim (optional, if you want to keep old variable names for some internal logic)
+line_bot_api = tenant_bot_api 
+
+def send_line_notify(message: str):
+    if not LINE_NOTIFY_TOKEN:
+        print(f"LINE NOTIFY (Mock): {message}")
+        return
+    url = "https://notify-api.line.me/api/notify"
+    headers = {"Authorization": f"Bearer {LINE_NOTIFY_TOKEN}"}
+    data = {"message": message}
+    requests.post(url, headers=headers, data=data)
+
+@app.get("/")
+async def root():
+    return {"message": "SukAnan Apartment API is running"}
+
+@app.post("/callback/admin")
+async def callback_admin(request: Request):
+    signature = request.headers.get("X-Line-Signature")
+    body = await request.body()
+    body_str = body.decode("utf-8")
+    
+    if not admin_handler:
+        print("Admin Handler not initialized. Check LINE_ADMIN_CHANNEL_SECRET.")
+        return "OK"
+        
+    try:
+        admin_handler.handle(body_str, signature)
+    except InvalidSignatureError:
+        print("Admin Webhook Error: Invalid Signature. Check LINE_ADMIN_CHANNEL_SECRET.")
+        raise HTTPException(status_code=400, detail="Invalid signature")
+    except Exception as e:
+        print(f"Admin Webhook Error: {e}")
+        import traceback
+        traceback.print_exc()
+    return "OK"
+
+@app.post("/callback/tenant")
+async def callback_tenant(request: Request):
+    signature = request.headers.get("X-Line-Signature")
+    body = await request.body()
+    body_str = body.decode("utf-8")
+    
+    if not tenant_handler:
+        print("Tenant Handler not initialized. Check LINE_TENANT_CHANNEL_SECRET.")
+        return "OK"
+        
+    try:
+        tenant_handler.handle(body_str, signature)
+    except InvalidSignatureError:
+        print("Tenant Webhook Error: Invalid Signature. Check LINE_TENANT_CHANNEL_SECRET.")
+        raise HTTPException(status_code=400, detail="Invalid signature")
+    except Exception as e:
+        print(f"Tenant Webhook Error: {e}")
+        import traceback
+        traceback.print_exc()
+    return "OK"
+@admin_handler.add(MessageEvent, message=TextMessage)
+def handle_admin_message(event, *args, **kwargs):
+    # Debug: See what was passed
+    print(f"DEBUG: handle_admin_message called with {len(args)} positional args and {list(kwargs.keys())} keyword args")
+
+    # Handle optional arguments from SDK or tests
+    destination = args[0] if len(args) > 0 else None
+    db = kwargs.get('db')
+
+    # Check if destination was actually db (from old test style)
+    if isinstance(destination, Session):
+        db = destination
+        destination = None
+
+    # Check if it's a MessageEvent with TextMessage
+    if not hasattr(event, "message") or not hasattr(event.message, "text"):
+        return
+        
+    text = event.message.text.strip()
+    user_id = event.source.user_id
+    
+    close_db = False
+    if db is None:
+        db = SessionLocal()
+        close_db = True
+        
+    reply_text = ""
+    try:
+        owner = db.query(models.Owner).filter(models.Owner.line_user_id == user_id).first()
+        if not owner:
+            if not db.query(models.Owner).first():
+                owner = models.Owner(line_user_id=user_id, display_name="Owner")
+                db.add(owner)
+                db.commit()
+                reply_text = "ยินดีด้วย! คุณได้รับการลงทะเบียนเป็นเจ้าของระบบใน Admin Channel เรียบร้อยแล้ว"
+            else:
+                reply_text = "ขออภัย คุณไม่ได้รับอนุญาตให้ใช้ Admin Channel นี้"
+        else:
+            if text.startswith("APPROVE_REG_") or text.startswith("REJECT_REG_"):
+                parts = text.split("_")
+                action = parts[0]
+                tid = int(parts[2])
+                target_tenant = db.query(models.Tenant).filter(models.Tenant.id == tid).first()
+                if target_tenant:
+                    if action == "APPROVE":
+                        room = target_tenant.room
+                        if room:
+                            room.status = "Occupied"
+                            new_lease = models.Lease(room_id=room.id, tenant_id=target_tenant.id, start_date=datetime.now())
+                            db.add(new_lease)
+                            target_tenant.status = "Active"
+                            db.commit()
+                            reply_text = f"อนุมัติผู้เช่าห้อง {room.room_number} เรียบร้อย"
+                            if tenant_bot_api:
+                                tenant_bot_api.push_message(target_tenant.line_user_id, TextSendMessage(text=f"ยินดีด้วย! การลงทะเบียนเข้าพักห้อง {room.room_number} ของคุณได้รับการอนุมัติแล้ว"))
+                        else:
+                            reply_text = "ไม่พบข้อมูลห้อง"
+                    else:
+                        target_tenant.status = "Rejected"
+                        target_tenant.current_room_id = None
+                        db.commit()
+                        reply_text = "ปฏิเสธการลงทะเบียนเรียบร้อย"
+                        if tenant_bot_api:
+                            tenant_bot_api.push_message(target_tenant.line_user_id, TextSendMessage(text="ขออภัย การลงทะเบียนของคุณถูกปฏิเสธ กรุณาติดต่อเจ้าของหอพัก"))
+                else:
+                    reply_text = "ไม่พบข้อมูลผู้เช่า"
+            elif text == "ผังห้อง":
+                reply_text = f"🏠 ดูผังห้องและจัดการผู้เช่า:\n{BASE_URL}/admin/dashboard"
+            elif text == "จดมิเตอร์":
+                reply_text = f"📊 จดบันทึกมิเตอร์น้ำ-ไฟ:\n{BASE_URL}/admin/dashboard"
+            elif text == "สรุปรายรับ":
+                reply_text = f"💰 สรุปรายรับและส่งออกรายงาน:\n{BASE_URL}/admin/dashboard"
+            elif text == "จัดการสัญญา":
+                reply_text = f"📜 จัดการสัญญาเช่า:\n{BASE_URL}/admin/dashboard"
+            elif text == "ตั้งค่า":
+                reply_text = f"⚙️ ตั้งค่าระบบและพร้อมเพย์:\n{BASE_URL}/admin/dashboard"
+            elif text == "รายการแจ้งซ่อม":
+                reply_text = f"🛠️ รายการแจ้งซ่อมจากผู้เช่า:\n{BASE_URL}/admin/dashboard"
+            else:
+                reply_text = "สวัสดีครับเจ้าของหอพัก! กรุณาเลือกเมนูจาก Rich Menu เพื่อดำเนินการ"
+        
+        if admin_bot_api and reply_text:
+            admin_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
+    finally:
+        if close_db:
+            db.close()
+
+@tenant_handler.add(MessageEvent, message=TextMessage)
+def handle_tenant_message(event, *args, **kwargs):
+    # Handle optional arguments from SDK or tests
+    destination = args[0] if len(args) > 0 else None
+    db = kwargs.get('db')
+    
+    # Check if destination was actually db (from old test style)
+    if isinstance(destination, Session):
+        db = destination
+        destination = None
+
+    text = event.message.text.strip()
+    user_id = event.source.user_id
+    
+    close_db = False
+    if db is None:
+        db = SessionLocal()
+        close_db = True
+        
+    try:
+        tenant = db.query(models.Tenant).filter(models.Tenant.line_user_id == user_id).first()
+        
+        if not tenant or tenant.status in ["Rejected", "AwaitingName", "AwaitingPhone"]:
+            if not tenant or tenant.status == "Rejected":
+                room = db.query(models.Room).filter(models.Room.room_number == text).first()
+                if room and room.status == "Vacant":
+                    if not tenant:
+                        tenant = models.Tenant(line_user_id=user_id, current_room_id=room.id, uuid=str(uuid.uuid4()), status="AwaitingName")
+                        db.add(tenant)
+                    else:
+                        tenant.current_room_id = room.id
+                        tenant.status = "AwaitingName"
+                    db.commit()
+                    reply_text = f"ห้อง {room.room_number} ว่าง! กรุณาพิมพ์ ชื่อ-นามสกุล ของคุณเพื่อลงทะเบียน"
+                elif room and room.status != "Vacant":
+                    reply_text = f"ห้อง {text} ไม่ว่างในขณะนี้ หากข้อมูลผิดพลาดกรุณาติดต่อเจ้าของ"
+                else:
+                    reply_text = f"สวัสดีครับ\nกรุณาพิมพ์หมายเลขห้องเพื่อลงทะเบียน (เช่น A101)"
+            
+            elif tenant.status == "AwaitingName":
+                tenant.full_name = text
+                tenant.status = "AwaitingPhone"
+                db.commit()
+                reply_text = f"ขอบคุณครับคุณ {text}, กรุณาพิมพ์ เบอร์โทรศัพท์ ของคุณ"
+            
+            elif tenant.status == "AwaitingPhone":
+                tenant.phone_number = text
+                tenant.status = "Pending"
+                db.commit()
+                db.refresh(tenant)
+                room_number = tenant.room.room_number if tenant.room else "N/A"
+                reply_text = f"บันทึกข้อมูลเรียบร้อย! กรุณารอเจ้าของอนุมัติการเข้าพักห้อง {room_number}"
+                
+                # Notify Owner via Admin Channel
+                owner = db.query(models.Owner).first()
+                if owner and owner.line_user_id and admin_bot_api:
+                    try:
+                        from linebot.models import ButtonsTemplate, TemplateSendMessage, MessageAction
+                        buttons_template = ButtonsTemplate(
+                            title='อนุมัติผู้เช่าใหม่',
+                            text=f'ห้อง {room_number}: {tenant.full_name}',
+                            actions=[
+                                MessageAction(label='อนุมัติ', text=f'APPROVE_REG_{tenant.id}'),
+                                MessageAction(label='ปฏิเสธ', text=f'REJECT_REG_{tenant.id}')
+                            ]
+                        )
+                        admin_bot_api.push_message(owner.line_user_id, TemplateSendMessage(alt_text='มีผู้ขอลงทะเบียนใหม่', template=buttons_template))
+                    except:
+                        send_line_notify(f"🔔 มีผู้ขอลงทะเบียนห้อง {room_number}\nชื่อ: {tenant.full_name}")
+                else:
+                    send_line_notify(f"🔔 มีผู้ขอลงทะเบียนห้อง {room_number}")
+        
+        elif tenant.status == "Pending":
+            reply_text = "คำขอของคุณอยู่ระหว่างการพิจารณา กรุณารอเจ้าของอนุมัติ"
+        else: # Active
+            room_number = tenant.room.room_number if tenant.room else "N/A"
+            if text == "ดูค่าเช่า":
+                invoice = db.query(models.Invoice).filter(models.Invoice.tenant_id == tenant.id).order_by(models.Invoice.id.desc()).first()
+                if invoice:
+                    reply_text = f"บิลเดือน {invoice.billing_month}/{invoice.billing_year}\nยอดรวม: {invoice.total_amount} บาท\nดูรายละเอียด: {BASE_URL}/bill/{invoice.uuid}"
+                else:
+                    reply_text = "ไม่พบข้อมูลบิลล่าสุด"
+            elif text == "แจ้งซ่อม":
+                reply_text = f"แจ้งซ่อมห้อง {room_number}:\n{BASE_URL}/repair/{tenant.uuid}"
+            elif text == "ประวัติ":
+                reply_text = f"ดูประวัติย้อนหลัง:\n{BASE_URL}/history/{tenant.uuid}"
+            else:
+                reply_text = f"สวัสดี ห้อง {room_number}!\nพิมพ์ 'ดูค่าเช่า', 'แจ้งซ่อม' หรือ 'ประวัติ'"
+            
+        if tenant_bot_api:
+            tenant_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
+    finally:
+        if close_db:
+            db.close()
+
+# Tenant APIs
+@app.get("/bill/{invoice_uuid}", response_class=HTMLResponse)
+async def view_bill(request: Request, invoice_uuid: str, db: Session = Depends(get_db)):
+    invoice = db.query(models.Invoice).filter(models.Invoice.uuid == invoice_uuid).first()
+    if not invoice: raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    owner = db.query(models.Owner).first()
+    
+    # Late fee calculation logic
+    current_total = invoice.rent_amount + invoice.electricity_amount + invoice.water_amount
+    late_fee = 0.0
+    if owner and owner.late_fee_enabled and invoice.status == "Unpaid":
+        # Check if today is past the due date of the billing month
+        due_date = datetime(invoice.billing_year, invoice.billing_month, owner.due_day)
+        # Handle month overflow if needed, but usually due date is same month
+        today = datetime.now()
+        if today > due_date:
+            days_late = (today - due_date).days
+            late_fee = days_late * owner.late_fee_per_day
+            invoice.late_fee = late_fee
+            invoice.total_amount = current_total + late_fee
+            db.commit()
+
+    promptpay_id = "0812345678" # Default fallback
+    qr_enabled = 1
+    
+    if owner:
+        qr_enabled = owner.qr_payment_enabled
+        if owner.promptpay_config:
+            try:
+                config = json.loads(owner.promptpay_config)
+                if isinstance(config, list) and len(config) > 0:
+                    promptpay_id = config[0]
+                elif isinstance(config, str):
+                    promptpay_id = config
+            except:
+                pass
+        
+    try:
+        payload = promptpay.generate_promptpay_payload(promptpay_id, invoice.total_amount)
+    except Exception as e:
+        print(f"PromptPay Generation Error: {e}")
+        payload = ""
+
+    return templates.TemplateResponse("bill.html", {
+        "request": request,
+        "invoice_uuid": invoice_uuid,
+        "room_number": invoice.room.room_number if invoice.room else "N/A",
+        "month": invoice.billing_month,
+        "year": invoice.billing_year,
+        "rent_amount": invoice.rent_amount,
+        "water_amount": invoice.water_amount,
+        "electricity_amount": invoice.electricity_amount,
+        "late_fee": invoice.late_fee,
+        "total_amount": invoice.total_amount,
+        "status": invoice.status,
+        "promptpay_payload": payload,
+        "qr_enabled": qr_enabled
+    })
+
+@app.post("/bill/{invoice_uuid}/upload-slip")
+async def upload_slip(
+    invoice_uuid: str, 
+    image: UploadFile = File(...), 
+    db: Session = Depends(get_db)
+):
+    invoice = db.query(models.Invoice).filter(models.Invoice.uuid == invoice_uuid).first()
+    if not invoice: raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    # Ensure directory exists
+    if not os.path.exists(uploads_dir):
+        os.makedirs(uploads_dir)
+        
+    file_ext = os.path.splitext(image.filename)[1]
+    file_name = f"slip_{invoice.id}_{uuid.uuid4().hex}{file_ext}"
+    file_path = os.path.join(uploads_dir, file_name)
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(image.file, buffer)
+    
+    invoice.status = "Pending Verification"
+    invoice.payment_method = "PromptPay"
+    invoice.payment_receipt_img = f"/uploads/{file_name}"
+    invoice.paid_at = datetime.now()
+    db.commit()
+    
+    # Notify Owner
+    room_number = invoice.room.room_number if invoice.room else "N/A"
+    send_line_notify(f"💰 สลิปใหม่: ห้อง {room_number}\nยอด: {invoice.total_amount:,.2f} บาท\nตรวจสอบได้ที่ dashboard")
+    
+    return {"status": "Success", "receipt": invoice.payment_receipt_img}
+
+@app.get("/repair/{tenant_uuid}", response_class=HTMLResponse)
+async def repair_form(request: Request, tenant_uuid: str, db: Session = Depends(get_db)):
+    tenant = db.query(models.Tenant).filter(models.Tenant.uuid == tenant_uuid).first()
+    if not tenant: raise HTTPException(status_code=404, detail="Tenant not found")
+    return templates.TemplateResponse("repair.html", {
+        "request": request,
+        "tenant_id": tenant.id,
+        "room_id": tenant.current_room_id,
+        "room_number": tenant.room.room_number if tenant.room else "N/A"
+    })
+
+@app.get("/history/{tenant_uuid}", response_class=HTMLResponse)
+async def view_history(request: Request, tenant_uuid: str, db: Session = Depends(get_db)):
+    tenant = db.query(models.Tenant).filter(models.Tenant.uuid == tenant_uuid).first()
+    if not tenant: raise HTTPException(status_code=404, detail="Tenant not found")
+    invoices = db.query(models.Invoice).filter(models.Invoice.tenant_id == tenant.id).order_by(models.Invoice.id.desc()).all()
+    return templates.TemplateResponse("history.html", {"request": request, "tenant": tenant, "invoices": invoices})
+
+# Admin Security Dependency
+def get_admin(request: Request):
+    if request.cookies.get("admin_session") != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return True
+
+@app.get("/admin/login", response_class=HTMLResponse)
+async def admin_login_page(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request})
+
+@app.post("/admin/login")
+async def admin_login(password: str = Form(...)):
+    if password == ADMIN_PASSWORD:
+        response = RedirectResponse(url="/admin/dashboard", status_code=303)
+        response.set_cookie(key="admin_session", value=ADMIN_PASSWORD, httponly=True)
+        return response
+    return RedirectResponse(url="/admin/login?error=1", status_code=303)
+
+@app.get("/admin/logout")
+async def admin_logout():
+    response = RedirectResponse(url="/admin/login", status_code=303)
+    response.delete_cookie("admin_session")
+    return response
+
+from sqlalchemy.orm import Session, joinedload
+# ... (existing code)
+
+# Update admin_dashboard
+@app.get("/admin/dashboard", response_class=HTMLResponse)
+async def admin_dashboard(request: Request, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+    stats = {
+        "total_rooms": db.query(models.Room).count(),
+        "vacant_rooms": db.query(models.Room).filter(models.Room.status == "Vacant").count(),
+        "unpaid_invoices": db.query(models.Invoice).filter(models.Invoice.status == "Unpaid").count(),
+        "pending_repairs": db.query(models.MaintenanceRequest).filter(models.MaintenanceRequest.status == "Pending").count()
+    }
+    recent_invoices = db.query(models.Invoice).order_by(models.Invoice.id.desc()).limit(10).all()
+    recent_repairs = db.query(models.MaintenanceRequest).order_by(models.MaintenanceRequest.id.desc()).limit(5).all()
+    # List tenants currently mapped to rooms, eager loading residents
+    active_tenants = db.query(models.Tenant).options(joinedload(models.Tenant.residents)).filter(models.Tenant.status == "Active", models.Tenant.current_room_id != None).all()
+    pending_registrations = db.query(models.Tenant).filter(models.Tenant.status == "Pending").all()
+    
+    all_rooms = db.query(models.Room).all()
+    owner = db.query(models.Owner).first()
+    
+    return templates.TemplateResponse("dashboard.html", {
+        "request": request,
+        "stats": stats,
+        "recent_invoices": recent_invoices,
+        "recent_repairs": recent_repairs,
+        "active_tenants": active_tenants,
+        "pending_registrations": pending_registrations,
+        "all_rooms": all_rooms,
+        "owner": owner,
+        "current_month": datetime.now().month,
+        "current_year": datetime.now().year
+    })
+
+@app.post("/admin/registration/{tenant_id}/approve")
+async def approve_registration(tenant_id: int, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
+    if not tenant: raise HTTPException(status_code=404, detail="Tenant not found")
+    
+    room = tenant.room
+    if not room: raise HTTPException(status_code=400, detail="No room assigned to this request")
+    
+    room.status = "Occupied"
+    new_lease = models.Lease(room_id=room.id, tenant_id=tenant.id, start_date=datetime.now())
+    db.add(new_lease)
+    tenant.status = "Active"
+    db.commit()
+    
+    # Notify tenant
+    if line_bot_api:
+        from linebot.models import TextSendMessage
+        try:
+            line_bot_api.push_message(tenant.line_user_id, TextSendMessage(text=f"ยินดีด้วย! การลงทะเบียนเข้าพักห้อง {room.room_number} ของคุณได้รับการอนุมัติแล้ว"))
+        except: pass
+        
+    return {"status": "Success"}
+
+@app.post("/admin/registration/{tenant_id}/reject")
+async def reject_registration(tenant_id: int, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
+    if not tenant: raise HTTPException(status_code=404, detail="Tenant not found")
+    
+    tenant.status = "Rejected"
+    tenant.current_room_id = None
+    db.commit()
+    
+    # Notify tenant
+    if line_bot_api:
+        from linebot.models import TextSendMessage
+        try:
+            line_bot_api.push_message(tenant.line_user_id, TextSendMessage(text="ขออภัย การลงทะเบียนของคุณถูกปฏิเสธ กรุณาติดต่อเจ้าของหอพัก"))
+        except: pass
+        
+    return {"status": "Success"}
+
+@app.post("/admin/unmap/{tenant_id}")
+async def unmap_tenant(tenant_id: int, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+        
+    room = tenant.room
+    if room:
+        room.status = "Vacant"
+    
+    # Close active lease
+    lease = db.query(models.Lease).filter(models.Lease.tenant_id == tenant.id, models.Lease.status == "Active").first()
+    if lease:
+        lease.status = "Closed"
+        lease.end_date = datetime.now()
+        
+        # Save History for all residents
+        for res in tenant.residents:
+            history = models.TenantHistory(
+                room_number=room.room_number if room else "N/A",
+                tenant_uuid=tenant.uuid,
+                first_name=res.first_name,
+                last_name=res.last_name,
+                nickname=res.nickname,
+                phone_number=res.phone_number,
+                workplace=res.workplace,
+                start_date=lease.start_date,
+                end_date=lease.end_date
+            )
+            db.add(history)
+        
+    tenant.current_room_id = None
+    db.commit()
+    return {"status": "Success"}
+
+@app.post("/admin/rooms/add")
+async def add_room(
+    room_number: str = Form(...),
+    floor: int = Form(...),
+    base_rent: float = Form(...),
+    electricity_rate: float = Form(...),
+    water_rate: float = Form(...),
+    db: Session = Depends(get_db),
+    admin: bool = Depends(get_admin)
+):
+    # Validation: room_number should be unique
+    existing = db.query(models.Room).filter(models.Room.room_number == room_number).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Room number already exists")
+        
+    new_room = models.Room(
+        room_number=room_number,
+        floor=floor,
+        base_rent=base_rent,
+        electricity_rate=electricity_rate,
+        water_rate=water_rate,
+        status="Vacant"
+    )
+    db.add(new_room)
+    db.commit()
+    return {"status": "Success"}
+
+@app.post("/admin/invoice/{invoice_id}/confirm-cash")
+async def confirm_cash_payment(
+    invoice_id: int, 
+    image: UploadFile = File(...), 
+    db: Session = Depends(get_db),
+    admin: bool = Depends(get_admin)
+):
+    invoice = db.query(models.Invoice).filter(models.Invoice.id == invoice_id).first()
+    if not invoice: raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    file_ext = os.path.splitext(image.filename)[1]
+    file_name = f"receipt_{invoice_id}_{uuid.uuid4().hex}{file_ext}"
+    file_path = os.path.join(uploads_dir, file_name)
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(image.file, buffer)
+    
+    invoice.status = "Paid"
+    invoice.payment_method = "Cash"
+    invoice.payment_receipt_img = f"/uploads/{file_name}"
+    invoice.paid_at = datetime.now()
+    db.commit()
+    return {"status": "Success", "receipt": invoice.payment_receipt_img}
+
+@app.post("/admin/invoice/{invoice_id}/approve")
+async def approve_invoice(invoice_id: int, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+    invoice = db.query(models.Invoice).filter(models.Invoice.id == invoice_id).first()
+    if not invoice: raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    invoice.status = "Paid"
+    if not invoice.paid_at:
+        invoice.paid_at = datetime.now()
+    db.commit()
+    
+    # Notify tenant
+    tenant = invoice.tenant
+    if tenant and tenant.line_user_id and line_bot_api:
+        from linebot.models import TextSendMessage
+        try:
+            line_bot_api.push_message(tenant.line_user_id, TextSendMessage(text=f"✅ ชำระเงินเรียบร้อย! บิลเดือน {invoice.billing_month}/{invoice.billing_year} ได้รับการตรวจสอบแล้ว ขอบคุณครับ"))
+        except: pass
+        
+    return {"status": "Success"}
+
+@app.post("/admin/invoice/{invoice_id}/reject")
+async def reject_invoice(invoice_id: int, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+    invoice = db.query(models.Invoice).filter(models.Invoice.id == invoice_id).first()
+    if not invoice: raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    invoice.status = "Unpaid"
+    # Optional: Keep the failed receipt but maybe clear it from being "the" receipt
+    # invoice.payment_receipt_img = None 
+    db.commit()
+    
+    # Notify tenant
+    tenant = invoice.tenant
+    if tenant and tenant.line_user_id and line_bot_api:
+        from linebot.models import TextSendMessage
+        try:
+            line_bot_api.push_message(tenant.line_user_id, TextSendMessage(text=f"❌ แจ้งเตือน: สลิปการโอนเงินของบิลเดือน {invoice.billing_month}/{invoice.billing_year} ไม่ถูกต้อง กรุณาตรวจสอบหรืออัปโหลดใหม่อีกครั้ง"))
+        except: pass
+        
+    return {"status": "Success"}
+
+@app.post("/admin/repair/{repair_id}/status")
+async def update_repair_status(repair_id: int, status: str = Form(...), db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+    repair = db.query(models.MaintenanceRequest).filter(models.MaintenanceRequest.id == repair_id).first()
+    if not repair: raise HTTPException(status_code=404, detail="Repair request not found")
+    
+    repair.status = status
+    db.commit()
+    
+    # Notify tenant via LINE if possible
+    tenant = repair.tenant
+    if tenant and tenant.line_user_id and line_bot_api:
+        from linebot.models import TextSendMessage
+        try:
+            message = f"🛠️ อัปเดตสถานะการแจ้งซ่อม: {repair.title}\nสถานะ: {status}"
+            line_bot_api.push_message(tenant.line_user_id, TextSendMessage(text=message))
+        except Exception as e:
+            print(f"LINE Push Error: {e}")
+            
+    return {"status": "Success"}
+
+@app.post("/admin/settings/save")
+async def save_settings(
+    display_name: str = Form(...),
+    promptpay_config: str = Form(...),
+    qr_enabled: int = Form(...),
+    late_fee_enabled: int = Form(0),
+    due_day: int = Form(5),
+    late_fee_per_day: float = Form(50.0),
+    db: Session = Depends(get_db),
+    admin: bool = Depends(get_admin)
+):
+    owner = db.query(models.Owner).first()
+    if not owner:
+        owner = models.Owner(line_user_id="Uf471c296504bb803caa0d0a83ea0b4f6") # Default if not exists
+        db.add(owner)
+    
+    owner.display_name = display_name
+    owner.promptpay_config = promptpay_config
+    owner.qr_payment_enabled = qr_enabled
+    owner.late_fee_enabled = late_fee_enabled
+    owner.due_day = due_day
+    owner.late_fee_per_day = late_fee_per_day
+    db.commit()
+    return {"status": "Success"}
+
+@app.post("/admin/broadcast")
+async def broadcast_announcement(message: str = Form(...), db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+    tenants = db.query(models.Tenant).filter(models.Tenant.line_user_id != None).all()
+    count = 0
+    if line_bot_api:
+        from linebot.models import TextSendMessage
+        for t in tenants:
+            try:
+                line_bot_api.push_message(t.line_user_id, TextSendMessage(text=f"📢 ประกาศจากหอพัก:\n{message}"))
+                count += 1
+            except Exception as e:
+                print(f"Broadcast Error to {t.line_user_id}: {e}")
+    else:
+        print(f"MOCK BROADCAST: {message}")
+        count = len(tenants)
+        
+    return {"status": "Success", "sent_count": count}
+
+@app.get("/admin/report/export")
+async def export_report(month: int, year: int, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+    invoices = db.query(models.Invoice).filter(
+        models.Invoice.billing_month == month,
+        models.Invoice.billing_year == year,
+        models.Invoice.status == "Paid"
+    ).all()
+    
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Room", "Month", "Year", "Rent", "Water", "Elec", "Total", "Paid At"])
+    
+    total_income = 0
+    for inv in invoices:
+        writer.writerow([
+            inv.room.room_number if inv.room else "N/A",
+            inv.billing_month,
+            inv.billing_year,
+            inv.rent_amount,
+            inv.water_amount,
+            inv.electricity_amount,
+            inv.total_amount,
+            inv.paid_at.strftime("%Y-%m-%d %H:%M") if inv.paid_at else ""
+        ])
+        total_income += inv.total_amount
+    
+    writer.writerow([])
+    writer.writerow(["Total Income", "", "", "", "", "", total_income, ""])
+    
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=report_{year}_{month}.csv"}
+    )
+
+@app.get("/admin/tenants/{tenant_id}/residents")
+async def get_residents(tenant_id: int, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
+    if not tenant: raise HTTPException(status_code=404, detail="Tenant not found")
+    return tenant.residents
+
+@app.post("/admin/tenants/{tenant_id}/residents/add")
+async def add_resident(
+    tenant_id: int,
+    first_name: str = Form(None),
+    last_name: str = Form(None),
+    nickname: str = Form(...),
+    phone_number: str = Form(None),
+    workplace: str = Form(None),
+    db: Session = Depends(get_db),
+    admin: bool = Depends(get_admin)
+):
+    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
+    if not tenant: raise HTTPException(status_code=404, detail="Tenant not found")
+    
+    new_resident = models.Resident(
+        tenant_id=tenant_id,
+        first_name=first_name,
+        last_name=last_name,
+        nickname=nickname,
+        phone_number=phone_number,
+        workplace=workplace
+    )
+    db.add(new_resident)
+    db.commit()
+    return {"status": "Success"}
+
+@app.post("/admin/residents/{resident_id}/edit")
+async def edit_resident(
+    resident_id: int,
+    first_name: str = Form(None),
+    last_name: str = Form(None),
+    nickname: str = Form(...),
+    phone_number: str = Form(None),
+    workplace: str = Form(None),
+    db: Session = Depends(get_db),
+    admin: bool = Depends(get_admin)
+):
+    resident = db.query(models.Resident).filter(models.Resident.id == resident_id).first()
+    if not resident: raise HTTPException(status_code=404, detail="Resident not found")
+    
+    resident.first_name = first_name
+    resident.last_name = last_name
+    resident.nickname = nickname
+    resident.phone_number = phone_number
+    resident.workplace = workplace
+    db.commit()
+    return {"status": "Success"}
+
+@app.post("/admin/residents/{resident_id}/delete")
+async def delete_resident(resident_id: int, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+    resident = db.query(models.Resident).filter(models.Resident.id == resident_id).first()
+    if not resident: raise HTTPException(status_code=404, detail="Resident not found")
+    
+    tenant = resident.tenant
+    # Constraint: at least one person's name must remain if the room is already mapped
+    if tenant.line_user_id and len(tenant.residents) <= 1:
+        raise HTTPException(status_code=400, detail="ไม่สามารถลบได้ ต้องมีอย่างน้อย 1 รายชื่อสำหรับห้องที่ลงทะเบียนแล้ว")
+        
+    db.delete(resident)
+    db.commit()
+    return {"status": "Success"}
+
+@app.get("/admin/tenants/search")
+async def search_tenants(q: str = "", db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+    # ... (existing search code)
+    from sqlalchemy import or_
+    current_residents = db.query(models.Resident).filter(
+        or_(
+            models.Resident.first_name.ilike(f"%{q}%"),
+            models.Resident.last_name.ilike(f"%{q}%"),
+            models.Resident.phone_number.ilike(f"%{q}%"),
+            models.Resident.workplace.ilike(f"%{q}%")
+        )
+    ).all()
+    
+    # Search history
+    past_residents = db.query(models.TenantHistory).filter(
+        or_(
+            models.TenantHistory.first_name.ilike(f"%{q}%"),
+            models.TenantHistory.last_name.ilike(f"%{q}%"),
+            models.TenantHistory.phone_number.ilike(f"%{q}%"),
+            models.TenantHistory.workplace.ilike(f"%{q}%")
+        )
+    ).all()
+    
+    results = []
+    for r in current_residents:
+        results.append({
+            "type": "Current",
+            "room": r.tenant.room.room_number if r.tenant and r.tenant.room else "N/A",
+            "name": f"{r.first_name or ''} {r.last_name or ''} ({r.nickname})",
+            "phone": r.phone_number,
+            "workplace": r.workplace,
+            "period": "ปัจจุบัน"
+        })
+    
+    for r in past_residents:
+        results.append({
+            "type": "Past",
+            "room": r.room_number,
+            "name": f"{r.first_name or ''} {r.last_name or ''} ({r.nickname})",
+            "phone": r.phone_number,
+            "workplace": r.workplace,
+            "period": f"{r.start_date.strftime('%d/%m/%Y') if r.start_date else '?'} - {r.end_date.strftime('%d/%m/%Y') if r.end_date else '?'}"
+        })
+        
+    return results
+
+@app.get("/admin/meters/history")
+async def get_meter_history(room_id: int = None, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+    # ... (existing code)
+    query = db.query(models.MeterReading).join(models.Room)
+    if room_id:
+        query = query.filter(models.MeterReading.room_id == room_id)
+    
+    readings = query.order_by(models.MeterReading.billing_year.desc(), models.MeterReading.billing_month.desc()).all()
+    
+    results = []
+    for r in readings:
+        room = db.query(models.Room).filter(models.Room.id == r.room_id).first()
+        results.append({
+            "room_number": room.room_number if room else "N/A",
+            "month": r.billing_month,
+            "year": r.billing_year,
+            "electricity": r.electricity_reading,
+            "water": r.water_reading,
+            "recorded_at": r.recorded_at.strftime("%d/%m/%Y %H:%M")
+        })
+    return results
+
+@app.get("/admin/repair/history")
+async def get_repair_history(room_id: int = None, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+    query = db.query(models.MaintenanceRequest).join(models.Room)
+    if room_id:
+        query = query.filter(models.MaintenanceRequest.room_id == room_id)
+    
+    repairs = query.order_by(models.MaintenanceRequest.id.desc()).all()
+    
+    results = []
+    for r in repairs:
+        results.append({
+            "room_number": r.room.room_number if r.room else "N/A",
+            "title": r.title,
+            "description": r.description,
+            "status": r.status,
+            "image_url": r.image_url,
+            "created_at": r.created_at.strftime("%d/%m/%Y %H:%M")
+        })
+    return results
+
+# Standard Utility APIs
+@app.post("/repair/submit")
+async def submit_repair(
+    tenant_id: int = Form(...),
+    room_id: int = Form(...),
+    title: str = Form(...),
+    description: str = Form(...),
+    image: UploadFile = File(None),
+    db: Session = Depends(get_db)
+):
+    # Validation
+    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    room = db.query(models.Room).filter(models.Room.id == room_id).first()
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+        
+    image_url = None
+    if image and image.filename:
+        file_ext = os.path.splitext(image.filename)[1]
+        file_name = f"repair_{uuid.uuid4().hex}{file_ext}"
+        file_path = os.path.join(uploads_dir, file_name)
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(image.file, buffer)
+        image_url = f"/uploads/{file_name}"
+    
+    request_obj = models.MaintenanceRequest(tenant_id=tenant_id, room_id=room_id, title=title, description=description, image_url=image_url)
+    db.add(request_obj)
+    db.commit()
+    
+    room = db.query(models.Room).filter(models.Room.id == room_id).first()
+    send_line_notify(f"🔔 แจ้งซ่อม: ห้อง {room.room_number if room else 'N/A'}\nเรื่อง: {title}")
+    return {"status": "Success"}
+
+@app.post("/meters/record")
+async def record_meter(room_id: int, month: int, year: int, elec: float, water: float, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+    room = db.query(models.Room).filter(models.Room.id == room_id).first()
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+        
+    reading = models.MeterReading(room_id=room_id, billing_month=month, billing_year=year, electricity_reading=elec, water_reading=water)
+    db.add(reading)
+    db.commit()
+    invoice = billing.calculate_bill(db, room_id, month, year)
+    return {"status": "Success", "invoice_uuid": invoice.uuid if invoice else None}
+
+@app.post("/setup/demo")
+async def setup_demo(db: Session = Depends(get_db)):
+    if not db.query(models.Owner).first():
+        db.add(models.Owner(line_user_id="Uf471c296504bb803caa0d0a83ea0b4f6", display_name="Owner", promptpay_config='["0812345678"]'))
+    rooms = [{"room_number": "A101", "base_rent": 3500, "electricity_rate": 8, "water_rate": 18},
+             {"room_number": "A102", "base_rent": 3500, "electricity_rate": 8, "water_rate": 18}]
+    for r in rooms:
+        if not db.query(models.Room).filter(models.Room.room_number == r["room_number"]).first():
+            db.add(models.Room(**r))
+    db.commit()
+    return {"status": "Demo setup complete"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

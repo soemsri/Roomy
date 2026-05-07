@@ -1,0 +1,18 @@
+SukAnan Apartment (for tenant)
+Bot basic ID: @080ehkkl
+Channel ID: 2009823554
+Channel secret: dc2e2616a566dcccc2d2fe534f978f89
+Your user ID: Uf471c296504bb803caa0d0a83ea0b4f6
+Channel access token: hoMaEApJucC37dk8UTqI5qWDTEAZMBUrIxenPVdCUdaz0rXi6piHXQ6Vcp8MyBQPuJx4LUf2GaiSR4wcjT5mLgBA1HgRF8BdN9pGjIMGdLiQscOLR2GMfZglS0Rf9iRPdwtvIT9XqeS7dnDroxOJVwdB04t89/1O/w1cDnyilFU=
+
+
+
+SukAnan Admin (for owner)
+Bot basic ID: @859ydbvm
+Channel ID: 2009889568
+Channel secret: c365858c050cb6b0a2253ce0e2a49585
+Your user ID: Uf471c296504bb803caa0d0a83ea0b4f6
+Channel access token: Am0h1++54LfstMVl1EXbHMYfaaBj+Hk9OKcgIcW0cfOx3H/MNO8Ijd0w9jIGd0Ym0PJ7ByHrOr+5quQNyIp4DPORBZN/BwgMX/SWaNxt61nW19Z5bwDlEpI4il9vlkWYuP5BC7cpiqTXbUn45Ty/XgdB04t89/1O/w1cDnyilFU=
+
+
+

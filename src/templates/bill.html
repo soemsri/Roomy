@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ใบแจ้งหนี้ - SukAnan Apartment</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f4f4f4; }
+        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); max-width: 500px; margin: auto; }
+        .header { border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px; }
+        .row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }
+        .total { font-size: 1.5em; font-weight: bold; color: #2c3e50; }
+        .btn { display: block; width: 100%; padding: 15px; background: #27ae60; color: white; text-align: center; text-decoration: none; border-radius: 5px; margin-top: 20px; font-weight: bold; border: none; cursor: pointer; }
+        .btn-cash { background: #95a5a6; margin-top: 10px; }
+        .qr-section { text-align: center; margin-top: 20px; display: none; }
+        #qr-image { width: 200px; height: 200px; border: 8px solid white; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .bank-info { text-align: left; background: #f8f9fa; padding: 15px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #eee; }
+        .btn-copy { background: #0078d4; color: white; border: none; padding: 4px 10px; border-radius: 6px; font-size: 0.8em; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="header">
+            <h2 style="margin: 0; color: #2c3e50;">ห้อง {{ room_number }}</h2>
+            <p style="margin: 5px 0 0 0; color: #7f8c8d;">รอบบิล: {{ month }}/{{ year }}</p>
+        </div>
+        
+        <div class="row">
+            <span>ค่าเช่าห้อง</span>
+            <span>{{ "{:,.2f}".format(rent_amount) }} บาท</span>
+        </div>
+        
+        <div class="row" style="flex-direction: column; align-items: flex-start;">
+            <div style="display: flex; justify-content: space-between; width: 100%;">
+                <span>ค่าไฟ (Electricity)</span>
+                <span>{{ "{:,.2f}".format(electricity_amount) }} บาท</span>
+            </div>
+            <div style="font-size: 0.85em; color: #7f8c8d; margin-top: 4px;">
+                เลขมิเตอร์: {{ electricity_reading }} - {{ prev_electricity_reading or 0 }} 
+                = {{ (electricity_reading - (prev_electricity_reading or 0)) | round(2) }} หน่วย 
+                (@ {{ room.electricity_rate }} บาท)
+            </div>
+        </div>
+
+        <div class="row" style="flex-direction: column; align-items: flex-start;">
+            <div style="display: flex; justify-content: space-between; width: 100%;">
+                <span>ค่าน้ำ (Water)</span>
+                <span>{{ "{:,.2f}".format(water_amount) }} บาท</span>
+            </div>
+            <div style="font-size: 0.85em; color: #7f8c8d; margin-top: 4px;">
+                เลขมิเตอร์: {{ water_reading }} - {{ prev_water_reading or 0 }} 
+                = {{ (water_reading - (prev_water_reading or 0)) | round(2) }} หน่วย 
+                (@ {{ room.water_rate }} บาท)
+            </div>
+        </div>
+
+        {% if other_charges %}
+            {% set charges = other_charges | from_json %}
+            {% for item in charges %}
+            <div class="row">
+                <span>{{ item.description }}</span>
+                <span>{{ "{:,.2f}".format(item.amount) }} บาท</span>
+            </div>
+            {% endfor %}
+        {% endif %}
+
+        {% if late_fee and late_fee > 0 %}
+        <div class="row" style="color: #e74c3c;">
+            <span>ค่าปรับจ่ายช้า</span>
+            <span>{{ "{:,.2f}".format(late_fee) }} บาท</span>
+        </div>
+        {% endif %}
+        
+        <div class="row total">
+            <span>รวมทั้งสิ้น</span>
+            <span>{{ "{:,.2f}".format(total_amount) }} บาท</span>
+        </div>
+
+        {% if status == 'Unpaid' %}
+            <div style="margin-top: 20px;">
+                <p style="font-weight: bold; color: #2c3e50; margin-bottom: 15px; text-align: center;">
+                    <i class="fa-solid fa-wallet"></i> เลือกช่องทางการชำระเงิน
+                </p>
+                
+                {% set pay_config = owner.promptpay_config | from_json if owner and owner.promptpay_config else {} %}
+                
+                <!-- 1. Cash Option -->
+                {% if pay_config.cash %}
+                <div class="payment-choice" onclick="selectPayment('cash')" style="background: #f8f9fa; padding: 15px; border-radius: 12px; margin-bottom: 10px; border: 2px solid #eee; cursor: pointer; display: flex; align-items: center; gap: 15px;">
+                    <div style="width: 40px; height: 40px; background: #e8f5e9; color: #2e7d32; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2em;">
+                        <i class="fa-solid fa-money-bill-1"></i>
+                    </div>
+                    <div style="flex: 1;">
+                        <div style="font-weight: bold; color: #2c3e50;">เงินสด (Cash)</div>
+                        <div style="font-size: 0.8em; color: #7f8c8d;">ชำระได้ที่ออฟฟิศ/เคาน์เตอร์</div>
+                    </div>
+                    <i class="fa-solid fa-chevron-right" style="color: #ccc;"></i>
+                </div>
+                {% endif %}
+
+                <!-- 2. PromptPay Options -->
+                {% if pay_config.promptpay %}
+                {% for pp in pay_config.promptpay %}
+                <div class="payment-choice" onclick="selectPayment('pp', {{ loop.index0 }}, '{{ pp.id }}')" style="background: #f8f9fa; padding: 15px; border-radius: 12px; margin-bottom: 10px; border: 2px solid #eee; cursor: pointer; display: flex; align-items: center; gap: 15px;">
+                    <div style="width: 40px; height: 40px; background: #e3f2fd; color: #0277bd; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2em;">
+                        <i class="fa-solid fa-qrcode"></i>
+                    </div>
+                    <div style="flex: 1;">
+                        <div style="font-weight: bold; color: #2c3e50;">พร้อมเพย์ ({{ pp.name }})</div>
+                        <div style="font-size: 0.8em; color: #7f8c8d;">สแกน QR เพื่อโอนทันที</div>
+                    </div>
+                    <i class="fa-solid fa-chevron-right" style="color: #ccc;"></i>
+                </div>
+                {% endfor %}
+                {% endif %}
+
+                <!-- 3. Bank Transfer Options -->
+                {% if pay_config.bank_transfer %}
+                {% for bt in pay_config.bank_transfer %}
+                <div class="payment-choice" onclick="selectPayment('bank', {{ loop.index0 }})" style="background: #f8f9fa; padding: 15px; border-radius: 12px; margin-bottom: 10px; border: 2px solid #eee; cursor: pointer; display: flex; align-items: center; gap: 15px;">
+                    <div style="width: 40px; height: 40px; background: #fff3e0; color: #ef6c00; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2em;">
+                        <i class="fa-solid fa-building-columns"></i>
+                    </div>
+                    <div style="flex: 1;">
+                        <div style="font-weight: bold; color: #2c3e50;">โอนผ่านธนาคาร ({{ bt.bank_name }})</div>
+                        <div style="font-size: 0.8em; color: #7f8c8d;">เลขบัญชี: {{ bt.bank_account }}</div>
+                    </div>
+                    <i class="fa-solid fa-chevron-right" style="color: #ccc;"></i>
+                </div>
+                {% endfor %}
+                {% endif %}
+            </div>
+        {% elif status == 'Pending Verification' %}
+            <div class="btn" style="background: #f39c12; cursor: default;"><i class="fa-solid fa-clock"></i> รอตรวจสอบการชำระเงิน</div>
+        {% else %}
+            <div class="btn" style="background: #3498db; cursor: default;"><i class="fa-solid fa-check-circle"></i> ชำระเงินแล้ว</div>
+        {% endif %}
+
+        <!-- Payment Detail Sections (Hidden initially) -->
+        <div id="payment-details-container" style="display: none; margin-top: 20px; border-top: 2px solid #eee; padding-top: 20px;">
+            <button class="btn-copy" onclick="backToChoices()" style="background: #95a5a6; margin-bottom: 15px; padding: 5px 12px; width: auto; font-size: 0.85em;">
+                <i class="fa-solid fa-arrow-left"></i> กลับไปเลือกใหม่
+            </button>
+
+            <!-- Cash Info -->
+            <div id="info-cash" class="payment-info-box" style="display: none; text-align: center; padding: 20px; background: #fdfdfd; border: 1px dashed #ccc; border-radius: 12px;">
+                <i class="fa-solid fa-store" style="font-size: 3em; color: #27ae60; margin-bottom: 15px;"></i>
+                <p style="font-weight: bold;">กรุณาชำระเงินสดที่เคาน์เตอร์</p>
+                <p style="font-size: 0.9em; color: #7f8c8d;">แจ้งเลขห้อง {{ room_number }} กับเจ้าหน้าที่ออฟฟิศ</p>
+            </div>
+
+            <!-- PromptPay Info -->
+            <div id="info-pp" class="payment-info-box" style="display: none; text-align: center;">
+                <div class="bank-info" style="text-align: center;">
+                    <p id="pp-name-display" style="font-weight: bold; color: #2c3e50; margin-bottom: 10px;"></p>
+                    <img id="qr-image" src="" alt="PromptPay QR" style="max-width: 220px; margin: 10px auto;">
+                    <div style="margin-top: 10px;">
+                        <img src="https://upload.wikimedia.org/wikipedia/commons/c/c5/PromptPay-logo.png" alt="PromptPay" style="height: 25px;">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bank Info -->
+            <div id="info-bank" class="payment-info-box" style="display: none;">
+                <div class="bank-info">
+                    <div style="margin-bottom: 8px;">
+                        <span style="color: #7f8c8d; font-size: 0.9em;">ธนาคาร:</span>
+                        <span id="bank-name-display" style="font-weight: bold; color: #2c3e50;"></span>
+                    </div>
+                    <div style="margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <span style="color: #7f8c8d; font-size: 0.9em;">เลขที่บัญชี:</span>
+                            <span id="bank-acc-display" style="font-weight: bold; color: #e67e22; font-size: 1.1em; letter-spacing: 1px;"></span>
+                        </div>
+                        <button class="btn-copy" id="btn-copy-acc">
+                            <i class="fa-solid fa-copy"></i> คัดลอก
+                        </button>
+                    </div>
+                    <div>
+                        <span style="color: #7f8c8d; font-size: 0.9em;">ชื่อบัญชี:</span>
+                        <span id="bank-owner-display" style="font-weight: bold; color: #2c3e50;"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Common Slip Upload -->
+            <div id="upload-section" style="margin-top: 20px;">
+                <p style="font-size: 0.8em; color: #7f8c8d; margin-bottom: 15px; border-top: 1px solid #eee; padding-top: 15px; text-align: center;">หลังจากโอนแล้ว กรุณาแนบสลิปเพื่อยืนยัน</p>
+                <form id="upload-form" style="text-align: left; padding: 15px; border: 1px dashed #ccc; border-radius: 8px;">
+                    <label style="font-size: 0.9em; display: block; margin-bottom: 8px; font-weight: bold;"><i class="fa-solid fa-file-invoice"></i> แนบสลิปการโอนเงิน:</label>
+                    <input type="file" id="slip-file" accept="image/*" required style="width: 100%; margin-bottom: 15px;">
+                    <button type="submit" class="btn" style="background: #2980b9; margin-top: 0; padding: 10px;">ส่งสลิปยืนยัน</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const payConfig = {{ owner.promptpay_config | safe if owner and owner.promptpay_config else '{}' }};
+
+        function selectPayment(type, index, ppId) {
+            document.querySelectorAll('.payment-choice').forEach(el => el.style.display = 'none');
+            document.querySelector('p[style*="เลือกช่องทางการชำระเงิน"]').style.display = 'none';
+            document.getElementById('payment-details-container').style.display = 'block';
+            document.querySelectorAll('.payment-info-box').forEach(el => el.style.display = 'none');
+            document.getElementById('upload-section').style.display = (type === 'cash') ? 'none' : 'block';
+
+            if (type === 'cash') {
+                document.getElementById('info-cash').style.display = 'block';
+            } else if (type === 'pp') {
+                const pp = payConfig.promptpay[index];
+                document.getElementById('info-pp').style.display = 'block';
+                document.getElementById('pp-name-display').innerText = "ชื่อบัญชี: " + pp.name;
+                const amount = {{ total_amount }};
+                const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent("promptpay://" + pp.id + "?amount=" + amount)}`;
+                // Actually need to generate the real payload, but using direct data for now or a helper
+                fetch(`/admin/promptpay/preview?pp_id=${pp.id}&amount=${amount}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        document.getElementById('qr-image').src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(data.payload)}`;
+                    });
+            } else if (type === 'bank') {
+                const bt = payConfig.bank_transfer[index];
+                document.getElementById('info-bank').style.display = 'block';
+                document.getElementById('bank-name-display').innerText = bt.bank_name;
+                document.getElementById('bank-acc-display').innerText = bt.bank_account;
+                document.getElementById('bank-owner-display').innerText = bt.name;
+                document.getElementById('btn-copy-acc').onclick = () => copyAccount(bt.bank_account, document.getElementById('btn-copy-acc'));
+            }
+        }
+
+        function backToChoices() {
+            document.querySelectorAll('.payment-choice').forEach(el => el.style.display = 'flex');
+            document.querySelector('p[style*="เลือกช่องทางการชำระเงิน"]').style.display = 'block';
+            document.getElementById('payment-details-container').style.display = 'none';
+        }
+
+        function copyAccount(text, btn) {
+            navigator.clipboard.writeText(text).then(() => {
+                const originalHtml = btn.innerHTML;
+                btn.innerHTML = '<i class="fa-solid fa-check"></i> คัดลอกแล้ว';
+                btn.style.background = '#27ae60';
+                setTimeout(() => {
+                    btn.innerHTML = originalHtml;
+                    btn.style.background = '#0078d4';
+                }, 2000);
+            });
+        }
+
+        const uploadForm = document.getElementById('upload-form');
+        if (uploadForm) {
+            uploadForm.onsubmit = async (e) => {
+                e.preventDefault();
+                const fileInput = document.getElementById('slip-file');
+                if (fileInput.files.length === 0) return;
+
+                const formData = new FormData();
+                formData.append('image', fileInput.files[0]);
+
+                const btn = e.target.querySelector('button');
+                btn.disabled = true;
+                btn.innerText = 'กำลังส่ง...';
+
+                try {
+                    const res = await fetch(`/bill/{{ invoice_uuid }}/upload-slip`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    if (res.ok) {
+                        alert('ส่งสลิปเรียบร้อยแล้ว กรุณารอเจ้าหน้าที่ตรวจสอบ');
+                        location.reload();
+                    } else {
+                        alert('เกิดข้อผิดพลาดในการส่งสลิป');
+                        btn.disabled = false;
+                        btn.innerText = 'ส่งสลิปยืนยัน';
+                    }
+                } catch (err) {
+                    alert('เกิดข้อผิดพลาด: ' + err);
+                    btn.disabled = false;
+                    btn.innerText = 'ส่งสลิปยืนยัน';
+                }
+            };
+        }
+    </script>
+</body>
+</html>

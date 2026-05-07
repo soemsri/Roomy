@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ประวัติการชำระเงิน - SukAnan Apartment</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f4f4f4; }
+        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 15px; }
+        .row { display: flex; justify-content: space-between; padding: 5px 0; }
+        .status { font-weight: bold; }
+        .Paid { color: #27ae60; }
+        .Unpaid { color: #e67e22; }
+        .btn-view { display: inline-block; padding: 5px 10px; background: #3498db; color: white; text-decoration: none; border-radius: 3px; font-size: 0.8em; }
+    </style>
+</head>
+<body>
+    <h2>ประวัติการชำระเงิน ห้อง {{ tenant.room.room_number }}</h2>
+    {% for inv in invoices %}
+    <div class="card">
+        <div class="row">
+            <strong>เดือน {{ inv.billing_month }}/{{ inv.billing_year }}</strong>
+            <span class="status {{ inv.status }}">{{ inv.status }}</span>
+        </div>
+        <div class="row">
+            <span>ยอดรวม: {{ "{:,.2f}".format(inv.total_amount) }} บาท</span>
+            <a href="/bill/{{ inv.uuid }}" class="btn-view">ดูรายละเอียด</a>
+        </div>
+    </div>
+    {% endfor %}
+</body>
+</html>

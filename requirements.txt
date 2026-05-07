@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+line-bot-sdk
+sqlalchemy
+python-dotenv
+jinja2
+python-multipart
+aiofiles
+crcmod
+requests
+pytest
+httpx
