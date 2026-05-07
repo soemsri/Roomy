@@ -681,6 +681,7 @@ async def admin_dashboard(request: Request, db: Session = Depends(get_db), admin
     from sqlalchemy.orm import joinedload
     stats = {
         "total_rooms": db.query(models.Room).count(),
+        "total_buildings": db.query(models.Building).count(),
         "vacant_rooms": db.query(models.Room).filter(models.Room.status == "Vacant").count(),
         "unpaid_invoices": db.query(models.Invoice).filter(models.Invoice.status == "Unpaid").count(),
         "pending_verification": db.query(models.Invoice).filter(models.Invoice.status == "Pending Verification").count(),
@@ -836,12 +837,27 @@ async def reject_registration(tenant_id: int, db: Session = Depends(get_db), adm
     return {"status": "Success"}
 
 @app.post("/admin/unmap/{tenant_id}")
-async def unmap_tenant(tenant_id: int, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+async def unmap_tenant(
+    tenant_id: int, 
+    final_elec: float = Form(None), 
+    final_water: float = Form(None), 
+    move_out_date: str = Form(None),
+    db: Session = Depends(get_db), 
+    admin: bool = Depends(get_admin)
+):
     tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
         
     room = tenant.room
+    
+    # Generate final bill if readings are provided
+    if final_elec is not None and final_water is not None:
+        import billing
+        from datetime import datetime
+        mo_date = datetime.strptime(move_out_date, "%Y-%m-%d") if move_out_date else datetime.now()
+        billing.calculate_pro_rated_bill(db, room.id, mo_date, final_elec, final_water)
+
     if room:
         room.status = "Vacant"
     
@@ -876,18 +892,32 @@ async def list_buildings(db: Session = Depends(get_db), admin: bool = Depends(ge
     return [{"id": b.id, "name": b.name, "description": b.description} for b in buildings]
 
 @app.post("/admin/buildings/add")
-async def add_building(name: str = Form(...), description: str = Form(None), db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
-    new_building = models.Building(name=name, description=description)
+async def add_building(
+    name: str = Form(...), 
+    description: str = Form(None), 
+    recurring_charges: str = Form("[]"),
+    db: Session = Depends(get_db), 
+    admin: bool = Depends(get_admin)
+):
+    new_building = models.Building(name=name, description=description, recurring_charges=recurring_charges)
     db.add(new_building)
     db.commit()
     return {"status": "Success", "id": new_building.id}
 
 @app.post("/admin/buildings/{building_id}/edit")
-async def edit_building(building_id: int, name: str = Form(...), description: str = Form(None), db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+async def edit_building(
+    building_id: int, 
+    name: str = Form(...), 
+    description: str = Form(None), 
+    recurring_charges: str = Form("[]"),
+    db: Session = Depends(get_db), 
+    admin: bool = Depends(get_admin)
+):
     building = db.query(models.Building).filter(models.Building.id == building_id).first()
     if not building: raise HTTPException(status_code=404, detail="Building not found")
     building.name = name
     building.description = description
+    building.recurring_charges = recurring_charges
     db.commit()
     return {"status": "Success"}
 
@@ -1018,6 +1048,7 @@ async def get_room_details(room_id: int, db: Session = Depends(get_db), admin: b
             "global_recurring": global_recurring
         },
         "tenant": {
+            "id": tenant.id if tenant else None,
             "full_name": tenant.full_name if tenant else None,
             "phone_number": tenant.phone_number if tenant else None,
             "residents": [{"nickname": r.nickname, "full_name": f"{r.first_name} {r.last_name}"} for r in tenant.residents] if tenant else []

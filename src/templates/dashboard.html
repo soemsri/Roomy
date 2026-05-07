@@ -131,6 +131,7 @@
         <nav class="sidebar-menu">
             <a onclick="showSection('overview')" class="menu-item active" id="menu-overview"><i class="fa-solid fa-chart-line"></i> ภาพรวม</a>
             <a onclick="showSection('meterSection')" class="menu-item"><i class="fa-solid fa-gauge-high"></i> จดมิเตอร์</a>
+            <a onclick="showSection('buildingSection')" class="menu-item"><i class="fa-solid fa-city"></i> จัดการอาคาร</a>
             <a onclick="showSection('roomSection')" class="menu-item"><i class="fa-solid fa-door-open"></i> จัดการห้อง</a>
             <a onclick="showSection('billSection')" class="menu-item"><i class="fa-solid fa-file-invoice-dollar"></i> บิลล่าสุด</a>
             <a onclick="showSection('repairSection')" class="menu-item"><i class="fa-solid fa-screwdriver-wrench"></i> แจ้งซ่อม</a>
@@ -141,6 +142,7 @@
 
     <div class="main-wrapper">
         <div id="overview" class="grid">
+            <div class="stat-card"><h3>อาคารทั้งหมด</h3><p>{{ stats.total_buildings }}</p></div>
             <div class="stat-card"><h3>ห้องทั้งหมด</h3><p>{{ stats.total_rooms }}</p></div>
             <div class="stat-card"><h3>ว่าง</h3><p>{{ stats.vacant_rooms }}</p></div>
             <div class="stat-card"><h3>บิลค้าง</h3><p>{{ stats.unpaid_invoices }}</p></div>
@@ -153,7 +155,7 @@
                 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap:15px;">
                     <div class="form-group"><label>ห้อง</label>
                         <select id="room_id" required>
-                            {% for r in all_rooms %}<option value="{{ r.id }}">{{ r.room_number }}</option>{% endfor %}
+                            {% for r in all_rooms %}<option value="{{ r.id }}">{{ r.room_number }} ({{ r.building.name if r.building else 'อาคารหลัก' }})</option>{% endfor %}
                         </select>
                     </div>
                     <div class="form-group"><label>มิเตอร์ไฟ</label><input type="number" step="0.1" id="elec" required></div>
@@ -163,19 +165,85 @@
             </form>
         </div>
 
-        <!-- Room Management -->
-        <div class="section-card" id="roomSection" style="display:none;">
-            <div class="section-header"><h2>จัดการห้องพัก</h2></div>
+        <!-- Building Management -->
+        <div class="section-card" id="buildingSection" style="display:none;">
+            <div class="section-header">
+                <h2><i class="fa-solid fa-city"></i> จัดการอาคาร</h2>
+                <button class="btn btn-primary" onclick="toggleForm('addBuildingForm')">+ เพิ่มอาคาร</button>
+            </div>
+            
+            <div id="addBuildingForm" style="display: none; background: #f8f9fa; padding: 20px; border-radius: 12px; margin-bottom: 25px; border: 1px solid var(--border);">
+                <form id="newBuildingForm" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div class="form-group"><label>ชื่ออาคาร</label><input type="text" id="nb_name" required placeholder="เช่น อาคาร A"></div>
+                    <div class="form-group"><label>คำอธิบาย</label><input type="text" id="nb_desc" placeholder="เช่น อาคารด้านหน้า"></div>
+                    <div style="grid-column: 1 / -1; display: flex; gap: 10px; margin-top: 10px;">
+                        <button type="submit" class="btn btn-primary" style="flex: 1; justify-content: center; height: 45px;">บันทึกอาคาร</button>
+                        <button type="button" class="btn btn-outline" onclick="toggleForm('addBuildingForm')" style="flex: 1; justify-content: center;">ยกเลิก</button>
+                    </div>
+                </form>
+            </div>
+
             <div class="table-container">
                 <table>
-                    <thead><tr><th>ห้อง</th><th>ชั้น</th><th>สถานะ</th><th>ค่าเช่า</th></tr></thead>
+                    <thead><tr><th>ชื่ออาคาร</th><th>คำอธิบาย</th><th>จำนวนห้อง</th><th>การจัดการ</th></tr></thead>
+                    <tbody>
+                        {% for b in all_buildings %}
+                        <tr>
+                            <td style="font-weight: 700;">{{ b.name }}</td>
+                            <td>{{ b.description or '-' }}</td>
+                            <td>{{ b.rooms | length }} ห้อง</td>
+                            <td>
+                                <button class="btn btn-danger" onclick="deleteBuilding({{ b.id }}, '{{ b.name }}')"><i class="fa-solid fa-trash"></i> ลบ</button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Room Management -->
+        <div class="section-card" id="roomSection" style="display:none;">
+            <div class="section-header">
+                <h2><i class="fa-solid fa-door-open"></i> จัดการห้องพัก</h2>
+                <button class="btn btn-primary" onclick="toggleForm('addRoomForm')">+ เพิ่มห้องพัก</button>
+            </div>
+
+            <!-- Add Room Form (Initially Hidden) -->
+            <div id="addRoomForm" style="display: none; background: #f8f9fa; padding: 20px; border-radius: 12px; margin-bottom: 25px; border: 1px solid var(--border);">
+                <form id="newRoomForm" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px;">
+                    <div class="form-group">
+                        <label>อาคาร</label>
+                        <select id="nr_building" required>
+                            {% for b in all_buildings %}<option value="{{ b.id }}">{{ b.name }}</option>{% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group"><label>เลขห้อง</label><input type="text" id="nr_number" required placeholder="เช่น 101"></div>
+                    <div class="form-group"><label>ชั้น</label><input type="number" id="nr_floor" required value="1"></div>
+                    <div class="form-group"><label>ค่าเช่าหลัก</label><input type="number" id="nr_rent" required value="3500"></div>
+                    <div class="form-group"><label>เรทค่าไฟ</label><input type="number" step="0.1" id="nr_elec" required value="8"></div>
+                    <div class="form-group"><label>เรทค่าน้ำ</label><input type="number" step="0.1" id="nr_water" required value="18"></div>
+                    <div style="grid-column: 1 / -1; display: flex; gap: 10px; margin-top: 10px;">
+                        <button type="submit" class="btn btn-primary" style="flex: 1; justify-content: center; height: 45px;">บันทึก</button>
+                        <button type="button" class="btn btn-outline" onclick="toggleForm('addRoomForm')" style="flex: 1; justify-content: center;">ยกเลิก</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead><tr><th>อาคาร</th><th>ห้อง</th><th>ชั้น</th><th>สถานะ</th><th>ค่าเช่า</th><th>การจัดการ</th></tr></thead>
                     <tbody>
                         {% for r in all_rooms %}
                         <tr>
-                            <td>{{ r.room_number }}</td>
+                            <td>{{ r.building.name if r.building else 'อาคารหลัก' }}</td>
+                            <td style="font-weight: 700;">{{ r.room_number }}</td>
                             <td>{{ r.floor }}</td>
                             <td><span class="badge {{ 'badge-success' if r.status=='Vacant' else 'badge-warning' }}">{{ r.status }}</span></td>
-                            <td>{{ r.base_rent }}</td>
+                            <td>{{ "{:,.0f}".format(r.base_rent) }}</td>
+                            <td>
+                                <button class="btn btn-outline" onclick="viewRoomDetails({{ r.id }}, '{{ r.room_number }}')"><i class="fa-solid fa-eye"></i> ดูข้อมูล</button>
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -185,9 +253,28 @@
 
         <!-- Settings Section -->
         <div class="section-card" id="settingsSection" style="display:none;">
-            <div class="section-header"><h2>ตั้งค่าระบบ</h2></div>
+            <div class="section-header"><h2><i class="fa-solid fa-gears"></i> ตั้งค่าระบบ</h2></div>
             <form id="settingsForm">
-                <div class="form-group"><label>ชื่อหอพัก</label><input type="text" id="display_name" value="{{ owner.display_name if owner else '' }}"></div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 25px;">
+                    <div class="form-group">
+                        <label>ชื่อหอพัก (แสดงในบิล)</label>
+                        <input type="text" id="display_name" value="{{ owner.display_name if owner else '' }}" placeholder="เช่น สุขอนันต์ อพาร์ทเม้นท์">
+                    </div>
+                    <div class="form-group">
+                        <label>วันครบกำหนดชำระ (ของทุกเดือน)</label>
+                        <input type="number" id="due_day" value="{{ owner.due_day if owner else 5 }}" min="1" max="31">
+                    </div>
+                    <div class="form-group">
+                        <label>ค่าปรับจ่ายช้า (บาท/วัน)</label>
+                        <input type="number" id="late_fee_per_day" value="{{ owner.late_fee_per_day if owner else 50 }}" step="1">
+                    </div>
+                    <div class="form-group" style="display: flex; align-items: flex-end; padding-bottom: 10px;">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 0;">
+                            <input type="checkbox" id="late_fee_enabled" style="width: 18px; height: 18px;" {% if owner and owner.late_fee_enabled %}checked{% endif %}>
+                            <span>เปิดใช้งานระบบค่าปรับอัตโนมัติ</span>
+                        </label>
+                    </div>
+                </div>
                 
                 <div style="background: #f8f9fa; padding: 20px; border-radius: 12px; border: 1px solid var(--border); margin-bottom:20px;">
                     <label style="color:var(--primary); font-weight:bold; margin-bottom:15px;">ช่องทางการชำระเงิน</label>
@@ -224,9 +311,206 @@
         <div class="section-card" id="repairSection" style="display:none;"><h2>แจ้งซ่อม</h2><div id="repairList">โหลดข้อมูล...</div></div>
     </div>
 
+    <!-- Room Details Modal -->
+    <div id="roomModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalRoomTitle">ข้อมูลห้อง</h2>
+                <span style="cursor:pointer; font-size: 24px;" onclick="closeModal('roomModal')">&times;</span>
+            </div>
+            <div class="modal-body" id="roomModalBody">
+                <!-- Content loaded via JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Move Out Modal -->
+    <div id="moveOutModal" class="modal">
+        <div class="modal-content" style="max-width: 450px;">
+            <div class="modal-header">
+                <h2>แจ้งย้ายออก & เคลียร์บิล</h2>
+                <span style="cursor:pointer; font-size: 24px;" onclick="closeModal('moveOutModal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="moveOutForm">
+                    <input type="hidden" id="mo_tenant_id">
+                    <div class="form-group">
+                        <label>วันที่ย้ายออก</label>
+                        <input type="date" id="mo_date" required>
+                    </div>
+                    <div class="form-group">
+                        <label>มิเตอร์ไฟสุดท้าย (ก่อนย้ายออก)</label>
+                        <input type="number" step="0.1" id="mo_elec" required placeholder="เลขมิเตอร์ไฟล่าสุด">
+                    </div>
+                    <div class="form-group">
+                        <label>มิเตอร์น้ำสุดท้าย (ก่อนย้ายออก)</label>
+                        <input type="number" step="0.1" id="mo_water" required placeholder="เลขมิเตอร์น้ำล่าสุด">
+                    </div>
+                    <div style="margin-top: 20px; display: flex; gap: 10px;">
+                        <button type="submit" class="btn btn-danger" style="flex: 1; justify-content: center;">ยืนยันการย้ายออกและออกบิล</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script id="raw_config" type="application/json">{{ (owner.promptpay_config if owner and owner.promptpay_config else "{}") | safe }}</script>
 
     <script>
+        function toggleForm(id) {
+            const el = document.getElementById(id);
+            el.style.display = el.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).style.display = 'none';
+        }
+
+        async function viewRoomDetails(roomId, roomNumber) {
+            document.getElementById('modalRoomTitle').innerText = 'ข้อมูลห้อง ' + roomNumber;
+            const body = document.getElementById('roomModalBody');
+            body.innerHTML = '<p>กำลังโหลด...</p>';
+            document.getElementById('roomModal').style.display = 'block';
+
+            try {
+                const res = await fetch(`/admin/rooms/${roomId}/details`);
+                const data = await res.json();
+                
+                let html = `
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div>
+                            <label style="color: var(--primary);">ผู้เช่าปัจจุบัน</label>
+                            <p><strong>${data.tenant.full_name || 'ไม่มี (ว่าง)'}</strong></p>
+                            <p style="font-size: 0.9em; color: var(--text-muted);">${data.tenant.phone_number || '-'}</p>
+                            
+                            ${data.tenant.full_name ? `
+                                <button class="btn btn-danger" onclick="openMoveOut('${data.room.id}', '${data.tenant.full_name}')" style="margin-top: 10px;">
+                                    <i class="fa-solid fa-person-walking-arrow-right"></i> ย้ายออก
+                                </button>
+                            ` : ''}
+                        </div>
+                        <div>
+                            <label style="color: var(--primary);">สถานะห้อง</label>
+                            <span class="badge ${data.room.status === 'Vacant' ? 'badge-success' : 'badge-warning'}">${data.room.status}</span>
+                            <p style="margin-top: 10px;">ค่าเช่า: ${data.room.base_rent.toLocaleString()} บาท</p>
+                        </div>
+                    </div>
+                    <hr style="margin: 20px 0; border: 0; border-top: 1px solid var(--border);">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div>
+                            <label><i class="fa-solid fa-gauge-high"></i> ประวัติมิเตอร์ (ล่าสุด)</label>
+                            <table style="font-size: 0.85em;">
+                                <thead><tr><th>เดือน/ปี</th><th>ไฟ</th><th>น้ำ</th></tr></thead>
+                                <tbody>
+                                    ${data.meters.map(m => `<tr><td>${m.month}/${m.year}</td><td>${m.elec}</td><td>${m.water}</td></tr>`).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div>
+                            <label><i class="fa-solid fa-file-invoice-dollar"></i> บิลล่าสุด</label>
+                            <table style="font-size: 0.85em;">
+                                <thead><tr><th>เดือน/ปี</th><th>ยอด</th><th>สถานะ</th></tr></thead>
+                                <tbody>
+                                    ${data.payments.map(p => `<tr><td>${p.month}/${p.year}</td><td>${p.total.toLocaleString()}</td><td>${p.status}</td></tr>`).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+                body.innerHTML = html;
+            } catch (e) {
+                body.innerHTML = '<p style="color:red;">เกิดข้อผิดพลาดในการโหลดข้อมูล</p>';
+            }
+        }
+
+        async function openMoveOut(roomId, tenantName) {
+            const res = await fetch(`/admin/rooms/${roomId}/details`);
+            const data = await res.json();
+            
+            if (!data.tenant.id) {
+                alert('ไม่พบผู้เช่าในห้องนี้');
+                return;
+            }
+            
+            document.getElementById('mo_tenant_id').value = data.tenant.id;
+            document.getElementById('mo_date').value = new Date().toISOString().split('T')[0];
+            
+            // Pre-fill with last readings if available to help user
+            if (data.meters && data.meters.length > 0) {
+                document.getElementById('mo_elec').placeholder = 'ล่าสุด: ' + data.meters[0].elec;
+                document.getElementById('mo_water').placeholder = 'ล่าสุด: ' + data.meters[0].water;
+            }
+            
+            document.getElementById('moveOutModal').style.display = 'block';
+        }
+
+        document.getElementById('moveOutForm').onsubmit = async (e) => {
+            e.preventDefault();
+            if (!confirm('ยืนยันการแจ้งย้ายออก? ระบบจะออกบิลสุดท้ายและยกเลิกสถานะผู้เช่าทันที')) return;
+            
+            const tenantId = document.getElementById('mo_tenant_id').value;
+            const formData = new FormData();
+            formData.append('move_out_date', document.getElementById('mo_date').value);
+            formData.append('final_elec', document.getElementById('mo_elec').value);
+            formData.append('final_water', document.getElementById('mo_water').value);
+            
+            const res = await fetch(`/admin/unmap/${tenantId}`, { method: 'POST', body: formData });
+            if (res.ok) {
+                alert('ดำเนินการย้ายออกและออกบิลเรียบร้อย');
+                location.reload();
+            } else {
+                const err = await res.json();
+                alert('เกิดข้อผิดพลาด: ' + (err.detail || JSON.stringify(err)));
+            }
+        };
+
+        document.getElementById('newBuildingForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const formData = new FormData();
+            formData.append('name', document.getElementById('nb_name').value);
+            formData.append('description', document.getElementById('nb_desc').value);
+            
+            const res = await fetch('/admin/buildings/add', { method: 'POST', body: formData });
+            if (res.ok) {
+                alert('เพิ่มอาคารเรียบร้อย');
+                location.reload();
+            } else {
+                alert('เกิดข้อผิดพลาด');
+            }
+        };
+
+        async function deleteBuilding(id, name) {
+            if (!confirm(`ยืนยันการลบอาคาร ${name}? (อาคารต้องไม่มีห้องอยู่ภายในจึงจะลบได้)`)) return;
+            const res = await fetch(`/admin/buildings/${id}/delete`, { method: 'POST' });
+            if (res.ok) {
+                alert('ลบอาคารเรียบร้อย');
+                location.reload();
+            } else {
+                const err = await res.json();
+                alert('เกิดข้อผิดพลาด: ' + (err.detail || 'ไม่สามารถลบได้'));
+            }
+        }
+
+        document.getElementById('newRoomForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const formData = new FormData();
+            formData.append('building_id', document.getElementById('nr_building').value);
+            formData.append('room_number', document.getElementById('nr_number').value);
+            formData.append('floor', document.getElementById('nr_floor').value);
+            formData.append('base_rent', document.getElementById('nr_rent').value);
+            formData.append('electricity_rate', document.getElementById('nr_elec').value);
+            formData.append('water_rate', document.getElementById('nr_water').value);
+            
+            const res = await fetch('/admin/rooms/add', { method: 'POST', body: formData });
+            if (res.ok) {
+                alert('เพิ่มห้องเรียบร้อย');
+                location.reload();
+            } else {
+                const err = await res.json();
+                alert('เกิดข้อผิดพลาด: ' + (err.detail || 'ไม่สามารถเพิ่มห้องได้'));
+            }
+        };
+
         function showSection(id) {
             document.querySelectorAll('.section-card, .grid').forEach(s => s.style.display = 'none');
             const target = document.getElementById(id);
