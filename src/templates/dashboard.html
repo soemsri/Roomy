@@ -305,7 +305,7 @@
                 <span class="nav-badge pulse">NEW</span>
                 {% endif %}
             </a>
-            <a href="#tenantSection" class="menu-item"><i class="fa-solid fa-users"></i> ผู้เช่าปัจจุบัน</a>
+            <a href="#tenantSection" class="menu-item"><i class="fa-solid fa-users"></i> ผู้เช่า</a>
             <a href="#settingsSection" class="menu-item"><i class="fa-solid fa-gears"></i> ตั้งค่าระบบ</a>
             <a href="/admin/logout" class="menu-item" style="margin-top: auto; color: var(--danger);"><i class="fa-solid fa-right-from-bracket"></i> ออกจากระบบ</a>
         </nav>
@@ -770,7 +770,7 @@
         <!-- Tenants & Residents -->
         <div class="section-card" id="tenantSection" style="margin-top: 30px;">
             <div class="section-header">
-                <h2><i class="fa-solid fa-user-group"></i> ผู้เช่าปัจจุบัน (Active Tenants)</h2>
+                <h2><i class="fa-solid fa-user-group"></i> ผู้เช่า (Active Tenants)</h2>
                 <div style="width: 300px;">
                     <div style="position: relative;">
                         <input type="text" id="search_query" placeholder="ค้นหาชื่อ/เบอร์โทร/สถานที่ทำงาน..." onkeyup="if(event.key==='Enter')doSearch()" style="padding-right: 40px;">
@@ -1544,7 +1544,7 @@
         async function loadRoomDetails(roomId) {
             const res = await fetch(`/admin/rooms/${roomId}/details`);
             const data = await res.json();
-            document.getElementById('dt-tenant-name').innerText = data.tenant.full_name || 'ไม่มีผู้เช่าปัจจุบัน';
+            document.getElementById('dt-tenant-name').innerText = data.tenant.full_name || 'ไม่มีผู้เช่า';
             document.getElementById('dt-tenant-phone').innerText = data.tenant.phone_number || '-';
             const resList = document.getElementById('dt-residents-list');
             resList.innerHTML = data.tenant.residents.map(r => `<li><strong>${r.nickname}</strong>: ${r.full_name}</li>`).join('');
