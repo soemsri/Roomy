@@ -1,8 +1,8 @@
 ﻿ภารกิจ: สร้างบริษัท "SukAnanProperty" ขึ้นมาเพื่อพัฒนาแอพ "SukAnan Apartment" ระบบบริหารอพาร์ทเม้นต์/หอพักครบวงจร
 
 ข้อกำหนดสำคัญ:
-1. การทำงานถาวร: ทุกอย่างที่ทำต้องเซฟลงไฟล์ในโฟลเดอร์ D:\\Gemini\\Project\\SukAnanApartment\\ เพื่อให้ปิดเครื่องแล้วเปิดมาทำต่อได้ ห้ามเก็บไว้ใน memory อย่างเดียว
-ส่วน source code ให้เก็บที่ D:\\Gemini\\Project\\SukAnanApartment\\src
+1. การทำงานถาวร: ทุกอย่างที่ทำต้องเซฟลงไฟล์ในโฟลเดอร์ D:\\Gemini\\Project\\Roomy\\ เพื่อให้ปิดเครื่องแล้วเปิดมาทำต่อได้ ห้ามเก็บไว้ใน memory อย่างเดียว
+ส่วน source code ให้เก็บที่ D:\\Gemini\\Project\\Roomy\\src
 
 2. โครงสร้างทีม: ให้คุณเป็น CEO แล้วสร้าง sub-agent ขึ้นมา 4 ทีม
    - CTO Agent: ดูแลสถาปัตยกรรม, DB Schema, API, ความปลอดภัย
@@ -58,12 +58,12 @@
   > การทำงาน: รายการพิเศษนี้จะปรากฏแค่ในบิลรอบเดือนนั้นเดือนเดียว ไม่ไปกระทบเดือนถัดไปครับ 
 
 
-6. ค่า API Key ของ LINE Developer จะอยู่ในไฟล์ D:\\Gemini\\Project\\SukAnanApartment\\src\\LINE_API_INFO.txt
+6. ค่า API Key ของ LINE Developer จะอยู่ในไฟล์ D:\\Gemini\\Project\\Roomy\\src\\LINE_API_INFO.txt
 
 7. สร้างรูป Richmenu เพื่อให้ฉันเอาไป upload เข้าในระบบ LINE OA
 
 เริ่มทำงาน:
-Step 1: กำหนดโฟลเดอร์ D:\\Gemini\\Project\\SukAnanApartment\\ และไฟล์ state ทั้งหมด โดยใส่ {"status": "initialized", "current_phase": 1, "last_action": ""}
+Step 1: กำหนดโฟลเดอร์ D:\\Gemini\\Project\\Roomy\\ และไฟล์ state ทั้งหมด โดยใส่ {"status": "initialized", "current_phase": 1, "last_action": ""}
 Step 2: ในฐานะ CEO เขียนแผน 5 เฟสลง TASKS.md
    เฟส1: ออกแบบ DB + Flow ผู้ใช้ทั้งหมด
    เฟส2: ระบบจัดการห้อง + สัญญาเช่า + ผู้เช่า
