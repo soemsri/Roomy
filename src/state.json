@@ -1,16 +1,15 @@
 {
   "status": "active",
   "current_phase": 8,
-  "last_action": "Implemented encrypted database secrets, multi-payment channels per room, and enhanced billing/preview details.",
-  "summary": "Phase 8: Security & Multi-Payment implementation complete. Secrets migrated to database with encryption. Payment options now support multiple accounts per room (PromptPay, Bank, Cash). Dashboard UI refined for consistency and transparency, with detailed breakdown views for all invoices and previews.",
+  "last_action": "Implemented secure admin password change workflow and encrypted database secrets management.",
+  "summary": "Phase 8: Security and Advanced Configuration. Moved all .env secrets to an encrypted database table. Implemented a secure password change workflow requiring verification of the current password. Dashboard UI now includes an 'Advanced Settings' section for managing encrypted system secrets with masking for privacy.",
   "next_steps": [
-    "Test the 'Forgot Password' flow using the new encrypted SMTP settings.",
-    "Verify LINE Messaging & Notify integration with database configurations.",
-    "Implement building-level filtering for financial reports and exports.",
-    "Perform full end-to-end regression test of the registration-to-billing lifecycle."
+    "Verify building-level filtering for financial reports.",
+    "Full end-to-end regression testing of the registration and billing cycle.",
+    "Refine tenant-side Flex Message receipts."
   ],
   "team_notes": {
-    "Gemini-CLI": "Significantly hardened the application by moving secrets to the database. Improved tenant UX by providing multiple payment options and detailed bill breakdowns. Fixed structural JS issues in the dashboard."
+    "Gemini-CLI": "Application is now significantly more secure with encrypted database secrets. The admin password change flow is verified and robust. Fixed all structural and 422/500 errors in the dashboard and backend."
   },
-  "timestamp": "2026-05-07T16:00:00"
+  "timestamp": "2026-05-09T14:30:00"
 }
