@@ -24,6 +24,7 @@ from database import SessionLocal, engine, get_db
 import models
 import billing
 import promptpay
+import security
 
 # Load env from src/.env
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
@@ -31,7 +32,6 @@ load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
 app = FastAPI()
 
 # Important: directory is relative to where you run uvicorn
-# If running from 'src' folder, directory="templates" is correct.
 templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "templates"))
 
 def from_json(value):
@@ -47,15 +47,34 @@ if not os.path.exists(uploads_dir):
     os.makedirs(uploads_dir)
 app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
-# LINE Credentials
-LINE_ADMIN_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_ADMIN_CHANNEL_ACCESS_TOKEN")
-LINE_ADMIN_CHANNEL_SECRET = os.getenv("LINE_ADMIN_CHANNEL_SECRET")
-LINE_TENANT_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_TENANT_CHANNEL_ACCESS_TOKEN")
-LINE_TENANT_CHANNEL_SECRET = os.getenv("LINE_TENANT_CHANNEL_SECRET")
+# Fetch configurations from Database (with .env fallback)
+def load_db_configs():
+    db = SessionLocal()
+    try:
+        # These will try DB first, then .env
+        return {
+            "LINE_ADMIN_CHANNEL_ACCESS_TOKEN": security.get_system_config(db, "LINE_ADMIN_CHANNEL_ACCESS_TOKEN"),
+            "LINE_ADMIN_CHANNEL_SECRET": security.get_system_config(db, "LINE_ADMIN_CHANNEL_SECRET"),
+            "LINE_TENANT_CHANNEL_ACCESS_TOKEN": security.get_system_config(db, "LINE_TENANT_CHANNEL_ACCESS_TOKEN"),
+            "LINE_TENANT_CHANNEL_SECRET": security.get_system_config(db, "LINE_TENANT_CHANNEL_SECRET"),
+            "LINE_NOTIFY_TOKEN": security.get_system_config(db, "LINE_NOTIFY_TOKEN", ""),
+            "BASE_URL": security.get_system_config(db, "BASE_URL", "http://localhost:8000").rstrip("/"),
+            "ADMIN_PASSWORD": security.get_system_config(db, "ADMIN_PASSWORD", "admin1234")
+        }
+    finally:
+        db.close()
 
-LINE_NOTIFY_TOKEN = os.getenv("LINE_NOTIFY_TOKEN", "")
-BASE_URL = os.getenv("BASE_URL", "http://localhost:8000").rstrip("/")
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin1234")
+configs = load_db_configs()
+
+# LINE Credentials
+LINE_ADMIN_CHANNEL_ACCESS_TOKEN = configs["LINE_ADMIN_CHANNEL_ACCESS_TOKEN"]
+LINE_ADMIN_CHANNEL_SECRET = configs["LINE_ADMIN_CHANNEL_SECRET"]
+LINE_TENANT_CHANNEL_ACCESS_TOKEN = configs["LINE_TENANT_CHANNEL_ACCESS_TOKEN"]
+LINE_TENANT_CHANNEL_SECRET = configs["LINE_TENANT_CHANNEL_SECRET"]
+
+LINE_NOTIFY_TOKEN = configs["LINE_NOTIFY_TOKEN"]
+BASE_URL = configs["BASE_URL"]
+ADMIN_PASSWORD = configs["ADMIN_PASSWORD"]
 
 # Admin Channel
 admin_bot_api = LineBotApi(LINE_ADMIN_CHANNEL_ACCESS_TOKEN) if LINE_ADMIN_CHANNEL_ACCESS_TOKEN else None
@@ -1086,51 +1105,70 @@ async def update_repair_status(repair_id: int, status: str = Form(...), db: Sess
             
     return {"status": "Success"}
 
+@app.get("/admin/settings/configs")
+async def get_all_configs(db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+    configs = db.query(models.SystemConfig).all()
+    # Return decrypted values for the UI
+    return [{
+        "key": c.key,
+        "value": security.decrypt_value(c.value),
+        "description": c.description
+    } for c in configs]
+
+@app.post("/admin/settings/configs/save")
+async def save_config(
+    key: str = Form(...),
+    value: str = Form(...),
+    description: str = Form(None),
+    db: Session = Depends(get_db),
+    admin: bool = Depends(get_admin)
+):
+    security.set_system_config(db, key, value, description)
+    return {"status": "Success"}
+
 @app.post("/admin/settings/save")
 async def save_settings(
-    display_name: str = Form(...),
-    promptpay_config: str = Form(...),
-    qr_enabled: int = Form(...),
-    late_fee_enabled: int = Form(0),
-    due_day: int = Form(5),
-    late_fee_per_day: float = Form(50.0),
+    display_name: str = Form(None),
+    promptpay_config: str = Form("[]"),
+    qr_enabled: str = Form("1"),
+    late_fee_enabled: str = Form("0"),
+    due_day: str = Form("5"),
+    late_fee_per_day: str = Form("50.0"),
     lease_template: str = Form(None),
-    move_in_fees_config: str = Form(None),
+    move_in_fees_config: str = Form("[]"),
     db: Session = Depends(get_db),
     admin: bool = Depends(get_admin)
 ):
     owner = db.query(models.Owner).first()
     if not owner:
-        owner = models.Owner(line_user_id="Uf471c296504bb803caa0d0a83ea0b4f6")
+        owner = models.Owner(line_user_id="SYSTEM")
         db.add(owner)
     
-    owner.display_name = display_name
+    if display_name is not None:
+        owner.display_name = display_name
+    
     owner.promptpay_config = promptpay_config
-    owner.qr_payment_enabled = qr_enabled
-    owner.late_fee_enabled = late_fee_enabled
-    owner.due_day = due_day
-    owner.late_fee_per_day = late_fee_per_day
+    
+    # Safe conversions
+    try: owner.qr_payment_enabled = int(qr_enabled)
+    except: owner.qr_payment_enabled = 1
+    
+    try: owner.late_fee_enabled = 1 if late_fee_enabled in ["1", "true", "on", "checked"] else 0
+    except: owner.late_fee_enabled = 0
+    
+    try: owner.due_day = int(due_day)
+    except: owner.due_day = 5
+    
+    try: owner.late_fee_per_day = float(late_fee_per_day)
+    except: owner.late_fee_per_day = 50.0
     
     if move_in_fees_config:
         owner.move_in_fees_config = move_in_fees_config
     
     if lease_template:
         owner.lease_template = lease_template
-    elif not owner.lease_template:
-        owner.lease_template = """
-        <div style="font-family: 'Sarabun', sans-serif; line-height: 1.6;">
-            <h2 style="text-align: center;">สัญญาเช่าที่พักอาศัย</h2>
-            <p>ทำขึ้นเมื่อวันที่ {start_date}</p>
-            <p><strong>ผู้เช่า:</strong> {tenant_name}</p>
-            <p><strong>ห้องพักเลขที่:</strong> {room_number} ชั้น {floor}</p>
-            <p><strong>อัตราค่าเช่า:</strong> {base_rent} บาท/เดือน</p>
-            <p><strong>เงื่อนไขเพิ่มเติม:</strong> ...</p>
-        </div>
-        """
     
     db.commit()
-    db.refresh(owner)
-    print(f"DEBUG: Saved PP Config: {owner.promptpay_config}")
     return {"status": "Success"}
 
 @app.get("/admin/promptpay/preview")

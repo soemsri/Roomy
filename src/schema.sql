@@ -128,3 +128,20 @@ CREATE TABLE room_assets (
     quantity INTEGER DEFAULT 1,
     FOREIGN KEY (room_id) REFERENCES rooms(id)
 );
+
+-- 9. Room Payment Channels
+CREATE TABLE room_payment_channels (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    room_id INTEGER NOT NULL,
+    channel_type TEXT DEFAULT 'PromptPay', -- PromptPay, Bank, Cash
+    channel_id TEXT NOT NULL, -- e.g. Phone number, Bank account, or 'Cash'
+    channel_name TEXT, -- e.g. Account name
+    FOREIGN KEY (room_id) REFERENCES rooms(id)
+);
+
+-- 10. System Configs (Encrypted)
+CREATE TABLE system_configs (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    description TEXT
+);

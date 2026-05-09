@@ -19,13 +19,29 @@ class Owner(Base):
     move_in_fees_config = Column(Text, default='[]') # JSON: [{"name": "...", "value": 0, "is_multiplier": bool}]
     default_recurring_charges = Column(Text, default='[]') # Template for bulk setup
 
+class SystemConfig(Base):
+    __tablename__ = "system_configs"
+    key = Column(String, primary_key=True, index=True)
+    value = Column(Text, nullable=False) # Encrypted value
+    description = Column(String, nullable=True)
+
 class Building(Base):
     __tablename__ = "buildings"
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
-    description = Column(Text)
+    description = Column(String)
     
     rooms = relationship("Room", back_populates="building")
+
+class RoomPaymentChannel(Base):
+    __tablename__ = "room_payment_channels"
+    id = Column(Integer, primary_key=True, index=True)
+    room_id = Column(Integer, ForeignKey("rooms.id"), nullable=False)
+    channel_type = Column(String, default="PromptPay") # PromptPay, Bank, Cash
+    channel_id = Column(String, nullable=False) # e.g. Phone number for PromptPay
+    channel_name = Column(String) # Account owner name
+    
+    room = relationship("Room", back_populates="payment_channels")
 
 class Room(Base):
     __tablename__ = "rooms"
@@ -42,6 +58,7 @@ class Room(Base):
 
     building = relationship("Building", back_populates="rooms")
     assets = relationship("RoomAsset", back_populates="room", cascade="all, delete-orphan")
+    payment_channels = relationship("RoomPaymentChannel", back_populates="room", cascade="all, delete-orphan")
 
     __table_args__ = (UniqueConstraint('building_id', 'room_number', name='_building_room_uc'),)
 

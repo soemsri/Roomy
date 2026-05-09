@@ -1214,6 +1214,9 @@
     <script id="pp_data_raw" type="application/json">
         {{ (owner.promptpay_config if owner and owner.promptpay_config else "[]") | safe }}
     </script>
+    <script id="move_in_fees_raw" type="application/json">
+        {{ (owner.move_in_fees_config if owner and owner.move_in_fees_config else "[]") | safe }}
+    </script>
     <script id="bulk_recurring_raw" type="application/json">
         {{ (owner.default_recurring_charges if owner and owner.default_recurring_charges else "[]") | safe }}
     </script>
@@ -1415,8 +1418,41 @@
             });
         }
 
+        // Init PromptPay
+        function initPP() {
+            try {
+                const rawConfig = document.getElementById('pp_data_raw').textContent.trim();
+                let list = JSON.parse(rawConfig);
+                const container = document.getElementById('pp_container');
+                if (!container) return;
+                container.innerHTML = '';
+                if (Array.isArray(list) && list.length > 0) {
+                    list.forEach(item => addPPField(item.id || item, item.name || ''));
+                } else { addPPField('', ''); }
+            } catch(e) { console.error("Error initPP:", e); addPPField('', ''); }
+        }
+
+        // Init Fees
+        function initFees() {
+            try {
+                const raw = document.getElementById('move_in_fees_raw').textContent.trim();
+                const list = JSON.parse(raw);
+                const container = document.getElementById('fee_container');
+                if (!container) return;
+                container.innerHTML = '';
+                if (list && list.length > 0) {
+                    list.forEach(f => addFeeField(f.name, f.value, f.is_multiplier));
+                } else {
+                    addFeeField('ค่าเช่าล่วงหน้า 1 เดือน', 1, true);
+                    addFeeField('ค่าประกันทรัพย์สิน', 5000, false);
+                }
+            } catch(e) { console.error("Error initFees:", e); }
+        }
+
         // Initialize Section Visibility (Default Hash or Overview)
         window.addEventListener('DOMContentLoaded', () => {
+            initPP();
+            initFees();
             const hash = window.location.hash.replace('#', '');
             if (hash) showSection(hash);
             else showSection('overview');
@@ -1459,8 +1495,22 @@
         }
 
         async function saveLeaseTemplate() {
-            const formData = new FormData(document.getElementById('settingsForm'));
+            const formData = new FormData();
+            formData.append('display_name', document.getElementById('display_name').value);
+            formData.append('qr_enabled', document.getElementById('qr_enabled').value);
+            formData.append('late_fee_enabled', document.getElementById('late_fee_enabled').checked ? 1 : 0);
+            formData.append('due_day', document.getElementById('due_day').value);
+            formData.append('late_fee_per_day', document.getElementById('late_fee_per_day').value);
+            
+            const pairs = [];
+            document.querySelectorAll('.pp-pair').forEach(div => {
+                const id = div.querySelector('.pp-id').value.trim();
+                const name = div.querySelector('.pp-name').value.trim();
+                if (id) pairs.push({ id, name });
+            });
+            formData.append('promptpay_config', JSON.stringify(pairs));
             formData.append('lease_template', leaseEditor.value);
+
             const res = await fetch('/admin/settings/save', { method: 'POST', body: formData });
             if (res.ok) alert('บันทึกเทมเพลตสัญญาเช่าเรียบร้อยแล้ว');
         }
@@ -1514,10 +1564,33 @@
                 const type = row.querySelector('.fee-type').value;
                 if (name) fees.push({ name, value, is_multiplier: type === 'multiplier' });
             });
-            const formData = new FormData(document.getElementById('settingsForm'));
+
+            const formData = new FormData();
+            formData.append('display_name', document.getElementById('display_name').value);
+            formData.append('qr_enabled', document.getElementById('qr_enabled').value);
+            formData.append('late_fee_enabled', document.getElementById('late_fee_enabled').checked ? "1" : "0");
+            formData.append('due_day', document.getElementById('due_day').value);
+            formData.append('late_fee_per_day', document.getElementById('late_fee_per_day').value);
+            
+            const pairs = [];
+            document.querySelectorAll('.pp-pair').forEach(div => {
+                const id = div.querySelector('.pp-id').value.trim();
+                const name = div.querySelector('.pp-name').value.trim();
+                if (id) pairs.push({ id, name });
+            });
+            formData.append('promptpay_config', JSON.stringify(pairs));
             formData.append('move_in_fees_config', JSON.stringify(fees));
+            
+            const leaseEd = document.getElementById('lease_template_editor');
+            if (leaseEd) formData.append('lease_template', leaseEd.value);
+
             const res = await fetch('/admin/settings/save', { method: 'POST', body: formData });
-            if (res.ok) alert('บันทึกเงินแรกเข้าเรียบร้อยแล้ว');
+            if (res.ok) {
+                alert('บันทึกเงินแรกเข้าเรียบร้อยแล้ว');
+                location.reload();
+            } else {
+                alert('Error saving move-in fees: ' + (await res.json()).detail);
+            }
         }
 
         function toggleForm(id) {
@@ -1604,17 +1677,33 @@
 
         document.getElementById('settingsForm').onsubmit = async (e) => {
             e.preventDefault();
+            
             const pairs = [];
             document.querySelectorAll('.pp-pair').forEach(div => {
                 const id = div.querySelector('.pp-id').value.trim();
                 const name = div.querySelector('.pp-name').value.trim();
                 if (id) pairs.push({ id, name });
             });
-            const formData = new FormData(e.target);
+
+            const formData = new FormData();
+            formData.append('display_name', document.getElementById('display_name').value);
+            formData.append('qr_enabled', document.getElementById('qr_enabled').value);
             formData.append('promptpay_config', JSON.stringify(pairs));
-            formData.append('late_fee_enabled', document.getElementById('late_fee_enabled').checked ? 1 : 0);
+            formData.append('late_fee_enabled', document.getElementById('late_fee_enabled').checked ? "1" : "0");
+            formData.append('due_day', document.getElementById('due_day').value);
+            formData.append('late_fee_per_day', document.getElementById('late_fee_per_day').value);
+            
+            const leaseEd = document.getElementById('lease_template_editor');
+            if (leaseEd) formData.append('lease_template', leaseEd.value);
+
             const res = await fetch('/admin/settings/save', { method: 'POST', body: formData });
-            if (res.ok) location.reload();
+            if (res.ok) {
+                alert('บันทึกการตั้งค่าเรียบร้อยแล้ว');
+                location.reload();
+            } else {
+                const err = await res.json();
+                alert('Error saving settings: ' + (err.detail || JSON.stringify(err)));
+            }
         };
 
         function addRecurringRow(containerId, desc = '', amt = '') {
@@ -1961,12 +2050,58 @@
             }; input.click();
         }
 
-        async function loadMeterHistory() {
-            const rid = document.getElementById('history_room_filter').value;
-            const res = await fetch(`/admin/meters/history${rid?'?room_id='+rid:''}`);
-            const data = await res.json();
-            document.getElementById('meterHistoryList').innerHTML = data.map(r => `<tr><td>${r.room_number}</td><td>${r.month}/${r.year}</td><td>${r.electricity}/${r.water}</td><td>${r.invoice_status}</td></tr>`).join('');
+        async function loadSystemConfigs() {
+            const list = document.getElementById('system_configs_list');
+            if (!list) return;
+            
+            try {
+                const res = await fetch('/admin/settings/configs');
+                const data = await res.json();
+                
+                list.innerHTML = data.map(c => `
+                    <tr>
+                        <td style="font-family: monospace; font-weight: 600; color: var(--primary);">${c.key}</td>
+                        <td>
+                            <div style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.85em; color: var(--text-muted);">
+                                ${c.value ? '••••••••' + c.value.slice(-4) : '(ว่าง)'}
+                            </div>
+                        </td>
+                        <td>
+                            <button class="btn btn-outline" style="padding: 5px 10px; font-size: 0.8em;" onclick='openConfigModal(${JSON.stringify(c)})'>
+                                <i class="fa-solid fa-edit"></i> แก้ไข
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (e) { console.error("Error loading configs:", e); }
         }
+
+        function openConfigModal(config) {
+            document.getElementById('conf_key').value = config.key;
+            document.getElementById('conf_value').value = config.value;
+            document.getElementById('conf_desc').innerText = config.description || '-';
+            document.getElementById('configModalTitle').innerText = `แก้ไข: ${config.key}`;
+            document.getElementById('configEditModal').style.display = 'block';
+        }
+
+        async function saveSystemConfig() {
+            const key = document.getElementById('conf_key').value;
+            const value = document.getElementById('conf_value').value;
+            
+            const formData = new FormData();
+            formData.append('key', key);
+            formData.append('value', value);
+            
+            const res = await fetch('/admin/settings/configs/save', { method: 'POST', body: formData });
+            if (res.ok) {
+                alert('บันทึกการตั้งค่าสำเร็จ (อาจต้องรีสตาร์ทระบบเพื่อให้มีผลสมบูรณ์)');
+                document.getElementById('configEditModal').style.display = 'none';
+                loadSystemConfigs();
+            }
+        }
+
+        // Initialize Settings
+        document.querySelector('a[href="#settingsSection"]').addEventListener('click', loadSystemConfigs);
     </script>
 </body>
 </html>

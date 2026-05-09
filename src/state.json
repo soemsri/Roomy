@@ -1,16 +1,16 @@
 {
   "status": "active",
-  "current_phase": 7,
-  "last_action": "Fixed critical dashboard bugs (404/500), corrected main.py logic/indentation, and enhanced UI with notification badges.",
-  "summary": "Phase 7 stabilization. Added dynamic 'NEW' badges to the admin sidebar for better visibility of pending items. Fixed a 404 error on the 'Send LINE' endpoint and corrected bulk meter recording URLs. Resolved an IndentationError and unreachable code in the meter history logic within main.py. Fixed a 500 error in the lease list by adding null safety for missing associations. The dashboard is now more stable and user-friendly.",
+  "current_phase": 8,
+  "last_action": "Implemented encrypted database secrets, multi-payment channels per room, and enhanced billing/preview details.",
+  "summary": "Phase 8: Security & Multi-Payment implementation complete. Secrets migrated to database with encryption. Payment options now support multiple accounts per room (PromptPay, Bank, Cash). Dashboard UI refined for consistency and transparency, with detailed breakdown views for all invoices and previews.",
   "next_steps": [
-    "Verify notification badges update correctly in real-time.",
-    "Perform a full regression test of the billing cycle.",
-    "Refine the 'Move-out' workflow as previously planned.",
-    "Implement building-level filtering for financial reports."
+    "Test the 'Forgot Password' flow using the new encrypted SMTP settings.",
+    "Verify LINE Messaging & Notify integration with database configurations.",
+    "Implement building-level filtering for financial reports and exports.",
+    "Perform full end-to-end regression test of the registration-to-billing lifecycle."
   ],
   "team_notes": {
-    "Gemini-CLI": "Stabilized the codebase by fixing logic errors and adding null safety. Enhanced admin UX with visual cues for pending tasks."
+    "Gemini-CLI": "Significantly hardened the application by moving secrets to the database. Improved tenant UX by providing multiple payment options and detailed bill breakdowns. Fixed structural JS issues in the dashboard."
   },
-  "timestamp": "2026-05-04T12:00:00"
+  "timestamp": "2026-05-07T16:00:00"
 }
