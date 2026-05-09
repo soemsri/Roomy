@@ -72,6 +72,9 @@ def run_dual_channel_tests():
     # --- TEST TENANT CHANNEL ---
     print("\n--- Testing Tenant Channel ---")
     
+    # 0. Initial Greeting
+    handle_tenant_message(MockEvent(tenant_line_id, "Hello"), db=db)
+    
     print("Step 1: Tenant sends room number to Tenant Channel...")
     handle_tenant_message(MockEvent(tenant_line_id, "101"), db=db)
     tenant = db.query(models.Tenant).filter(models.Tenant.line_user_id == tenant_line_id).first()

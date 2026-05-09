@@ -49,7 +49,7 @@ def run_tests():
     print("Testing: Setup Tenant...")
     db = TestingSessionLocal()
     room = db.query(models.Room).filter(models.Room.room_number == "T101").first()
-    tenant = models.Tenant(line_user_id="LINE_USER_1", current_room_id=room.id)
+    tenant = models.Tenant(line_user_id="LINE_USER_1", current_room_id=room.id, status="Active")
     db.add(tenant)
     db.commit()
     tenant_id = tenant.id
@@ -90,7 +90,14 @@ def run_tests():
     
     # 8. Meter Reading
     print("Testing: Meter Reading & Billing...")
-    res = client.post(f"/meters/record?room_id={room.id}&month=5&year=2026&elec=150&water=25", cookies=cookies)
+    res = client.post("/admin/meters/record", data={
+        "room_id": room.id,
+        "month": 5,
+        "year": 2026,
+        "elec": 150,
+        "water": 25,
+        "issue_bill": True
+    }, cookies=cookies)
     assert res.status_code == 200
     print(f"  Invoice created: {res.json()['invoice_uuid']}")
 

@@ -361,6 +361,15 @@
                 </div>
                 <div style="display: flex; gap: 15px; align-items: flex-end;">
                     <div style="flex: 1;">
+                        <label>อาคาร</label>
+                        <select id="report_building_id">
+                            <option value="all">ทั้งหมด</option>
+                            {% for b in all_buildings %}
+                            <option value="{{ b.id }}">{{ b.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div style="flex: 1;">
                         <label>เดือน</label>
                         <input type="number" id="report_month" value="{{ current_month }}" min="1" max="12">
                     </div>
@@ -380,7 +389,7 @@
                     <h2><i class="fa-solid fa-bullhorn"></i> ประกาศด่วน (LINE)</h2>
                 </div>
                 <form id="broadcastForm">
-                    <textarea id="broadcast_message" placeholder="ข้อความที่ต้องการประกาศ..." style="height: 60px; margin-bottom: 10px;"></textarea>
+                    <textarea id="broadcast_message" name="message" placeholder="ข้อความที่ต้องการประกาศ..." style="height: 60px; margin-bottom: 10px;"></textarea>
                     <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; background: #e67e22;">
                         <i class="fa-brands fa-line"></i> ส่งประกาศ
                     </button>
@@ -573,24 +582,24 @@
                 <form id="roomForm" method="POST">
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 15px;">
                         <div><label>ตึก</label>
-                            <select id="building_id" required>
+                            <select id="building_id" name="building_id" required>
                                 {% for b in all_buildings %}
                                 <option value="{{ b.id }}">{{ b.name }}</option>
                                 {% endfor %}
                             </select>
                         </div>
-                        <div><label>เลขห้อง</label><input type="text" id="room_number" required></div>
-                        <div><label>ชั้น</label><input type="number" id="floor" required></div>
-                        <div><label>ค่าเช่าฐาน</label><input type="number" id="base_rent" required></div>
+                        <div><label>เลขห้อง</label><input type="text" id="room_number" name="room_number" required></div>
+                        <div><label>ชั้น</label><input type="number" id="floor" name="floor" required></div>
+                        <div><label>ค่าเช่าฐาน</label><input type="number" id="base_rent" name="base_rent" required></div>
                         <div><label>เรทไฟ/น้ำ</label>
                             <div style="display: flex; gap: 5px;">
-                                <input type="number" id="elec_rate" value="8" required>
-                                <input type="number" id="water_rate" value="18" required>
+                                <input type="number" id="elec_rate" name="electricity_rate" value="8" required>
+                                <input type="number" id="water_rate" name="water_rate" value="18" required>
                             </div>
                         </div>
                         <div>
                             <label>พร้อมเพย์ที่ใช้</label>
-                            <select id="room_promptpay_id">
+                            <select id="room_promptpay_id" name="promptpay_id">
                                 <option value="">(ค่าเริ่มต้น)</option>
                                 {% if owner and owner.promptpay_config %}
                                     {% set pp_list = owner.promptpay_config | from_json %}
@@ -1027,8 +1036,8 @@
                 <div id="tab-assets" class="tab-content">
                     <form id="assetForm" style="display: flex; gap: 10px; margin-bottom: 20px; background: #f8f9fa; padding: 15px; border-radius: 12px; align-items: center;">
                         <input type="hidden" id="asset_room_id">
-                        <input type="text" id="asset_name" placeholder="ชื่อรายการ..." required style="flex:2;">
-                        <input type="number" id="asset_qty" value="1" style="width: 80px;">
+                        <input type="text" id="asset_name" name="name" placeholder="ชื่อรายการ..." required style="flex:2;">
+                        <input type="number" id="asset_qty" name="quantity" value="1" style="width: 80px;">
                         <label style="display:flex; align-items:center; gap:5px; margin:0; cursor:pointer; font-size:0.8em;">
                             <input type="checkbox" id="asset_to_all" style="width:16px; height:16px;"> ทั้งอาคาร
                         </label>
@@ -1054,7 +1063,7 @@
                     <input type="hidden" id="edit_room_id">
                     <div class="form-group">
                         <label>ตึก</label>
-                        <select id="edit_building_id" required>
+                        <select id="edit_building_id" name="building_id" required>
                             {% for b in all_buildings %}
                             <option value="{{ b.id }}">{{ b.name }}</option>
                             {% endfor %}
@@ -1062,19 +1071,19 @@
                     </div>
                     <div class="form-group">
                         <label>เลขห้อง</label>
-                        <input type="text" id="edit_room_number" required>
+                        <input type="text" id="edit_room_number" name="room_number" required>
                     </div>
                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
-                        <div class="form-group"><label>ชั้น</label><input type="number" id="edit_floor" required></div>
-                        <div class="form-group"><label>ค่าเช่าฐาน</label><input type="number" id="edit_base_rent" required></div>
+                        <div class="form-group"><label>ชั้น</label><input type="number" id="edit_floor" name="floor" required></div>
+                        <div class="form-group"><label>ค่าเช่าฐาน</label><input type="number" id="edit_base_rent" name="base_rent" required></div>
                     </div>
                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
-                        <div class="form-group"><label>เรทไฟ</label><input type="number" id="edit_elec_rate" required></div>
-                        <div class="form-group"><label>เรทน้ำ</label><input type="number" id="edit_water_rate" required></div>
+                        <div class="form-group"><label>เรทไฟ</label><input type="number" id="edit_elec_rate" name="electricity_rate" required></div>
+                        <div class="form-group"><label>เรทน้ำ</label><input type="number" id="edit_water_rate" name="water_rate" required></div>
                     </div>
                     <div class="form-group">
                         <label>พร้อมเพย์เฉพาะห้อง</label>
-                        <select id="edit_room_promptpay_id">
+                        <select id="edit_room_promptpay_id" name="promptpay_id">
                             <option value="">(ค่าเริ่มต้น)</option>
                             {% if owner and owner.promptpay_config %}
                                 {% set pp_list = owner.promptpay_config | from_json %}
@@ -1109,11 +1118,11 @@
                     <input type="hidden" id="building_id_hidden">
                     <div class="form-group">
                         <label>ชื่ออาคาร</label>
-                        <input type="text" id="building_name" required placeholder="เช่น อาคาร A">
+                        <input type="text" id="building_name" name="name" required placeholder="เช่น อาคาร A">
                     </div>
                     <div class="form-group">
                         <label>คำอธิบาย</label>
-                        <textarea id="building_desc" placeholder="ข้อมูลเพิ่มเติม..."></textarea>
+                        <textarea id="building_desc" name="description" placeholder="ข้อมูลเพิ่มเติม..."></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -1206,6 +1215,29 @@
                         <option value="Cancelled">Cancelled (ยกเลิก)</option>
                     </select>
                     <button class="btn btn-primary" onclick="saveRepairStatus()">บันทึกสถานะ</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk Recurring Charges Modal -->
+    <div id="bulkRecurringModal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3 style="margin:0; font-weight:700;"><i class="fa-solid fa-layer-group"></i> ตั้งค่าส่วนกลาง (เริ่มต้นสำหรับทุกห้อง)</h3>
+                <button class="btn btn-outline" style="padding:5px 10px;" onclick="document.getElementById('bulkRecurringModal').style.display='none'"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <p style="color: var(--text-muted); margin-bottom: 20px;">ค่าใช้จ่ายเหล่านี้จะถูกนำไปใช้เป็นค่าเริ่มต้นเมื่อเริ่มบันทึกมิเตอร์ของทุกห้อง</p>
+                <div id="bulk_recurring_container"></div>
+                <button class="btn btn-outline" onclick="addRecurringRow('bulk_recurring_container')" style="width: 100%; margin: 15px 0;">
+                    <i class="fa-solid fa-plus"></i> เพิ่มรายการ
+                </button>
+            </div>
+            <div class="modal-footer">
+                <div style="display: flex; gap: 10px; justify-content: flex-end; width:100%;">
+                    <button class="btn btn-outline" onclick="document.getElementById('bulkRecurringModal').style.display='none'">ยกเลิก</button>
+                    <button class="btn btn-primary" onclick="applyBulkRecurring()">บันทึกการตั้งค่า</button>
                 </div>
             </div>
         </div>
@@ -1666,7 +1698,12 @@
             img.onload = () => { img.style.display = 'inline-block'; document.getElementById('qrPreviewLoading').style.display='none'; };
         }
 
-        function exportReport() { window.location.href = `/admin/report/export?month=${document.getElementById('report_month').value}&year=${document.getElementById('report_year').value}`; }
+        function exportReport() { 
+            const bid = document.getElementById('report_building_id').value;
+            const month = document.getElementById('report_month').value;
+            const year = document.getElementById('report_year').value;
+            window.location.href = `/admin/report/export?month=${month}&year=${year}${bid !== 'all' ? '&building_id=' + bid : ''}`; 
+        }
 
         document.getElementById('broadcastForm').onsubmit = async (e) => {
             e.preventDefault();
@@ -2099,6 +2136,39 @@
                 loadSystemConfigs();
             }
         }
+
+        function openBuildingModal() {
+            document.getElementById('buildingModalTitle').innerText = 'เพิ่มตึกใหม่';
+            document.getElementById('building_id_hidden').value = '';
+            document.getElementById('building_name').value = '';
+            document.getElementById('building_desc').value = '';
+            document.getElementById('buildingModal').style.display = 'block';
+        }
+
+        function editBuilding(id, name, desc) {
+            document.getElementById('buildingModalTitle').innerText = 'แก้ไขข้อมูลอาคาร';
+            document.getElementById('building_id_hidden').value = id;
+            document.getElementById('building_name').value = name;
+            document.getElementById('building_desc').value = desc;
+            document.getElementById('buildingModal').style.display = 'block';
+        }
+
+        async function deleteBuilding(id) {
+            if (confirm('ยืนยันการลบอาคาร? (ห้องพักในอาคารจะได้รับผลกระทบ)')) {
+                const res = await fetch(`/admin/buildings/${id}/delete`, { method: 'POST' });
+                if (res.ok) location.reload();
+            }
+        }
+
+        document.getElementById('buildingForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('building_id_hidden').value;
+            const formData = new FormData(e.target);
+            const url = id ? `/admin/buildings/${id}/edit` : '/admin/buildings/add';
+            const res = await fetch(url, { method: 'POST', body: formData });
+            if (res.ok) location.reload();
+            else alert('Error: ' + (await res.json()).detail);
+        };
 
         // Initialize Settings
         document.querySelector('a[href="#settingsSection"]').addEventListener('click', loadSystemConfigs);

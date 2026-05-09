@@ -9,6 +9,7 @@ sys.path.append(os.path.dirname(__file__))
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from unittest.mock import MagicMock
 
 # Standard imports for DB
 from database import Base, get_db
@@ -30,6 +31,21 @@ import models
 import main
 
 from main import app, ADMIN_PASSWORD, handle_admin_message, handle_tenant_message
+
+# Mock LINE Event
+class MockMessage:
+    def __init__(self, text):
+        self.text = text
+
+class MockSource:
+    def __init__(self, user_id):
+        self.user_id = user_id
+
+class MockEvent:
+    def __init__(self, user_id, text, reply_token="token"):
+        self.source = MockSource(user_id)
+        self.message = MockMessage(text)
+        self.reply_token = reply_token
 
 def run_registration_tests():
     # Use localized overrides and mocks
@@ -57,11 +73,17 @@ def run_registration_tests():
     
     tenant_line_id = "TENANT_LINE"
     
+    # 0. Initial Message (Triggers status -> AwaitingRoom)
+    print("Step 0: Initial Greeting...")
+    handle_tenant_message(MockEvent(tenant_line_id, "สวัสดี"), db=db)
+    tenant = db.query(models.Tenant).filter(models.Tenant.line_user_id == tenant_line_id).first()
+    assert tenant.status == "AwaitingRoom"
+
     # 1. Step 1: Enter Room Number
     print("Step 1: Tenant enters Room Number 'R101'...")
     handle_tenant_message(MockEvent(tenant_line_id, "R101"), db=db)
     
-    tenant = db.query(models.Tenant).filter(models.Tenant.line_user_id == tenant_line_id).first()
+    db.refresh(tenant)
     assert tenant is not None
     assert tenant.status == "AwaitingName"
     assert tenant.current_room_id is not None

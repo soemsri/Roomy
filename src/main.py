@@ -18,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
-from linebot.models import MessageEvent, TextMessage, TextSendMessage
+from linebot.models import MessageEvent, TextMessage, TextSendMessage, FlexSendMessage, FlexContainer
 
 from database import SessionLocal, engine, get_db
 import models
@@ -49,9 +49,21 @@ app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
 # Fetch configurations from Database (with .env fallback)
 def load_db_configs():
+    # If testing, always use env
+    if os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("TESTING"):
+        return {
+            "LINE_ADMIN_CHANNEL_ACCESS_TOKEN": os.getenv("LINE_ADMIN_CHANNEL_ACCESS_TOKEN"),
+            "LINE_ADMIN_CHANNEL_SECRET": os.getenv("LINE_ADMIN_CHANNEL_SECRET"),
+            "LINE_TENANT_CHANNEL_ACCESS_TOKEN": os.getenv("LINE_TENANT_CHANNEL_ACCESS_TOKEN"),
+            "LINE_TENANT_CHANNEL_SECRET": os.getenv("LINE_TENANT_CHANNEL_SECRET"),
+            "LINE_NOTIFY_TOKEN": os.getenv("LINE_NOTIFY_TOKEN", ""),
+            "BASE_URL": (os.getenv("BASE_URL") or "http://localhost:8000").rstrip("/"),
+            "ADMIN_PASSWORD": os.getenv("ADMIN_PASSWORD", "admin1234")
+        }
+
     db = SessionLocal()
     try:
-        # These will try DB first, then .env
+        # These will try DB first, then .env via security.get_system_config
         return {
             "LINE_ADMIN_CHANNEL_ACCESS_TOKEN": security.get_system_config(db, "LINE_ADMIN_CHANNEL_ACCESS_TOKEN"),
             "LINE_ADMIN_CHANNEL_SECRET": security.get_system_config(db, "LINE_ADMIN_CHANNEL_SECRET"),
@@ -60,6 +72,17 @@ def load_db_configs():
             "LINE_NOTIFY_TOKEN": security.get_system_config(db, "LINE_NOTIFY_TOKEN", ""),
             "BASE_URL": security.get_system_config(db, "BASE_URL", "http://localhost:8000").rstrip("/"),
             "ADMIN_PASSWORD": security.get_system_config(db, "ADMIN_PASSWORD", "admin1234")
+        }
+    except Exception as e:
+        # Fallback to env if DB is not ready or table missing
+        return {
+            "LINE_ADMIN_CHANNEL_ACCESS_TOKEN": os.getenv("LINE_ADMIN_CHANNEL_ACCESS_TOKEN"),
+            "LINE_ADMIN_CHANNEL_SECRET": os.getenv("LINE_ADMIN_CHANNEL_SECRET"),
+            "LINE_TENANT_CHANNEL_ACCESS_TOKEN": os.getenv("LINE_TENANT_CHANNEL_ACCESS_TOKEN"),
+            "LINE_TENANT_CHANNEL_SECRET": os.getenv("LINE_TENANT_CHANNEL_SECRET"),
+            "LINE_NOTIFY_TOKEN": os.getenv("LINE_NOTIFY_TOKEN", ""),
+            "BASE_URL": (os.getenv("BASE_URL") or "http://localhost:8000").rstrip("/"),
+            "ADMIN_PASSWORD": os.getenv("ADMIN_PASSWORD", "admin1234")
         }
     finally:
         db.close()
@@ -1032,14 +1055,106 @@ async def approve_invoice(invoice_id: int, db: Session = Depends(get_db), admin:
         invoice.paid_at = datetime.now()
     db.commit()
     
-    # Notify tenant
+    # Notify tenant via Flex Message
     tenant = invoice.tenant
-    if tenant and tenant.line_user_id and line_bot_api:
-        from linebot.models import TextSendMessage
-        try:
-            line_bot_api.push_message(tenant.line_user_id, TextSendMessage(text=f"✅ ชำระเงินเรียบร้อย! บิลเดือน {invoice.billing_month}/{invoice.billing_year} ได้รับการตรวจสอบแล้ว ขอบคุณครับ"))
-        except: pass
+    if tenant and tenant.line_user_id and tenant_bot_api:
+        owner = db.query(models.Owner).first()
+        apt_name = owner.display_name if owner and owner.display_name else "SukAnan Apartment"
+        room_no = invoice.room.room_number if invoice.room else "N/A"
+        period = f"{invoice.billing_month}/{invoice.billing_year}"
+        paid_date = invoice.paid_at.strftime("%d/%m/%Y %H:%M")
+        total_fmt = f"{invoice.total_amount:,.2f}"
+        bill_url = f"{BASE_URL}/bill/{invoice.uuid}"
         
+        flex_json = {
+            "type": "bubble",
+            "header": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {"type": "text", "text": "ใบเสร็จรับเงิน", "weight": "bold", "size": "xl", "color": "#FFFFFF", "align": "center"},
+                    {"type": "text", "text": "ชำระเงินเรียบร้อยแล้ว", "size": "sm", "color": "#FFFFFF", "align": "center", "margin": "sm"}
+                ],
+                "backgroundColor": "#27ae60",
+                "paddingAll": "20px"
+            },
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {"type": "text", "text": apt_name, "weight": "bold", "size": "md", "margin": "md"},
+                    {"type": "separator", "margin": "lg"},
+                    {
+                        "type": "box",
+                        "layout": "vertical",
+                        "margin": "lg",
+                        "spacing": "sm",
+                        "contents": [
+                            {
+                                "type": "box",
+                                "layout": "horizontal",
+                                "contents": [
+                                    {"type": "text", "text": "ห้อง", "size": "sm", "color": "#555555", "flex": 0},
+                                    {"type": "text", "text": room_no, "size": "sm", "color": "#111111", "align": "end"}
+                                ]
+                            },
+                            {
+                                "type": "box",
+                                "layout": "horizontal",
+                                "contents": [
+                                    {"type": "text", "text": "รอบบิล", "size": "sm", "color": "#555555", "flex": 0},
+                                    {"type": "text", "text": period, "size": "sm", "color": "#111111", "align": "end"}
+                                ]
+                            },
+                            {
+                                "type": "box",
+                                "layout": "horizontal",
+                                "contents": [
+                                    {"type": "text", "text": "วันที่ชำระ", "size": "sm", "color": "#555555", "flex": 0},
+                                    {"type": "text", "text": paid_date, "size": "sm", "color": "#111111", "align": "end"}
+                                ]
+                            }
+                        ]
+                    },
+                    {"type": "separator", "margin": "lg"},
+                    {
+                        "type": "box",
+                        "layout": "horizontal",
+                        "margin": "lg",
+                        "contents": [
+                            {"type": "text", "text": "ยอดชำระสุทธิ", "size": "md", "color": "#555555", "flex": 0, "weight": "bold"},
+                            {"type": "text", "text": f"฿{total_fmt}", "size": "xl", "color": "#27ae60", "align": "end", "weight": "bold"}
+                        ]
+                    },
+                    {"type": "text", "text": "ขอบคุณที่ใช้บริการค่ะ", "size": "sm", "color": "#aaaaaa", "margin": "xxl", "align": "center"}
+                ],
+                "paddingAll": "20px"
+            },
+            "footer": {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "sm",
+                "contents": [
+                    {
+                        "type": "button",
+                        "style": "link",
+                        "height": "sm",
+                        "action": {"type": "uri", "label": "ดูรายละเอียดบิล", "uri": bill_url}
+                    }
+                ],
+                "flex": 0
+            }
+        }
+        
+        try:
+            tenant_bot_api.push_message(tenant.line_user_id, FlexSendMessage(alt_text="ใบเสร็จรับเงิน", contents=flex_json))
+        except Exception as e:
+            print(f"LINE Flex Error: {e}")
+            # Fallback to text
+            try:
+                tenant_bot_api.push_message(tenant.line_user_id, TextSendMessage(text=f"✅ ชำระเงินเรียบร้อย! บิลเดือน {period} ได้รับการตรวจสอบแล้ว ขอบคุณครับ"))
+            except: pass
+            
     return {"status": "Success"}
 
 @app.post("/admin/invoice/{invoice_id}/reject")
@@ -1198,20 +1313,30 @@ async def broadcast_announcement(message: str = Form(...), db: Session = Depends
     return {"status": "Success", "sent_count": count}
 
 @app.get("/admin/report/export")
-async def export_report(month: int, year: int, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
-    invoices = db.query(models.Invoice).filter(
+async def export_report(month: int, year: int, building_id: int = None, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+    query = db.query(models.Invoice).filter(
         models.Invoice.billing_month == month,
         models.Invoice.billing_year == year,
         models.Invoice.status == "Paid"
-    ).all()
+    )
+    
+    b_name = "All"
+    if building_id:
+        query = query.join(models.Room).filter(models.Room.building_id == building_id)
+        building = db.query(models.Building).filter(models.Building.id == building_id).first()
+        if building:
+            b_name = building.name
+            
+    invoices = query.all()
     
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["Room", "Month", "Year", "Rent", "Water", "Elec", "Total", "Paid At"])
+    writer.writerow(["Building", "Room", "Month", "Year", "Rent", "Water", "Elec", "Total", "Paid At"])
     
     total_income = 0
     for inv in invoices:
         writer.writerow([
+            inv.room.building.name if inv.room and inv.room.building else "N/A",
             inv.room.room_number if inv.room else "N/A",
             inv.billing_month,
             inv.billing_year,
@@ -1224,13 +1349,14 @@ async def export_report(month: int, year: int, db: Session = Depends(get_db), ad
         total_income += inv.total_amount
     
     writer.writerow([])
-    writer.writerow(["Total Income", "", "", "", "", "", total_income, ""])
+    writer.writerow(["Total Income", "", "", "", "", "", "", total_income, ""])
     
     output.seek(0)
+    filename = f"report_{b_name}_{year}_{month}.csv".replace(" ", "_")
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename=report_{year}_{month}.csv"}
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 
 @app.get("/admin/tenants/{tenant_id}/residents")

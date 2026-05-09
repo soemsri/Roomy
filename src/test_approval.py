@@ -71,13 +71,16 @@ def run_approval_tests():
     # 2. Simulate Tenant Registration Message
     print("Step 2: Simulating Tenant Registration ('R999')...")
     tenant_line_id = "LINE_TENANT_456"
+    
+    # 2.0 Initial Greeting
+    handle_tenant_message(MockEvent(tenant_line_id, "Hello"), db=db)
+    
     event = MockEvent(tenant_line_id, "R999")
     
     # Manually call handle_tenant_message
     handle_tenant_message(event, db=db)
     
-    # Verify Pending Status (Wait, step-by-step registration might need more calls)
-    # The current handle_tenant_message puts it in AwaitingName first
+    # Verify Pending Status
     tenant = db.query(models.Tenant).filter(models.Tenant.line_user_id == tenant_line_id).first()
     assert tenant is not None
     assert tenant.status == "AwaitingName"
