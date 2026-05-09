@@ -1339,6 +1339,51 @@
             }
         }
 
+        async function loadMeterHistory() {
+            const roomId = document.getElementById('history_room_filter').value;
+            const list = document.getElementById('meterHistoryList');
+            const table = document.getElementById('meterHistoryTable');
+            
+            // Set Table Header if needed (assuming it might be empty or needs resetting)
+            table.innerHTML = `
+                <thead>
+                    <tr>
+                        <th>ห้อง</th>
+                        <th>รอบบิล</th>
+                        <th>มิเตอร์ไฟ</th>
+                        <th>มิเตอร์น้ำ</th>
+                        <th>สถานะบิล</th>
+                    </tr>
+                </thead>
+                <tbody id="meterHistoryList">
+                    <tr><td colspan="5" style="text-align:center; padding:20px;">กำลังโหลดข้อมูล...</td></tr>
+                </tbody>
+            `;
+            const newList = document.getElementById('meterHistoryList');
+
+            try {
+                const res = await fetch(`/admin/meters/history${roomId ? '?room_id='+roomId : ''}`);
+                const data = await res.json();
+                
+                if (data.length === 0) {
+                    newList.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">ไม่พบข้อมูลมิเตอร์</td></tr>';
+                    return;
+                }
+
+                newList.innerHTML = data.map(m => `
+                    <tr>
+                        <td><strong>${m.room_number}</strong></td>
+                        <td>${m.month}/${m.year}</td>
+                        <td>${m.electricity}</td>
+                        <td>${m.water}</td>
+                        <td><span class="badge ${m.invoice_status === 'Paid' ? 'badge-success' : 'badge-warning'}">${m.invoice_status}</span></td>
+                    </tr>
+                `).join('');
+            } catch (e) {
+                newList.innerHTML = '<tr><td colspan="5" style="color:var(--danger); text-align:center;">ไม่สามารถโหลดข้อมูลได้: ' + e + '</td></tr>';
+            }
+        }
+
         function viewRepairDetails(repair) {
             document.getElementById('current_repair_id').value = repair.id;
             document.getElementById('update_repair_status').value = repair.status;

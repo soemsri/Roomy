@@ -638,14 +638,17 @@ async def approve_registration(tenant_id: int, db: Session = Depends(get_db), ad
 
     lease_content = ""
     if owner and owner.lease_template:
-        lease_content = owner.lease_template.format(
-            tenant_name=tenant.full_name,
-            room_number=room.room_number,
-            floor=room.floor,
-            base_rent=f"{room.base_rent:,.2f}",
-            start_date=datetime.now().strftime("%d/%m/%Y"),
-            initial_fees=fees_text
-        )
+        lease_content = owner.lease_template
+        replacements = {
+            "{tenant_name}": tenant.full_name,
+            "{room_number}": room.room_number,
+            "{floor}": str(room.floor),
+            "{base_rent}": f"{room.base_rent:,.2f}",
+            "{start_date}": datetime.now().strftime("%d/%m/%Y"),
+            "{initial_fees}": fees_text
+        }
+        for placeholder, value in replacements.items():
+            lease_content = lease_content.replace(placeholder, value)
 
     room.status = "Occupied"
     new_lease = models.Lease(

@@ -47,6 +47,11 @@ def migrate():
         # Room building_id
         "ALTER TABLE rooms ADD COLUMN building_id INTEGER REFERENCES buildings(id)",
 
+        # Lease table missing columns or creation
+        "CREATE TABLE IF NOT EXISTS leases (id INTEGER PRIMARY KEY AUTOINCREMENT, room_id INTEGER NOT NULL, tenant_id INTEGER NOT NULL, start_date DATETIME NOT NULL, end_date DATETIME, status TEXT DEFAULT 'Active', lease_content TEXT, initial_fees TEXT, FOREIGN KEY (room_id) REFERENCES rooms(id), FOREIGN KEY (tenant_id) REFERENCES tenants(id))",
+        "ALTER TABLE leases ADD COLUMN lease_content TEXT",
+        "ALTER TABLE leases ADD COLUMN initial_fees TEXT",
+
         # Room uniqueness migration (building-scoped)
         "DROP INDEX IF EXISTS ix_rooms_room_number",
         "CREATE UNIQUE INDEX IF NOT EXISTS _building_room_uc ON rooms (building_id, room_number)"
