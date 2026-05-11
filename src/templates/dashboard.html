@@ -207,6 +207,18 @@
         
         /* Mobile Optimization for Bulk Meter Grid */
         @media (max-width: 600px) {
+            .meter-actions {
+                flex-wrap: wrap;
+            }
+            .meter-actions button {
+                flex: 1 1 45% !important;
+                height: 50px !important;
+                font-size: 0.9rem !important;
+            }
+            .meter-actions button.btn-primary {
+                flex: 1 1 100% !important;
+                order: 10;
+            }
             .bulk-meter-table { min-width: 0 !important; }
             .bulk-meter-table th, .bulk-meter-table td {
                 padding: 10px 5px !important;
@@ -494,10 +506,12 @@
                     </div>
                     <div>
                         <label>มิเตอร์ไฟ</label>
+                        <div id="prev_elec_single" style="font-size: 0.75em; color: var(--text-muted); margin-bottom: 3px;">เดิม: -</div>
                         <input type="number" step="0.1" id="elec" name="elec" required placeholder="0.0">
                     </div>
                     <div>
                         <label>มิเตอร์น้ำ</label>
+                        <div id="prev_water_single" style="font-size: 0.75em; color: var(--text-muted); margin-bottom: 3px;">เดิม: -</div>
                         <input type="number" step="0.1" id="water" name="water" required placeholder="0.0">
                     </div>
                 </div>
@@ -518,7 +532,7 @@
                         <!-- Rows added here -->
                     </div>
                 </div>
-                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <div class="meter-actions" style="display: flex; gap: 10px; margin-top: 10px;">
                     <button type="button" class="btn btn-outline" onclick="previewMeterBill()" style="flex: 1; justify-content: center; height: 45px; border-color: var(--primary); color: var(--primary);">
                         <i class="fa-solid fa-magnifying-glass-dollar"></i> Preview บิล
                     </button>
@@ -1921,6 +1935,14 @@
             document.getElementById('tab_bulk_meter').classList.toggle('active', mode==='bulk');
             document.getElementById('meterForm').style.display = mode==='single'?'block':'none';
             document.getElementById('bulkMeterContainer').style.display = mode==='bulk'?'block':'none';
+
+            if (mode === 'bulk') {
+                const bid = document.getElementById('bulk_building_id').value;
+                if (bid) renderBulkGrid(bid);
+            } else {
+                const rid = document.getElementById('room_id').value;
+                if (rid) loadCurrentRoomMeter();
+            }
         }
 
         function filterMeterRooms(bid) {
@@ -1957,6 +1979,10 @@
                 document.getElementById('elec').value = '';
                 document.getElementById('water').value = '';
             }
+
+            // Update PREVIOUS reading labels
+            document.getElementById('prev_elec_single').innerText = `เดิม: ${data.prev_electricity || 0}`;
+            document.getElementById('prev_water_single').innerText = `เดิม: ${data.prev_water || 0}`;
         }
 
         async function previewMeterBill() {

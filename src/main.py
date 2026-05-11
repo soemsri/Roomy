@@ -1729,10 +1729,21 @@ async def get_current_meter(room_id: int, month: int, year: int, db: Session = D
         except:
             pass
 
+    # Fetch previous reading for context
+    prev_month = month - 1 if month > 1 else 12
+    prev_year = year if month > 1 else year - 1
+    prev_reading = db.query(models.MeterReading).filter(
+        models.MeterReading.room_id == room_id,
+        models.MeterReading.billing_month == prev_month,
+        models.MeterReading.billing_year == prev_year
+    ).first()
+
     return {
         "found": True if reading else False,
-        "electricity": reading.electricity_reading if reading else None,
-        "water": reading.water_reading if reading else None,
+        "electricity": reading.electricity_reading if reading else 0,
+        "water": reading.water_reading if reading else 0,
+        "prev_electricity": prev_reading.electricity_reading if prev_reading else 0,
+        "prev_water": prev_reading.water_reading if prev_reading else 0,
         "global_recurring": global_recurring,
         "room_recurring": room_recurring,
         "manual_charges": manual_charges,
@@ -1950,12 +1961,22 @@ async def bulk_record_meters(
     results = []
     for r in readings:
         room_id = r.get("room_id")
-        elec = r.get("elec")
-        water = r.get("water")
+        elec_raw = r.get("elec")
+        water_raw = r.get("water")
         other_charges = r.get("other_charges") # List of dicts
         
-        if room_id is None or elec is None or water is None:
+        if room_id is None:
             continue
+            
+        # Skip if both are empty (just saving partial building)
+        if (elec_raw == '' or elec_raw is None) and (water_raw == '' or water_raw is None):
+            continue
+            
+        try:
+            elec = float(elec_raw)
+            water = float(water_raw)
+        except (ValueError, TypeError):
+            continue # Skip invalid numbers
             
         # Check if paid
         invoice = db.query(models.Invoice).filter(
