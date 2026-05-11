@@ -303,6 +303,13 @@
             .sidebar.active { transform: translateX(0); }
         }
     </style>
+    <!-- CKEditor 5 for Lease Template -->
+    <script src="https://cdn.ckeditor.com/ckeditor5/36.0.1/classic/ckeditor.js"></script>
+    <style>
+        .ck-editor__editable {
+            min-height: 400px;
+        }
+    </style>
 </head>
 <body>
     <!-- Sidebar -->
@@ -1612,12 +1619,26 @@
         });
 
         // Lease Template Logic
-        const leaseEditor = document.getElementById('lease_template_editor');
+        let editorInstance;
+        ClassicEditor
+            .create(document.querySelector('#lease_template_editor'), {
+                toolbar: [ 'heading', '|', 'bold', 'italic', 'link', 'bulletedList', 'numberedList', 'blockQuote', 'insertTable', 'undo', 'redo' ]
+            })
+            .then(editor => {
+                editorInstance = editor;
+                editor.model.document.on('change:data', () => {
+                    updateLeasePreview(editor.getData());
+                });
+                updateLeasePreview(editor.getData());
+            })
+            .catch(error => {
+                console.error(error);
+            });
+
         const leasePreview = document.getElementById('lease_preview');
 
-        function updateLeasePreview() {
-            if (!leaseEditor || !leasePreview) return;
-            let content = leaseEditor.value;
+        function updateLeasePreview(content) {
+            if (!leasePreview) return;
             const mockData = {
                 '{tenant_name}': 'สมชาย สายเสมอ',
                 '{room_number}': 'A101',
@@ -1629,11 +1650,6 @@
                 content = content.replaceAll(k, `<span style="color:var(--primary); font-weight:700;">${v}</span>`);
             }
             leasePreview.innerHTML = content || '<p style="color:var(--text-muted); text-align:center; margin-top:50px;">ไม่มีข้อมูลเทมเพลต</p>';
-        }
-
-        if (leaseEditor) {
-            leaseEditor.oninput = updateLeasePreview;
-            updateLeasePreview();
         }
 
         async function saveLeaseTemplate() {
@@ -1652,7 +1668,7 @@
                 if (id) pairs.push({ id, name });
             });
             formData.append('promptpay_config', JSON.stringify(pairs));
-            formData.append('lease_template', leaseEditor.value);
+            formData.append('lease_template', editorInstance.getData());
 
             const res = await fetch('/admin/settings/save', { method: 'POST', body: formData });
             if (res.ok) alert('บันทึกเทมเพลตสัญญาเช่าเรียบร้อยแล้ว');
