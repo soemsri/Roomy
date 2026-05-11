@@ -551,8 +551,14 @@ async def view_history(request: Request, tenant_uuid: str, db: Session = Depends
     return templates.TemplateResponse("history.html", {"request": request, "tenant": tenant, "invoices": invoices})
 
 # Admin Security Dependency
-def get_admin(request: Request):
-    if request.cookies.get("admin_session") != ADMIN_PASSWORD:
+def get_admin(request: Request, db: Session = Depends(get_db)):
+    admin_session = request.cookies.get("admin_session")
+    if not admin_session:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    # Check if the session is the hashed password of the owner
+    owner = db.query(models.Owner).first()
+    if not owner or admin_session != owner.password_hash:
         raise HTTPException(status_code=401, detail="Unauthorized")
     return True
 
@@ -561,10 +567,11 @@ async def admin_login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
 
 @app.post("/admin/login")
-async def admin_login(password: str = Form(...)):
-    if password == ADMIN_PASSWORD:
+async def admin_login(password: str = Form(...), db: Session = Depends(get_db)):
+    owner = db.query(models.Owner).first()
+    if owner and security.verify_password(password, owner.password_hash):
         response = RedirectResponse(url="/admin/dashboard", status_code=303)
-        response.set_cookie(key="admin_session", value=ADMIN_PASSWORD, httponly=True)
+        response.set_cookie(key="admin_session", value=owner.password_hash, httponly=True)
         return response
     return RedirectResponse(url="/admin/login?error=1", status_code=303)
 
@@ -573,6 +580,76 @@ async def admin_logout():
     response = RedirectResponse(url="/admin/login", status_code=303)
     response.delete_cookie("admin_session")
     return response
+
+@app.get("/admin/forgot-password", response_class=HTMLResponse)
+async def forgot_password_page(request: Request):
+    return templates.TemplateResponse("forgot_password.html", {"request": request})
+
+@app.post("/admin/forgot-password")
+async def request_password_reset(db: Session = Depends(get_db)):
+    owner = db.query(models.Owner).first()
+    if not owner or not owner.line_user_id or owner.line_user_id == "SYSTEM":
+        return {"error": "No valid admin LINE ID found. Please contact support."}
+    
+    # Generate token
+    import secrets
+    from datetime import datetime, timedelta
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.now() + timedelta(minutes=5)
+    
+    reset_token = models.PasswordResetToken(
+        token=token,
+        expires_at=expires_at
+    )
+    db.add(reset_token)
+    db.commit()
+    
+    # Send LINE message
+    if admin_bot_api:
+        reset_link = f"{BASE_URL}/admin/reset-password?token={token}"
+        message = f"คุณได้ทำการขอรีเซ็ตรหัสผ่าน Admin\n\nกรุณากดลิงก์ด้านล่างเพื่อตั้งรหัสผ่านใหม่ (ลิงก์มีอายุ 5 นาที):\n{reset_link}"
+        try:
+            admin_bot_api.push_message(owner.line_user_id, TextSendMessage(text=message))
+        except Exception as e:
+            print(f"Error sending reset link: {e}")
+            return {"error": "Failed to send LINE message."}
+            
+    return {"message": "ส่งลิงก์รีเซ็ตรหัสผ่านไปยัง LINE Admin แล้ว"}
+
+@app.get("/admin/reset-password", response_class=HTMLResponse)
+async def reset_password_page(request: Request, token: str, db: Session = Depends(get_db)):
+    from datetime import datetime
+    reset_token = db.query(models.PasswordResetToken).filter(
+        models.PasswordResetToken.token == token,
+        models.PasswordResetToken.used == 0,
+        models.PasswordResetToken.expires_at > datetime.now()
+    ).first()
+    
+    if not reset_token:
+        return HTMLResponse(content="<h2>ลิงก์หมดอายุหรือไม่ถูกต้อง</h2>", status_code=400)
+    
+    return templates.TemplateResponse("reset_password.html", {"request": request, "token": token})
+
+@app.post("/admin/reset-password")
+async def reset_password(token: str = Form(...), new_password: str = Form(...), db: Session = Depends(get_db)):
+    from datetime import datetime
+    reset_token = db.query(models.PasswordResetToken).filter(
+        models.PasswordResetToken.token == token,
+        models.PasswordResetToken.used == 0,
+        models.PasswordResetToken.expires_at > datetime.now()
+    ).first()
+    
+    if not reset_token:
+        return HTMLResponse(content="<h2>ลิงก์หมดอายุหรือไม่ถูกต้อง</h2>", status_code=400)
+    
+    owner = db.query(models.Owner).first()
+    if owner:
+        owner.password_hash = security.hash_password(new_password)
+        reset_token.used = 1
+        db.commit()
+        return RedirectResponse(url="/admin/login?reset_success=1", status_code=303)
+    
+    return HTMLResponse(content="<h2>เกิดข้อผิดพลาดในการรีเซ็ตรหัสผ่าน</h2>", status_code=500)
 
 # Update admin_dashboard
 @app.get("/admin/dashboard", response_class=HTMLResponse)

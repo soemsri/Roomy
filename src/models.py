@@ -9,6 +9,7 @@ class Owner(Base):
     id = Column(Integer, primary_key=True, index=True)
     line_user_id = Column(String, unique=True, index=True, nullable=False)
     display_name = Column(String)
+    password_hash = Column(String) # For admin login
     promptpay_config = Column(Text, default='[]')
     promptpay_name = Column(String)
     qr_payment_enabled = Column(Integer, default=1)
@@ -18,6 +19,14 @@ class Owner(Base):
     lease_template = Column(Text) # HTML Template for contracts
     move_in_fees_config = Column(Text, default='[]') # JSON: [{"name": "...", "value": 0, "is_multiplier": bool}]
     default_recurring_charges = Column(Text, default='[]') # Template for bulk setup
+
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+    id = Column(Integer, primary_key=True, index=True)
+    token = Column(String, unique=True, index=True, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    expires_at = Column(DateTime, nullable=False)
+    used = Column(Integer, default=0) # 0 = no, 1 = yes
 
 class SystemConfig(Base):
     __tablename__ = "system_configs"

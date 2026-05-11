@@ -10,6 +10,7 @@ import os
 sys.path.append(os.path.dirname(__file__))
 
 from database import Base, get_db
+import security
 
 from main import app, ADMIN_PASSWORD
 import models
@@ -34,12 +35,27 @@ def setup_db():
     app.dependency_overrides.clear()
     app.dependency_overrides[get_db] = override_get_db
     Base.metadata.create_all(bind=engine)
+    
+    # Create default owner for tests
+    db = TestingSessionLocal()
+    hashed_pw = security.hash_password("admin1234")
+    owner = models.Owner(line_user_id="UADMIN", password_hash=hashed_pw)
+    db.add(owner)
+    db.commit()
+    db.close()
+    
     yield
     Base.metadata.drop_all(bind=engine)
     app.dependency_overrides.clear()
 
 def get_admin_cookie():
-    return {"admin_session": ADMIN_PASSWORD}
+    # In the new system, admin_session cookie stores the password hash
+    # We must use the SAME hash as stored in the DB because it's used as a session token
+    db = TestingSessionLocal()
+    owner = db.query(models.Owner).first()
+    cookie = {"admin_session": owner.password_hash}
+    db.close()
+    return cookie
 
 def test_root(setup_db):
     response = client.get("/")

@@ -20,11 +20,16 @@
             <button type="submit">Login</button>
         </form>
         <p id="error-msg" class="error" style="display:none;">รหัสผ่านไม่ถูกต้อง</p>
+        <p id="success-msg" style="display:none; color: #27ae60; font-size: 0.9em; margin-bottom: 20px;">เปลี่ยนรหัสผ่านเรียบร้อยแล้ว กรุณาเข้าสู่ระบบ</p>
+        <a href="/admin/forgot-password" style="display: block; margin-top: 20px; color: #3498db; text-decoration: none; font-size: 0.9em;">ลืมรหัสผ่าน?</a>
     </div>
     <script>
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.has('error')) {
             document.getElementById('error-msg').style.display = 'block';
+        }
+        if (urlParams.has('reset_success')) {
+            document.getElementById('success-msg').style.display = 'block';
         }
     </script>
 </body>
