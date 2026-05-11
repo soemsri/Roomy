@@ -1931,17 +1931,31 @@
         };
 
         function switchMeterMode(mode) {
-            document.getElementById('tab_single_meter').classList.toggle('active', mode==='single');
-            document.getElementById('tab_bulk_meter').classList.toggle('active', mode==='bulk');
-            document.getElementById('meterForm').style.display = mode==='single'?'block':'none';
-            document.getElementById('bulkMeterContainer').style.display = mode==='bulk'?'block':'none';
-
-            if (mode === 'bulk') {
-                const bid = document.getElementById('bulk_building_id').value;
-                if (bid) renderBulkGrid(bid);
+            const isSingle = mode === 'single';
+            
+            // Sync Month/Year/Building between modes
+            if (isSingle) {
+                document.getElementById('month').value = document.getElementById('bulk_month').value;
+                document.getElementById('year').value = document.getElementById('bulk_year').value;
+                document.getElementById('meter_building_id').value = document.getElementById('bulk_building_id').value;
+                filterMeterRooms(document.getElementById('meter_building_id').value);
             } else {
+                document.getElementById('bulk_month').value = document.getElementById('month').value;
+                document.getElementById('bulk_year').value = document.getElementById('year').value;
+                document.getElementById('bulk_building_id').value = document.getElementById('meter_building_id').value;
+            }
+
+            document.getElementById('tab_single_meter').classList.toggle('active', isSingle);
+            document.getElementById('tab_bulk_meter').classList.toggle('active', !isSingle);
+            document.getElementById('meterForm').style.display = isSingle ? 'block' : 'none';
+            document.getElementById('bulkMeterContainer').style.display = isSingle ? 'none' : 'block';
+
+            if (isSingle) {
                 const rid = document.getElementById('room_id').value;
                 if (rid) loadCurrentRoomMeter();
+            } else {
+                const bid = document.getElementById('bulk_building_id').value;
+                if (bid) renderBulkGrid(bid);
             }
         }
 
@@ -1968,7 +1982,12 @@
             const otherContainer = document.getElementById('other_charges_container');
             otherContainer.innerHTML = ''; // Clear existing
             
+            const editIndicator = document.getElementById('edit_indicator');
             if (data.found) {
+                if (editIndicator) {
+                    editIndicator.style.display = 'block';
+                    editIndicator.innerHTML = `<i class="fa-solid fa-edit"></i> กำลังแก้ไขข้อมูลเดิม${data.recorded_at ? ' (จดเมื่อ: ' + data.recorded_at + ')' : ''}`;
+                }
                 document.getElementById('elec').value = data.electricity;
                 document.getElementById('water').value = data.water;
                 
@@ -1976,6 +1995,7 @@
                     data.manual_charges.forEach(c => addOtherChargeRow('other_charges_container', c.description, c.amount));
                 }
             } else {
+                if (editIndicator) editIndicator.style.display = 'none';
                 document.getElementById('elec').value = '';
                 document.getElementById('water').value = '';
             }
@@ -2101,7 +2121,8 @@
                 const data = await res.json();
                 if (res.ok) {
                     alert(isIssue ? 'ออกบิลและแจ้งเตือนเรียบร้อย' : 'บันทึกร่างเรียบร้อย');
-                    location.reload();
+                    const bid = document.getElementById('meter_building_id').value;
+                    window.location.href = `/admin/dashboard?mode=single&month=${month}&year=${year}&building_id=${bid}#meterSection`;
                 } else {
                     alert('Error: ' + (data.detail || JSON.stringify(data)));
                 }
@@ -2149,13 +2170,20 @@
         async function saveBulkMeters(isIssue) {
             const rows = document.querySelectorAll('.bulk-row');
             const data = Array.from(rows).map(r => ({ room_id: r.dataset.roomId, elec: r.querySelector('.bulk-elec').value, water: r.querySelector('.bulk-water').value, other_charges: null }));
+            const month = document.getElementById('bulk_month').value;
+            const year = document.getElementById('bulk_year').value;
+            const bid = document.getElementById('bulk_building_id').value;
+
             const formData = new FormData();
             formData.append('data', JSON.stringify(data));
-            formData.append('month', document.getElementById('bulk_month').value);
-            formData.append('year', document.getElementById('bulk_year').value);
+            formData.append('month', month);
+            formData.append('year', year);
             formData.append('issue_bill', isIssue);
             const res = await fetch('/admin/meters/bulk-record', { method: 'POST', body: formData });
-            if (res.ok) location.reload();
+            if (res.ok) {
+                alert(isIssue ? 'ออกบิลและแจ้งเตือนเรียบร้อย' : 'บันทึกร่างเรียบร้อย');
+                window.location.href = `/admin/dashboard?mode=bulk&month=${month}&year=${year}&building_id=${bid}#meterSection`;
+            }
         }
 
         async function viewInvoiceDetails(id) {
@@ -2342,8 +2370,20 @@
 
         window.onload = () => {
             const params = new URLSearchParams(window.location.search);
-            if (params.get('mode') === 'bulk') {
+            const mode = params.get('mode');
+            const bid = params.get('building_id') || '{{ building_id if building_id else "" }}';
+            
+            if (bid && bid !== 'None' && bid !== '') {
+                document.getElementById('meter_building_id').value = bid;
+                document.getElementById('bulk_building_id').value = bid;
+                filterMeterRooms(bid);
+            }
+
+            if (mode === 'bulk') {
                 switchMeterMode('bulk');
+                document.getElementById('meterSection').scrollIntoView();
+            } else if (mode === 'single') {
+                switchMeterMode('single');
                 document.getElementById('meterSection').scrollIntoView();
             }
         };

@@ -735,7 +735,14 @@ async def generate_pairing_code(db: Session = Depends(get_db), admin: bool = Dep
 
 # Update admin_dashboard
 @app.get("/admin/dashboard", response_class=HTMLResponse)
-async def admin_dashboard(request: Request, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+async def admin_dashboard(
+    request: Request, 
+    month: int = None, 
+    year: int = None, 
+    building_id: int = None,
+    db: Session = Depends(get_db), 
+    admin: bool = Depends(get_admin)
+):
     from sqlalchemy.orm import joinedload
     stats = {
         "total_rooms": db.query(models.Room).count(),
@@ -754,6 +761,9 @@ async def admin_dashboard(request: Request, db: Session = Depends(get_db), admin
     all_buildings = db.query(models.Building).all()
     owner = db.query(models.Owner).first()
     
+    cur_m = month if month else datetime.now().month
+    cur_y = year if year else datetime.now().year
+    
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "stats": stats,
@@ -764,8 +774,9 @@ async def admin_dashboard(request: Request, db: Session = Depends(get_db), admin
         "all_rooms": all_rooms,
         "all_buildings": all_buildings,
         "owner": owner,
-        "current_month": datetime.now().month,
-        "current_year": datetime.now().year
+        "current_month": cur_m,
+        "current_year": cur_y,
+        "building_id": building_id
     })
 
 @app.post("/admin/registration/{tenant_id}/approve")
@@ -1744,6 +1755,7 @@ async def get_current_meter(room_id: int, month: int, year: int, db: Session = D
         "water": reading.water_reading if reading else 0,
         "prev_electricity": prev_reading.electricity_reading if prev_reading else 0,
         "prev_water": prev_reading.water_reading if prev_reading else 0,
+        "recorded_at": reading.recorded_at.strftime("%d/%m/%Y %H:%M") if reading and reading.recorded_at else None,
         "global_recurring": global_recurring,
         "room_recurring": room_recurring,
         "manual_charges": manual_charges,
@@ -2020,7 +2032,15 @@ async def bulk_record_meters(
 
 @app.get("/admin/meters/bulk-context")
 async def get_bulk_context(building_id: int, month: int, year: int, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
-    rooms = db.query(models.Room).filter(models.Room.building_id == building_id).all()
+    rooms_query = db.query(models.Room).filter(models.Room.building_id == building_id).all()
+    
+    # Natural sort in Python
+    import re
+    def natural_sort_key(s):
+        return [int(text) if text.isdigit() else text.lower()
+                for text in re.split('([0-9]+)', s.room_number)]
+    
+    rooms = sorted(rooms_query, key=natural_sort_key)
     
     # Previous period
     prev_month = month - 1 if month > 1 else 12

@@ -81,7 +81,23 @@ def calculate_bill(db: Session, room_id: int, month: int, year: int, other_charg
             final_other_charges.extend(room_recurring)
         except: pass
 
+    # Get existing invoice if any
+    invoice = db.query(models.Invoice).filter(
+        models.Invoice.room_id == room_id,
+        models.Invoice.billing_month == month,
+        models.Invoice.billing_year == year
+    ).first()
+
     # 3. Additional Manual Charges
+    if other_charges is None and invoice and invoice.other_charges:
+        # Load existing charges from invoice and filter for manual ones
+        try:
+            existing_all = json.loads(invoice.other_charges)
+            rec_keys = set((c.get('description'), c.get('amount')) for c in global_recurring + room_recurring)
+            other_charges = [c for c in existing_all if (c.get('description'), c.get('amount')) not in rec_keys]
+        except:
+            other_charges = []
+
     if other_charges is not None:
         # We want to avoid duplicating recurring charges if they were passed from the UI
         # We'll use a set of (description, amount) to track what's already included
@@ -99,13 +115,6 @@ def calculate_bill(db: Session, room_id: int, month: int, year: int, other_charg
     # Calculate Late Fee if applicable
     late_fee = get_late_fee(db, billing_month=month, billing_year=year)
     total_amount = subtotal + late_fee
-
-    # Create invoice if it doesn't exist
-    invoice = db.query(models.Invoice).filter(
-        models.Invoice.room_id == room_id,
-        models.Invoice.billing_month == month,
-        models.Invoice.billing_year == year
-    ).first()
 
     if not invoice:
         # Find current tenant for this room
