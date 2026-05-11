@@ -11,6 +11,9 @@ class Owner(Base):
     display_name = Column(String)
     password_hash = Column(String) # For admin login
     pairing_code = Column(String, unique=True, index=True) # Temporary code to link LINE
+    magic_token = Column(String, unique=True, index=True) # For auto-login from LINE
+    magic_token_expires = Column(DateTime)
+    magic_link_duration_min = Column(Integer, default=5) # Duration of magic link in minutes
     promptpay_config = Column(Text, default='[]')
     promptpay_name = Column(String)
     qr_payment_enabled = Column(Integer, default=1)

@@ -247,17 +247,75 @@ def handle_admin_message(event, *args, **kwargs):
                 else:
                     reply_text = "ไม่พบข้อมูลผู้เช่า"
             elif text == "ผังห้อง":
-                reply_text = f"🏠 ดูผังห้องและจัดการผู้เช่า:\n{BASE_URL}/admin/dashboard"
+                url = get_magic_url(owner, db)
+                reply_text = f"🏠 ดูผังห้องและจัดการผู้เช่า:\n{url}"
             elif text == "จดมิเตอร์":
-                reply_text = f"📊 จดบันทึกมิเตอร์น้ำ-ไฟ:\n{BASE_URL}/admin/dashboard"
+                url_single = get_magic_url(owner, db)
+                url_bulk = url_single + "&mode=bulk" # simple append since get_magic_url has ?token=
+                flex_contents = {
+                    "type": "bubble",
+                    "header": {
+                        "type": "box",
+                        "layout": "vertical",
+                        "contents": [
+                            {"type": "text", "text": "📊 จดมิเตอร์น้ำ-ไฟ", "weight": "bold", "size": "xl", "color": "#FFFFFF"}
+                        ],
+                        "backgroundColor": "#0078d4",
+                        "paddingAll": "20px"
+                    },
+                    "body": {
+                        "type": "box",
+                        "layout": "vertical",
+                        "contents": [
+                            {"type": "text", "text": "เลือกรูปแบบที่ต้องการจดมิเตอร์", "size": "sm", "color": "#888888"},
+                            {
+                                "type": "box",
+                                "layout": "vertical",
+                                "margin": "lg",
+                                "spacing": "sm",
+                                "contents": [
+                                    {
+                                        "type": "button",
+                                        "style": "secondary",
+                                        "height": "sm",
+                                        "action": {
+                                            "type": "uri",
+                                            "label": "จดทีละห้อง",
+                                            "uri": url_single + "#meterSection"
+                                        }
+                                    },
+                                    {
+                                        "type": "button",
+                                        "style": "primary",
+                                        "height": "sm",
+                                        "color": "#27ae60",
+                                        "action": {
+                                            "type": "uri",
+                                            "label": "จดรายอาคาร (แนะนำ)",
+                                            "uri": url_bulk + "#meterSection"
+                                        }
+                                    }
+                                ]
+                            }
+                        ],
+                        "paddingAll": "20px"
+                    }
+                }
+                if admin_bot_api:
+                    admin_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="จดมิเตอร์น้ำ-ไฟ", contents=flex_contents))
+                return
             elif text == "สรุปรายรับ":
-                reply_text = f"💰 สรุปรายรับและส่งออกรายงาน:\n{BASE_URL}/admin/dashboard"
+                url = get_magic_url(owner, db)
+                reply_text = f"💰 สรุปรายรับและส่งออกรายงาน:\n{url}#billSection"
             elif text == "จัดการสัญญา":
-                reply_text = f"📜 จัดการสัญญาเช่า:\n{BASE_URL}/admin/dashboard"
+                url = get_magic_url(owner, db)
+                reply_text = f"📜 จัดการสัญญาเช่า:\n{url}#leaseSection"
             elif text == "ตั้งค่า":
-                reply_text = f"⚙️ ตั้งค่าระบบและพร้อมเพย์:\n{BASE_URL}/admin/dashboard"
+                url = get_magic_url(owner, db)
+                reply_text = f"⚙️ ตั้งค่าระบบและพร้อมเพย์:\n{url}#settingsSection"
             elif text == "รายการแจ้งซ่อม":
-                reply_text = f"🛠️ รายการแจ้งซ่อมจากผู้เช่า:\n{BASE_URL}/admin/dashboard"
+                url = get_magic_url(owner, db)
+                reply_text = f"🛠️ รายการแจ้งซ่อมจากผู้เช่า:\n{url}#repairSection"
             else:
                 reply_text = "สวัสดีครับเจ้าของหอพัก! กรุณาเลือกเมนูจาก Rich Menu เพื่อดำเนินการ"
         
@@ -1355,6 +1413,7 @@ async def save_settings(
     late_fee_per_day: str = Form("50.0"),
     lease_template: str = Form(None),
     move_in_fees_config: str = Form("[]"),
+    magic_link_duration_min: int = Form(5),
     db: Session = Depends(get_db),
     admin: bool = Depends(get_admin)
 ):
@@ -1387,8 +1446,53 @@ async def save_settings(
     if lease_template:
         owner.lease_template = lease_template
     
+    owner.magic_link_duration_min = magic_link_duration_min
+    
     db.commit()
     return {"status": "Success"}
+
+@app.get("/admin/magic-login")
+async def magic_login(request: Request, token: str, db: Session = Depends(get_db)):
+    owner = db.query(models.Owner).filter(
+        models.Owner.magic_token == token,
+        models.Owner.magic_token_expires > datetime.now()
+    ).first()
+    
+    if not owner:
+        return HTMLResponse(content="<h2>ลิงก์หมดอายุหรือไม่ถูกต้อง กรุณากดใหม่จาก LINE Admin</h2>", status_code=400)
+    
+    # Capture all query params except 'token' to pass to dashboard
+    params = dict(request.query_params)
+    if 'token' in params: del params['token']
+    
+    import urllib.parse
+    query_string = urllib.parse.urlencode(params)
+    target_url = "/admin/dashboard"
+    if query_string:
+        target_url += "?" + query_string
+    
+    # Set session cookie (use the password hash as session token)
+    response = RedirectResponse(url=target_url, status_code=303)
+    response.set_cookie(key="admin_session", value=owner.password_hash, httponly=True)
+    
+    return response
+
+# Helper for LINE Bot to generate magic links
+def get_magic_url(owner, db, path=""):
+    import secrets
+    from datetime import timedelta
+    token = secrets.token_urlsafe(16)
+    owner.magic_token = token
+    owner.magic_token_expires = datetime.now() + timedelta(minutes=owner.magic_link_duration_min or 5)
+    db.commit()
+    
+    url = f"{BASE_URL}/admin/magic-login?token={token}"
+    if path:
+        # After magic-login, redirect to specific section if needed
+        # We need to handle this in magic_login endpoint if we want redirect.
+        # For now, let's keep it simple and just go to dashboard.
+        pass
+    return url
 
 @app.get("/admin/promptpay/preview")
 async def preview_promptpay(pp_id: str, admin: bool = Depends(get_admin)):
@@ -1892,6 +1996,46 @@ async def bulk_record_meters(
         results.append({"room_id": room_id, "status": "Success", "invoice_uuid": inv.uuid if inv else None})
         
     return {"status": "Complete", "results": results}
+
+@app.get("/admin/meters/bulk-context")
+async def get_bulk_context(building_id: int, month: int, year: int, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+    rooms = db.query(models.Room).filter(models.Room.building_id == building_id).all()
+    
+    # Previous period
+    prev_month = month - 1 if month > 1 else 12
+    prev_year = year if month > 1 else year - 1
+    
+    results = []
+    for r in rooms:
+        # Get active tenant
+        tenant = db.query(models.Tenant).filter(models.Tenant.current_room_id == r.id, models.Tenant.line_user_id != None).first()
+        
+        # Get previous readings
+        prev_reading = db.query(models.MeterReading).filter(
+            models.MeterReading.room_id == r.id,
+            models.MeterReading.billing_month == prev_month,
+            models.MeterReading.billing_year == prev_year
+        ).first()
+        
+        # Get current (already recorded) readings if any
+        curr_reading = db.query(models.MeterReading).filter(
+            models.MeterReading.room_id == r.id,
+            models.MeterReading.billing_month == month,
+            models.MeterReading.billing_year == year
+        ).first()
+        
+        results.append({
+            "id": r.id,
+            "room_number": r.room_number,
+            "tenant_name": tenant.full_name if tenant else None,
+            "prev_elec": prev_reading.electricity_reading if prev_reading else 0,
+            "prev_water": prev_reading.water_reading if prev_reading else 0,
+            "curr_elec": curr_reading.electricity_reading if curr_reading else None,
+            "curr_water": curr_reading.water_reading if curr_reading else None,
+            "is_recorded": curr_reading is not None
+        })
+        
+    return results
 
 @app.post("/admin/meters/record")
 async def record_meter(

@@ -204,6 +204,26 @@
 
         /* Tables */
         .table-container { overflow-x: auto; }
+        
+        /* Mobile Optimization for Bulk Meter Grid */
+        @media (max-width: 600px) {
+            .bulk-meter-table { min-width: 0 !important; }
+            .bulk-meter-table th, .bulk-meter-table td {
+                padding: 10px 5px !important;
+                font-size: 0.85rem !important;
+            }
+            .bulk-meter-table input {
+                padding: 8px 4px !important;
+                font-size: 0.9rem !important;
+                width: 100% !important;
+                min-width: 70px !important;
+            }
+            .bulk-meter-table th:nth-child(1), .bulk-meter-table td:nth-child(1) { width: 60px !important; }
+            .bulk-meter-table th:nth-child(2), .bulk-meter-table td:nth-child(2) { width: auto !important; }
+            .bulk-meter-table th:nth-child(3), .bulk-meter-table td:nth-child(3) { width: auto !important; }
+            .bulk-meter-table th:nth-child(4), .bulk-meter-table td:nth-child(4) { display: none; } /* Hide status on tiny mobile */
+        }
+
         table { width: 100%; border-collapse: collapse; min-width: 700px; }
         th { text-align: left; padding: 15px; border-bottom: 2px solid var(--border); color: var(--text-muted); font-size: 0.85em; text-transform: uppercase; font-weight: 600; }
         td { padding: 15px; border-bottom: 1px solid var(--border); font-size: 0.95em; vertical-align: middle; }
@@ -543,13 +563,13 @@
                     </div>
                 </div>
                 <div class="table-container">
-                    <table>
+                    <table class="bulk-meter-table">
                         <thead>
                             <tr>
-                                <th style="width: 150px;">ห้อง</th>
-                                <th>มิเตอร์ไฟ (Electricity)</th>
-                                <th>มิเตอร์น้ำ (Water)</th>
-                                <th style="width: 120px;">สถานะ</th>
+                                <th style="width: 80px;">ห้อง</th>
+                                <th>มิเตอร์ไฟ</th>
+                                <th>มิเตอร์น้ำ</th>
+                                <th class="mobile-hide">สถานะ</th>
                             </tr>
                         </thead>
                         <tbody id="bulkMeterGrid">
@@ -883,6 +903,11 @@
                                 <i class="fa-solid fa-key"></i> {{ 'สร้างรหัสใหม่' if owner and owner.pairing_code else 'เริ่มการเชื่อมต่อ LINE' }}
                             </button>
                         </div>
+                    </div>
+                    <div class="form-group">
+                        <label>ระยะเวลาลิงก์ล็อกอินอัตโนมัติ (นาที)</label>
+                        <input type="number" id="magic_link_duration_min" value="{{ owner.magic_link_duration_min if owner and owner.magic_link_duration_min else 5 }}" min="1" max="1440">
+                        <p style="font-size: 0.75em; color: var(--text-muted); margin-top: 5px;">ลิงก์ที่ส่งจาก LINE จะใช้งานได้ภายในเวลาที่กำหนดนี้เท่านั้น (สูงสุด 1,440 นาที หรือ 24 ชม.)</p>
                     </div>
                     <div class="form-group">
                         <label>เปิดรับชำระผ่าน QR Code</label>
@@ -1604,6 +1629,7 @@
             formData.append('late_fee_enabled', document.getElementById('late_fee_enabled').checked ? 1 : 0);
             formData.append('due_day', document.getElementById('due_day').value);
             formData.append('late_fee_per_day', document.getElementById('late_fee_per_day').value);
+            formData.append('magic_link_duration_min', document.getElementById('magic_link_duration_min').value);
             
             const pairs = [];
             document.querySelectorAll('.pp-pair').forEach(div => {
@@ -1674,6 +1700,7 @@
             formData.append('late_fee_enabled', document.getElementById('late_fee_enabled').checked ? "1" : "0");
             formData.append('due_day', document.getElementById('due_day').value);
             formData.append('late_fee_per_day', document.getElementById('late_fee_per_day').value);
+            formData.append('magic_link_duration_min', document.getElementById('magic_link_duration_min').value);
             
             const pairs = [];
             document.querySelectorAll('.pp-pair').forEach(div => {
@@ -2060,8 +2087,37 @@
         async function renderBulkGrid(bid) {
             const grid = document.getElementById('bulkMeterGrid');
             if (!bid) { grid.innerHTML = ''; return; }
-            const rooms = document.querySelectorAll(`.meter-room-opt[data-building-id="${bid}"]`);
-            grid.innerHTML = Array.from(rooms).map(r => `<tr class="bulk-row" data-room-id="${r.value}"><td>${r.text}</td><td><input type="number" class="bulk-elec"></td><td><input type="number" class="bulk-water"></td><td>-</td></tr>`).join('');
+            grid.innerHTML = '<tr><td colspan="4" style="text-align: center;"><i class="fa-solid fa-spinner fa-spin"></i> กำลังโหลดรายชื่อห้อง...</td></tr>';
+            
+            try {
+                // Get rooms and their PREVIOUS readings for context
+                const res = await fetch(`/admin/meters/bulk-context?building_id=${bid}&month=${document.getElementById('bulk_month').value}&year=${document.getElementById('bulk_year').value}`);
+                const rooms = await res.json();
+                
+                grid.innerHTML = rooms.map(r => `
+                    <tr class="bulk-row" data-room-id="${r.id}">
+                        <td>
+                            <div style="font-weight:700;">${r.room_number}</div>
+                            <div style="font-size:0.7em; color:var(--text-muted);">${r.tenant_name || 'ห้องว่าง'}</div>
+                        </td>
+                        <td>
+                            <div class="prev-val">เดิม: ${r.prev_elec}</div>
+                            <input type="number" step="0.1" class="bulk-elec" value="${r.curr_elec || ''}" placeholder="ระบุเลขใหม่">
+                        </td>
+                        <td>
+                            <div class="prev-val">เดิม: ${r.prev_water}</div>
+                            <input type="number" step="0.1" class="bulk-water" value="${r.curr_water || ''}" placeholder="ระบุเลขใหม่">
+                        </td>
+                        <td class="mobile-hide">
+                            <span class="badge ${r.is_recorded ? 'badge-success' : 'badge-secondary'}">
+                                ${r.is_recorded ? 'จดแล้ว' : 'ยังไม่จด'}
+                            </span>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (err) {
+                grid.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--danger);">ไม่สามารถโหลดข้อมูลได้</td></tr>';
+            }
         }
 
         async function saveBulkMeters(isIssue) {
@@ -2257,6 +2313,14 @@
 
         // Initialize Settings
         document.querySelector('a[href="#settingsSection"]').addEventListener('click', loadSystemConfigs);
+
+        window.onload = () => {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('mode') === 'bulk') {
+                switchMeterMode('bulk');
+                document.getElementById('meterSection').scrollIntoView();
+            }
+        };
     </script>
 </body>
 </html>
