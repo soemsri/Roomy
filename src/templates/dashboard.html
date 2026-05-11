@@ -858,6 +858,32 @@
                     </div>
                 </div>
                 <div class="right-col">
+                    <div class="form-group" style="background: #eef2ff; padding: 20px; border-radius: 12px; border: 1px solid #c7d2fe;">
+                        <label style="color: #4338ca;"><i class="fa-brands fa-line"></i> การเชื่อมต่อ LINE Admin</label>
+                        <div id="line_pairing_status" style="margin-bottom: 15px;">
+                            {% if owner and owner.line_user_id and owner.line_user_id != 'SYSTEM' %}
+                                <div style="display:flex; align-items:center; gap:10px; color: var(--success); font-weight: 600;">
+                                    <i class="fa-solid fa-circle-check"></i> เชื่อมต่อแล้ว ({{ owner.line_user_id[:10] }}...)
+                                </div>
+                            {% else %}
+                                <div style="display:flex; align-items:center; gap:10px; color: var(--danger); font-weight: 600;">
+                                    <i class="fa-solid fa-circle-xmark"></i> ยังไม่ได้เชื่อมต่อ LINE
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div id="pairing_code_area" style="text-align: center;">
+                            {% if owner and owner.pairing_code %}
+                                <div style="font-size: 0.8em; color: var(--text-muted); margin-bottom: 5px;">รหัสสำหรับพิมพ์ใน LINE Admin:</div>
+                                <div style="font-size: 2em; font-weight: 800; letter-spacing: 5px; color: var(--primary); background: white; padding: 10px; border-radius: 8px; border: 1px dashed var(--primary);">
+                                    {{ owner.pairing_code }}
+                                </div>
+                                <p style="font-size: 0.75em; color: var(--text-muted); margin-top: 10px;">พิมพ์รหัสนี้ส่งไปยัง LINE Admin Bot เพื่อผูกบัญชี</p>
+                            {% endif %}
+                            <button type="button" class="btn btn-outline" style="width: 100%; margin-top: 10px;" onclick="generatePairingCode()">
+                                <i class="fa-solid fa-key"></i> {{ 'สร้างรหัสใหม่' if owner and owner.pairing_code else 'เริ่มการเชื่อมต่อ LINE' }}
+                            </button>
+                        </div>
+                    </div>
                     <div class="form-group">
                         <label>เปิดรับชำระผ่าน QR Code</label>
                         <select id="qr_enabled">
@@ -2214,6 +2240,20 @@
             if (res.ok) location.reload();
             else alert('Error: ' + (await res.json()).detail);
         };
+
+        async function generatePairingCode() {
+            try {
+                const res = await fetch('/admin/generate-pairing-code', { method: 'POST' });
+                const data = await res.json();
+                if (data.pairing_code) {
+                    location.reload(); // Simplest way to update the UI
+                } else {
+                    alert('Error generating code: ' + (data.error || 'Unknown error'));
+                }
+            } catch (e) {
+                alert('Connection error');
+            }
+        }
 
         // Initialize Settings
         document.querySelector('a[href="#settingsSection"]').addEventListener('click', loadSystemConfigs);

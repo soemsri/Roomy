@@ -196,6 +196,18 @@ def handle_admin_message(event, *args, **kwargs):
         
     reply_text = ""
     try:
+        # Check for pairing code FIRST if not already linked or even if linked (to re-pair)
+        if text.isdigit() and len(text) == 6:
+            owner_by_code = db.query(models.Owner).filter(models.Owner.pairing_code == text).first()
+            if owner_by_code:
+                owner_by_code.line_user_id = user_id
+                owner_by_code.pairing_code = None # Clear after use
+                db.commit()
+                reply_text = "✅ เชื่อมต่อบัญชี LINE Admin เรียบร้อยแล้ว! คุณสามารถใช้ฟีเจอร์แจ้งเตือนและรีเซ็ตรหัสผ่านได้แล้วครับ"
+                if admin_bot_api:
+                    admin_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
+                return
+
         owner = db.query(models.Owner).filter(models.Owner.line_user_id == user_id).first()
         if not owner:
             if not db.query(models.Owner).first():
@@ -650,6 +662,18 @@ async def reset_password(token: str = Form(...), new_password: str = Form(...), 
         return RedirectResponse(url="/admin/login?reset_success=1", status_code=303)
     
     return HTMLResponse(content="<h2>เกิดข้อผิดพลาดในการรีเซ็ตรหัสผ่าน</h2>", status_code=500)
+
+@app.post("/admin/generate-pairing-code")
+async def generate_pairing_code(db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+    import secrets
+    # Generate 6-digit numeric code
+    code = "".join([str(secrets.randbelow(10)) for _ in range(6)])
+    owner = db.query(models.Owner).first()
+    if owner:
+        owner.pairing_code = code
+        db.commit()
+        return {"pairing_code": code}
+    return {"error": "Owner not found"}
 
 # Update admin_dashboard
 @app.get("/admin/dashboard", response_class=HTMLResponse)

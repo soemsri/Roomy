@@ -10,6 +10,7 @@ class Owner(Base):
     line_user_id = Column(String, unique=True, index=True, nullable=False)
     display_name = Column(String)
     password_hash = Column(String) # For admin login
+    pairing_code = Column(String, unique=True, index=True) # Temporary code to link LINE
     promptpay_config = Column(Text, default='[]')
     promptpay_name = Column(String)
     qr_payment_enabled = Column(Integer, default=1)
