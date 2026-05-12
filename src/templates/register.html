@@ -129,12 +129,30 @@
             <i class="fa-solid fa-circle-check"></i>
             <h3>ส่งข้อมูลเรียบร้อยแล้ว!</h3>
             <p>กรุณารอเจ้าของหอพักตรวจสอบและอนุมัติการเข้าพัก ระบบจะแจ้งเตือนคุณผ่าน LINE เมื่อมีการอัปเดต</p>
-            <button class="btn" onclick="window.close()">ปิดหน้านี้</button>
+            <button class="btn" onclick="closeWindow()">ปิดหน้านี้</button>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 15px;">(หากปุ่มไม่ทำงาน สามารถกดปุ่ม X ที่มุมบนเพื่อปิดได้เลยครับ)</p>
         </div>
     </div>
 
     <script>
         const tenant_uuid = "{{ tenant_uuid }}";
+
+        function closeWindow() {
+            // Try standard window.close
+            window.close();
+            
+            // For LINE In-App Browser, sometimes this helps trigger close
+            if (window.MessengerExtensions) {
+                MessengerExtensions.requestCloseBrowser(function success() {}, function error(err) {});
+            }
+            
+            // Fallback for LINE
+            setTimeout(() => {
+                // If it's still open, try common URL schemes to 'go back' or close
+                // But most secure way is to just let user know
+                console.log("Window did not close automatically.");
+            }, 300);
+        }
         
         async function loadRooms() {
             const bid = document.getElementById('building_id').value;

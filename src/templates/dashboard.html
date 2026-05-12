@@ -2202,7 +2202,9 @@
                 if (res.ok) {
                     alert(isIssue ? 'ออกบิลและแจ้งเตือนเรียบร้อย' : 'บันทึกร่างเรียบร้อย');
                     const bid = document.getElementById('meter_building_id').value;
+                    // Force refresh by redirecting to the exact current context
                     window.location.href = `/admin/dashboard?mode=single&month=${month}&year=${year}&building_id=${bid}#meterSection`;
+                    window.location.reload();
                 } else {
                     alert('Error: ' + (data.detail || JSON.stringify(data)));
                 }
@@ -2263,6 +2265,7 @@
             if (res.ok) {
                 alert(isIssue ? 'ออกบิลและแจ้งเตือนเรียบร้อย' : 'บันทึกร่างเรียบร้อย');
                 window.location.href = `/admin/dashboard?mode=bulk&month=${month}&year=${year}&building_id=${bid}#meterSection`;
+                window.location.reload();
             }
         }
 
