@@ -23,7 +23,11 @@ def create_tenant_rich_menu():
             {"bounds": {"x": 0, "y": 0, "width": 833, "height": 843}, "action": {"type": "message", "text": "ดูค่าเช่า"}},
             {"bounds": {"x": 833, "y": 0, "width": 834, "height": 843}, "action": {"type": "message", "text": "แจ้งซ่อม"}},
             {"bounds": {"x": 1667, "y": 0, "width": 833, "height": 843}, "action": {"type": "message", "text": "ประวัติ"}},
-            {"bounds": {"x": 0, "y": 843, "width": 833, "height": 843}, "action": {"type": "message", "text": "สนทนา"}},
+            {"bounds": {"x": 0, "y": 843, "width": 833, "height": 843}, "action": {
+                "type": "postback",
+                "data": "action=chat",
+                "inputOption": "openKeyboard"
+            }},
             {"bounds": {"x": 833, "y": 843, "width": 834, "height": 843}, "action": {"type": "message", "text": "ย้ายเข้า"}},
             {"bounds": {"x": 1667, "y": 843, "width": 833, "height": 843}, "action": {"type": "message", "text": "ย้ายออก"}}
         ]

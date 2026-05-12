@@ -18,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
-from linebot.models import MessageEvent, TextMessage, TextSendMessage, FlexSendMessage, FlexContainer
+from linebot.models import MessageEvent, TextMessage, TextSendMessage, FlexSendMessage, FlexContainer, PostbackEvent
 
 from database import SessionLocal, engine, get_db
 import models
