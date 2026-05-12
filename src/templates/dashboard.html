@@ -606,6 +606,7 @@
             <div class="section-header">
                 <h2><i class="fa-solid fa-door-closed"></i> จัดการห้องพัก</h2>
                 <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-outline" onclick="openBuildingListModal()"><i class="fa-solid fa-building"></i> จัดการอาคาร</button>
                     <button class="btn btn-outline" onclick="openBulkRecurringModal()"><i class="fa-solid fa-layer-group"></i> ตั้งค่าส่วนกลางทุกห้อง</button>
                     <button class="btn btn-primary" onclick="toggleForm('roomFormContainer')"><i class="fa-solid fa-plus"></i> เพิ่มห้องใหม่</button>
                 </div>
@@ -1178,6 +1179,35 @@
                     <button type="submit" class="btn btn-primary">บันทึกการแก้ไข</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Building Modal -->
+    <div id="buildingListModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 style="margin:0; font-weight:700;"><i class="fa-solid fa-building"></i> จัดการอาคาร (Buildings)</h3>
+                <button class="btn btn-outline" style="padding:5px 10px;" onclick="document.getElementById('buildingListModal').style.display='none'"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <div style="text-align: right; margin-bottom: 15px;">
+                    <button class="btn btn-primary" onclick="openBuildingModal()"><i class="fa-solid fa-plus"></i> เพิ่มอาคารใหม่</button>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ชื่ออาคาร</th>
+                                <th>คำอธิบาย</th>
+                                <th>จัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="buildingListTableBody">
+                            <!-- Filled via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -2331,6 +2361,48 @@
                 alert('บันทึกการตั้งค่าสำเร็จ (อาจต้องรีสตาร์ทระบบเพื่อให้มีผลสมบูรณ์)');
                 document.getElementById('configEditModal').style.display = 'none';
                 loadSystemConfigs();
+            }
+        }
+
+        async function openBuildingListModal() {
+            const modal = document.getElementById('buildingListModal');
+            const tbody = document.getElementById('buildingListTableBody');
+            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;"><i class="fa-solid fa-spinner fa-spin"></i> กำลังโหลด...</td></tr>';
+            modal.style.display = 'block';
+
+            try {
+                const res = await fetch('/admin/buildings/list');
+                const buildings = await res.json();
+                
+                if (buildings.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:var(--text-muted);">ไม่พบข้อมูลอาคาร</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = buildings.map(b => `
+                    <tr>
+                        <td><strong>${b.name}</strong></td>
+                        <td style="font-size: 0.85em; color: var(--text-muted);">${b.description || '-'}</td>
+                        <td>
+                            <button class="btn btn-outline" style="padding: 5px 10px;" onclick="editBuilding(${b.id}, '${b.name}', '${b.description || ''}')"><i class="fa-solid fa-edit"></i></button>
+                            <button class="btn btn-danger" style="padding: 5px 10px;" onclick="deleteBuildingInModal(${b.id})"><i class="fa-solid fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (err) {
+                tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:var(--danger);">เกิดข้อผิดพลาดในการโหลดข้อมูล</td></tr>';
+            }
+        }
+
+        async function deleteBuildingInModal(id) {
+            if (confirm('ยืนยันการลบอาคาร? (อาคารจะถูกลบได้เมื่อไม่มีห้องผูกอยู่เท่านั้น)')) {
+                const res = await fetch(`/admin/buildings/${id}/delete`, { method: 'POST' });
+                if (res.ok) {
+                    location.reload(); // Refresh the screen
+                } else {
+                    const err = await res.json();
+                    alert('Error: ' + (err.detail || 'ไม่สามารถลบอาคารได้'));
+                }
             }
         }
 
