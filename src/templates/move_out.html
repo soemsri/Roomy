@@ -1,0 +1,168 @@
+
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>แจ้งย้ายออก - SukAnan Apartment</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #ef4444;
+            --primary-dark: #b91c1c;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --success: #22c55e;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            width: 100%;
+            max-width: 500px;
+            background: var(--card);
+            border-radius: 16px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: var(--primary);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h2 { margin: 0; font-size: 1.5rem; }
+        .header p { margin: 10px 0 0; opacity: 0.9; font-size: 0.9rem; }
+        
+        .form-content { padding: 30px; }
+        .form-group { margin-bottom: 20px; }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 1rem;
+            box-sizing: border-box;
+            transition: border-color 0.2s;
+        }
+        .btn {
+            width: 100%;
+            padding: 14px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn:hover { background: var(--primary-dark); }
+        .success-view {
+            display: none;
+            text-align: center;
+            padding: 40px 20px;
+        }
+        .success-view i {
+            font-size: 4rem;
+            color: var(--success);
+            margin-bottom: 20px;
+        }
+        .info-box {
+            background: #fef2f2;
+            border-left: 4px solid var(--primary);
+            padding: 15px;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+            color: #991b1b;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2><i class="fa-solid fa-door-open"></i> แจ้งย้ายออก</h2>
+            <p>ห้อง {{ tenant.room.room_number }} - {{ tenant.full_name }}</p>
+        </div>
+        <div class="form-content" id="formContent">
+            <div class="info-box">
+                <i class="fa-solid fa-circle-info"></i> การแจ้งย้ายออกต้องแจ้งล่วงหน้าตามเงื่อนไขในสัญญาเช่า กรุณาตรวจสอบวันที่ย้ายออกให้ถูกต้อง
+            </div>
+            <form id="moveOutForm">
+                <div class="form-group">
+                    <label>วันที่ต้องการย้ายออก</label>
+                    <input type="date" id="requested_date" required>
+                </div>
+                <div class="form-group">
+                    <label>เหตุผลที่ย้ายออก (ระบุหรือไม่ก็ได้)</label>
+                    <textarea id="reason" rows="3" placeholder="ระบุเหตุผล..."></textarea>
+                </div>
+                <button type="submit" class="btn">ส่งคำขอแจ้งย้ายออก</button>
+            </form>
+        </div>
+        <div class="success-view" id="successView">
+            <i class="fa-solid fa-circle-check"></i>
+            <h3>ส่งคำขอเรียบร้อยแล้ว</h3>
+            <p>เจ้าของหอพักได้รับคำขอแจ้งย้ายออกของคุณแล้ว จะดำเนินการตรวจสอบและติดต่อกลับโดยเร็วที่สุด</p>
+            <button class="btn" style="background: var(--text-muted);" onclick="window.close()">ปิดหน้านี้</button>
+        </div>
+    </div>
+
+    <script>
+        const tenant_uuid = "{{ tenant.uuid }}";
+        
+        document.getElementById('moveOutForm').onsubmit = async (e) => {
+            e.preventDefault();
+            if (!confirm('ยืนยันการส่งคำขอแจ้งย้ายออก?')) return;
+
+            const btn = e.target.querySelector('button');
+            btn.disabled = true;
+            btn.innerText = 'กำลังส่งข้อมูล...';
+
+            const data = {
+                requested_date: document.getElementById('requested_date').value,
+                reason: document.getElementById('reason').value
+            };
+
+            try {
+                const res = await fetch(`/move-out/${tenant_uuid}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (res.ok) {
+                    document.getElementById('formContent').style.display = 'none';
+                    document.getElementById('successView').style.display = 'block';
+                } else {
+                    const err = await res.json();
+                    alert(err.detail || 'เกิดข้อผิดพลาด');
+                    btn.disabled = false;
+                    btn.innerText = 'ส่งคำขอแจ้งย้ายออก';
+                }
+            } catch (err) {
+                alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+                btn.disabled = false;
+                btn.innerText = 'ส่งคำขอแจ้งย้ายออก';
+            }
+        };
+    </script>
+</body>
+</html>

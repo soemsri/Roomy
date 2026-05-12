@@ -81,8 +81,13 @@
         {% elif status == 'Pending Verification' %}
             <div class="btn" style="background: #f39c12;">รอตรวจสอบการชำระเงิน</div>
             <p style="text-align: center; color: #7f8c8d; font-size: 0.8em; margin-top: 10px;">เจ้าหน้าที่กำลังตรวจสอบสลิปของคุณ</p>
-        {% else %}
+        {% elif status == 'Draft' %}
+            <div class="btn" style="background: #95a5a6;">ยังไม่ออกใบแจ้งหนี้ (Draft)</div>
+            <p style="text-align: center; color: #7f8c8d; font-size: 0.8em; margin-top: 10px;">รายการนี้ยังอยู่ระหว่างการตรวจสอบโดยเจ้าหน้าที่</p>
+        {% elif status == 'Paid' %}
             <div class="btn" style="background: #3498db;">ชำระเงินแล้ว</div>
+        {% else %}
+            <div class="btn" style="background: #3498db;">{{ status }}</div>
         {% endif %}
 
         <div class="qr-section" id="qr-container">

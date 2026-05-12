@@ -437,11 +437,12 @@
         </div>
 
         <!-- Pending Registrations -->
-        <div class="section-card" id="pendingSection" style="{% if pending_registrations|length == 0 %}display:none;{% endif %} border-top: 4px solid var(--warning);">
+        <div class="section-card" id="pendingSection" style="{% if pending_registrations|length == 0 and move_out_requests|length == 0 %}display:none;{% endif %} border-top: 4px solid var(--warning);">
+            {% if pending_registrations|length > 0 %}
             <div class="section-header">
                 <h2><i class="fa-solid fa-user-plus" style="color: var(--warning);"></i> การอนุมัติลงทะเบียนใหม่</h2>
             </div>
-            <div class="table-container">
+            <div class="table-container" style="margin-bottom: 30px;">
                 <table>
                     <thead>
                         <tr>
@@ -466,6 +467,39 @@
                     </tbody>
                 </table>
             </div>
+            {% endif %}
+
+            {% if move_out_requests|length > 0 %}
+            <div class="section-header">
+                <h2><i class="fa-solid fa-door-open" style="color: var(--danger);"></i> รายการแจ้งย้ายออก</h2>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ห้อง</th>
+                            <th>ชื่อผู้เช่า</th>
+                            <th>วันที่แจ้งย้าย</th>
+                            <th>เหตุผล</th>
+                            <th>จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in move_out_requests %}
+                        <tr>
+                            <td style="font-weight: 700;">{{ r.room.room_number if r.room else 'N/A' }}</td>
+                            <td>{{ r.tenant.full_name if r.tenant else 'N/A' }}</td>
+                            <td style="color: var(--danger); font-weight: 600;">{{ r.requested_date.strftime('%d/%m/%Y') }}</td>
+                            <td style="font-size: 0.85em; color: var(--text-muted);">{{ r.reason or '-' }}</td>
+                            <td>
+                                <button class="btn btn-danger" onclick="unmapTenant({{ r.tenant.id }})">ย้ายออก (ยืนยัน)</button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
         </div>
 
         <!-- Meter Recording -->

@@ -111,3 +111,16 @@ if __name__ == "__main__":
     owner_icons = ["room", "meter", "income", "lease", "settings", "repair"]
     
     create_rich_menu_pro("owner_richmenu.png", "Owner Menu", owner_btns, owner_icons)
+
+    # Tenant Rich Menu Config
+    tenant_btns = [
+        ("ดูค่าเช่า", "Rent/Bill"),
+        ("แจ้งซ่อม", "Repair"),
+        ("ประวัติ", "History"),
+        ("สนทนา", "Chat"),
+        ("ย้ายเข้า", "Move In"),
+        ("ย้ายออก", "Move Out")
+    ]
+    tenant_icons = ["income", "repair", "lease", "settings", "room", "repair"] # reuse icons
+    
+    create_rich_menu_pro("tenant_richmenu.png", "Tenant Menu", tenant_btns, tenant_icons)

@@ -10,6 +10,8 @@
         .status { font-weight: bold; }
         .Paid { color: #27ae60; }
         .Unpaid { color: #e67e22; }
+        .Draft { color: #95a5a6; }
+        .Pending { color: #f39c12; }
         .btn-view { display: inline-block; padding: 5px 10px; background: #3498db; color: white; text-decoration: none; border-radius: 3px; font-size: 0.8em; }
     </style>
 </head>
@@ -19,7 +21,9 @@
     <div class="card">
         <div class="row">
             <strong>เดือน {{ inv.billing_month }}/{{ inv.billing_year }}</strong>
-            <span class="status {{ inv.status }}">{{ inv.status }}</span>
+            <span class="status {{ inv.status }}">
+                {{ 'ชำระแล้ว' if inv.status == 'Paid' else ('ค้างชำระ' if inv.status == 'Unpaid' else ('รอตรวจสอบ' if inv.status == 'Pending Verification' else ('ฉบับร่าง' if inv.status == 'Draft' else inv.status))) }}
+            </span>
         </div>
         <div class="row">
             <span>ยอดรวม: {{ "{:,.2f}".format(inv.total_amount) }} บาท</span>

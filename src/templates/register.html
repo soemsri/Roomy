@@ -1,0 +1,203 @@
+
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ลงทะเบียนเข้าพัก - SukAnan Apartment</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1e40af;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --success: #22c55e;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            width: 100%;
+            max-width: 500px;
+            background: var(--card);
+            border-radius: 16px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: var(--primary);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h2 { margin: 0; font-size: 1.5rem; }
+        .header p { margin: 10px 0 0; opacity: 0.9; font-size: 0.9rem; }
+        
+        .form-content { padding: 30px; }
+        .form-group { margin-bottom: 20px; }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 1rem;
+            box-sizing: border-box;
+            transition: border-color 0.2s;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        .btn {
+            width: 100%;
+            padding: 14px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn:hover { background: var(--primary-dark); }
+        .success-view {
+            display: none;
+            text-align: center;
+            padding: 40px 20px;
+        }
+        .success-view i {
+            font-size: 4rem;
+            color: var(--success);
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="mainContainer">
+        <div class="header">
+            <h2><i class="fa-solid fa-file-contract"></i> ลงทะเบียนเข้าพัก</h2>
+            <p>กรุณากรอกข้อมูลเพื่อทำสัญญาเช่า</p>
+        </div>
+        <div class="form-content" id="formContent">
+            <form id="regForm">
+                <div class="form-group">
+                    <label>อาคาร</label>
+                    <select id="building_id" required onchange="loadRooms()">
+                        <option value="">เลือกอาคาร</option>
+                        {% for b in buildings %}
+                        <option value="{{ b.id }}">{{ b.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>เลขห้อง</label>
+                    <select id="room_id" required disabled>
+                        <option value="">กรุณาเลือกอาคารก่อน</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>ชื่อ-นามสกุล</label>
+                    <input type="text" id="full_name" placeholder="ชื่อจริง - นามสกุล" required>
+                </div>
+                <div class="form-group">
+                    <label>เบอร์โทรศัพท์</label>
+                    <input type="tel" id="phone_number" placeholder="08x-xxx-xxxx" required>
+                </div>
+                <button type="submit" class="btn">ส่งข้อมูลเพื่ออนุมัติ</button>
+            </form>
+        </div>
+        <div class="success-view" id="successView">
+            <i class="fa-solid fa-circle-check"></i>
+            <h3>ส่งข้อมูลเรียบร้อยแล้ว!</h3>
+            <p>กรุณารอเจ้าของหอพักตรวจสอบและอนุมัติการเข้าพัก ระบบจะแจ้งเตือนคุณผ่าน LINE เมื่อมีการอัปเดต</p>
+            <button class="btn" onclick="window.close()">ปิดหน้านี้</button>
+        </div>
+    </div>
+
+    <script>
+        const tenant_uuid = "{{ tenant_uuid }}";
+        
+        async function loadRooms() {
+            const bid = document.getElementById('building_id').value;
+            const roomSelect = document.getElementById('room_id');
+            
+            if (!bid) {
+                roomSelect.innerHTML = '<option value="">กรุณาเลือกอาคารก่อน</option>';
+                roomSelect.disabled = true;
+                return;
+            }
+
+            roomSelect.innerHTML = '<option value="">กำลังโหลด...</option>';
+            roomSelect.disabled = false;
+
+            try {
+                const res = await fetch(`/api/buildings/${bid}/vacant-rooms`);
+                const rooms = await res.json();
+                
+                if (rooms.length === 0) {
+                    roomSelect.innerHTML = '<option value="">ไม่มีห้องว่างในอาคารนี้</option>';
+                } else {
+                    roomSelect.innerHTML = '<option value="">เลือกห้อง</option>' + 
+                        rooms.map(r => `<option value="${r.id}">ห้อง ${r.room_number}</option>`).join('');
+                }
+            } catch (err) {
+                roomSelect.innerHTML = '<option value="">เกิดข้อผิดพลาด</option>';
+            }
+        }
+
+        document.getElementById('regForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const btn = e.target.querySelector('button');
+            btn.disabled = true;
+            btn.innerText = 'กำลังส่งข้อมูล...';
+
+            const data = {
+                room_id: document.getElementById('room_id').value,
+                full_name: document.getElementById('full_name').value,
+                phone_number: document.getElementById('phone_number').value
+            };
+
+            try {
+                const res = await fetch(`/register/${tenant_uuid}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (res.ok) {
+                    document.getElementById('formContent').style.display = 'none';
+                    document.getElementById('successView').style.display = 'block';
+                } else {
+                    const err = await res.json();
+                    alert(err.detail || 'เกิดข้อผิดพลาด');
+                    btn.disabled = false;
+                    btn.innerText = 'ส่งข้อมูลเพื่ออนุมัติ';
+                }
+            } catch (err) {
+                alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+                btn.disabled = false;
+                btn.innerText = 'ส่งข้อมูลเพื่ออนุมัติ';
+            }
+        };
+    </script>
+</body>
+</html>

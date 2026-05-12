@@ -347,123 +347,31 @@ def handle_tenant_message(event, *args, **kwargs):
     try:
         tenant = db.query(models.Tenant).filter(models.Tenant.line_user_id == user_id).first()
         
-        if not tenant or tenant.status in ["Rejected", "AwaitingBuilding", "AwaitingRoom", "AwaitingName", "AwaitingPhone"]:
-            # Initial Greeting or Restarting Registration
-            if not tenant or tenant.status == "Rejected":
-                buildings = db.query(models.Building).all()
-                if len(buildings) > 1:
-                    # Multiple buildings: Must select building first
-                    if not tenant:
-                        tenant = models.Tenant(line_user_id=user_id, uuid=str(uuid.uuid4()), status="AwaitingBuilding")
-                        db.add(tenant)
-                    else:
-                        tenant.status = "AwaitingBuilding"
-                    db.commit()
-                    
-                    # Send Buttons to select building
-                    from linebot.models import ButtonsTemplate, TemplateSendMessage, MessageAction
-                    actions = [MessageAction(label=b.name, text=f"อาคาร {b.name}") for b in buildings[:4]] # LINE limit 4 buttons
-                    buttons_template = ButtonsTemplate(
-                        title='กรุณาเลือกอาคาร',
-                        text='พบหลายอาคารในระบบ กรุณาเลือกอาคารที่คุณพักอาศัย',
-                        actions=actions
-                    )
-                    if tenant_bot_api:
-                        tenant_bot_api.reply_message(event.reply_token, TemplateSendMessage(alt_text='กรุณาเลือกอาคาร', template=buttons_template))
-                    return
-                else:
-                    # Only one building or no buildings (fallback to default)
-                    bid = buildings[0].id if buildings else None
-                    if not tenant:
-                        tenant = models.Tenant(line_user_id=user_id, uuid=str(uuid.uuid4()), status="AwaitingRoom")
-                        db.add(tenant)
-                    else:
-                        tenant.status = "AwaitingRoom"
-                    
-                    # If we have exactly one building, we can pre-assign it or just wait for room
-                    # To keep it simple, we just move to AwaitingRoom. 
-                    # If there's only one building, the room search will naturally find it.
-                    db.commit()
-                    reply_text = "สวัสดีครับ คุณพักอยู่ห้องหมายเลขอะไรครับ? (ตัวอย่าง: 101)"
-
-            elif tenant.status == "AwaitingBuilding":
-                # User should have typed/clicked "อาคาร [Name]"
-                # If they click a button, text is "อาคาร [Name]"
-                if text.startswith("อาคาร "):
-                    building_name = text[6:].strip() # "อาคาร " is 6 chars
-                else:
-                    building_name = text.strip()
-                
-                building = db.query(models.Building).filter(models.Building.name == building_name).first()
-                if building:
-                    tenant.status = "AwaitingRoom"
-                    tenant.temp_building_id = building.id
-                    db.commit()
-                    reply_text = f"คุณเลือก {building.name} กรุณาพิมพ์หมายเลขห้องของคุณ"
-                else:
-                    reply_text = "ขออภัย ไม่พบข้อมูลอาคารดังกล่าว กรุณาเลือกจากปุ่มที่ระบบส่งให้"
-
-            elif tenant.status == "AwaitingRoom":
-                # If we have a temp_building_id, search rooms in that building
-                query = db.query(models.Room).filter(models.Room.room_number == text)
-                if tenant.temp_building_id:
-                    query = query.filter(models.Room.building_id == tenant.temp_building_id)
-                
-                rooms = query.all()
-                
-                if not rooms:
-                    reply_text = f"ไม่พบห้องหมายเลข {text} กรุณาตรวจสอบอีกครั้ง"
-                elif len(rooms) == 1:
-                    room = rooms[0]
-                    if room.status == "Vacant":
-                        tenant.current_room_id = room.id
-                        tenant.status = "AwaitingName"
-                        db.commit()
-                        reply_text = f"ห้อง {room.room_number} ({room.building.name if room.building else ''}) ว่าง! กรุณาพิมพ์ ชื่อ-นามสกุล ของคุณเพื่อลงทะเบียน"
-                    else:
-                        reply_text = f"ห้อง {text} ไม่ว่างในขณะนี้ หากข้อมูลผิดพลาดกรุณาติดต่อเจ้าของ"
-                else:
-                    # This happens if multiple rooms with same number and no building was selected yet
-                    # Fallback to building selection
-                    reply_text = "พบห้องหมายเลขนี้ในหลายอาคาร กรุณาพิมพ์ 'อาคาร [ชื่ออาคาร]' เพื่อเลือกอาคารก่อน"
-                    tenant.status = "AwaitingBuilding"
-                    db.commit()
-            
-            elif tenant.status == "AwaitingName":
-                tenant.full_name = text
-                tenant.status = "AwaitingPhone"
-                db.commit()
-                reply_text = f"ขอบคุณครับคุณ {text}, กรุณาพิมพ์ เบอร์โทรศัพท์ ของคุณ"
-            
-            elif tenant.status == "AwaitingPhone":
-                tenant.phone_number = text
-                tenant.status = "Pending"
+        if not tenant or tenant.status != "Active":
+            # Welcome message with registration link
+            if not tenant:
+                tenant = models.Tenant(line_user_id=user_id, status="AwaitingRegistration")
+                db.add(tenant)
                 db.commit()
                 db.refresh(tenant)
-                room_number = tenant.room.room_number if tenant.room else "N/A"
-                reply_text = f"บันทึกข้อมูลเรียบร้อย! กรุณารอเจ้าของอนุมัติการเข้าพักห้อง {room_number}"
-                
-                # Notify Owner via Admin Channel
-                owner = db.query(models.Owner).first()
-                if owner and owner.line_user_id and admin_bot_api:
-                    try:
-                        from linebot.models import ButtonsTemplate, TemplateSendMessage, MessageAction
-                        buttons_template = ButtonsTemplate(
-                            title='อนุมัติผู้เช่าใหม่',
-                            text=f'ห้อง {room_number}: {tenant.full_name}',
-                            actions=[
-                                MessageAction(label='อนุมัติ', text=f'APPROVE_REG_{tenant.id}'),
-                                MessageAction(label='ปฏิเสธ', text=f'REJECT_REG_{tenant.id}')
-                            ]
-                        )
-                        admin_bot_api.push_message(owner.line_user_id, TemplateSendMessage(alt_text='มีผู้ขอลงทะเบียนใหม่', template=buttons_template))
-                    except:
-                        send_line_notify(f"🔔 มีผู้ขอลงทะเบียนห้อง {room_number}\nชื่อ: {tenant.full_name}")
-                else:
-                    send_line_notify(f"🔔 มีผู้ขอลงทะเบียนห้อง {room_number}")
-        
-        elif tenant.status == "Pending":
-            reply_text = "คำขอของคุณอยู่ระหว่างการพิจารณา กรุณารอเจ้าของอนุมัติ"
+            
+            reg_url = f"{BASE_URL}/register/{tenant.uuid}"
+            reply_text = f"สวัสดีครับ! ยินดีต้อนรับสู่ระบบหอพัก SukAnan\n\nหากคุณเป็นผู้เช่าใหม่ กรุณาลงทะเบียนเข้าพักที่นี่:\n{reg_url}\n\nหรือหากต้องการสอบถาม สามารถพิมพ์ข้อความทิ้งไว้ได้เลยครับ"
+            
+            # Send as Buttons if possible
+            if tenant_bot_api:
+                from linebot.models import ButtonsTemplate, TemplateSendMessage, URITemplateAction
+                buttons_template = ButtonsTemplate(
+                    title='ยินดีต้อนรับ',
+                    text='กรุณาลงทะเบียนเข้าพักเพื่อใช้งานระบบ',
+                    actions=[
+                        URITemplateAction(label='ลงทะเบียนเข้าพัก', uri=reg_url)
+                    ]
+                )
+                try:
+                    tenant_bot_api.reply_message(event.reply_token, TemplateSendMessage(alt_text='ลงทะเบียนเข้าพัก', template=buttons_template))
+                    return
+                except: pass
         else: # Active
             room_number = tenant.room.room_number if tenant.room else "N/A"
             if text == "ดูค่าเช่า":
@@ -476,6 +384,14 @@ def handle_tenant_message(event, *args, **kwargs):
                 reply_text = f"แจ้งซ่อมห้อง {room_number}:\n{BASE_URL}/repair/{tenant.uuid}"
             elif text == "ประวัติ":
                 reply_text = f"ดูประวัติย้อนหลัง:\n{BASE_URL}/history/{tenant.uuid}"
+            elif text == "สนทนา":
+                reply_text = "คุณสามารถพิมพ์ข้อความที่ต้องการสอบถามทิ้งไว้ได้เลยครับ เจ้าหน้าที่จะรีบมาตอบกลับโดยเร็วที่สุด"
+            elif text == "ย้ายเข้า":
+                # Even if they are already active, maybe they want to register for a new room?
+                # But usually, it's for new users.
+                reply_text = f"หากคุณต้องการลงทะเบียนเข้าพักเพิ่ม หรือทำสัญญาใหม่ กรุณากดที่ลิงก์นี้ครับ:\n{BASE_URL}/register/{tenant.uuid}"
+            elif text == "ย้ายออก":
+                reply_text = f"คุณต้องการแจ้งย้ายออกใช่หรือไม่? กรุณากรอกรายละเอียดที่ลิงก์นี้เพื่อดำเนินการ:\n{BASE_URL}/move-out/{tenant.uuid}"
             else:
                 reply_text = f"สวัสดี ห้อง {room_number}!\nพิมพ์ 'ดูค่าเช่า', 'แจ้งซ่อม' หรือ 'ประวัติ'"
             
@@ -486,6 +402,95 @@ def handle_tenant_message(event, *args, **kwargs):
             db.close()
 
 # Tenant APIs
+@app.get("/register/{tenant_uuid}", response_class=HTMLResponse)
+async def view_registration(request: Request, tenant_uuid: str, db: Session = Depends(get_db)):
+    tenant = db.query(models.Tenant).filter(models.Tenant.uuid == tenant_uuid).first()
+    if not tenant: raise HTTPException(status_code=404, detail="Tenant not found")
+    
+    buildings = db.query(models.Building).all()
+    return templates.TemplateResponse("register.html", {"request": request, "tenant_uuid": tenant_uuid, "buildings": buildings})
+
+@app.post("/register/{tenant_uuid}")
+async def submit_registration(tenant_uuid: str, data: dict, db: Session = Depends(get_db)):
+    tenant = db.query(models.Tenant).filter(models.Tenant.uuid == tenant_uuid).first()
+    if not tenant: raise HTTPException(status_code=404, detail="Tenant not found")
+    
+    room_id = data.get("room_id")
+    full_name = data.get("full_name")
+    phone_number = data.get("phone_number")
+    
+    if not all([room_id, full_name, phone_number]):
+        raise HTTPException(status_code=400, detail="กรุณากรอกข้อมูลให้ครบถ้วน")
+        
+    room = db.query(models.Room).filter(models.Room.id == room_id).first()
+    if not room or room.status != "Vacant":
+        raise HTTPException(status_code=400, detail="ห้องไม่ว่างหรือไม่มีอยู่จริง")
+        
+    tenant.current_room_id = room.id
+    tenant.full_name = full_name
+    tenant.phone_number = phone_number
+    tenant.status = "Pending"
+    db.commit()
+    
+    # Notify Owner
+    owner = db.query(models.Owner).first()
+    if owner and owner.line_user_id and admin_bot_api:
+        msg = f"🔔 มีผู้ลงทะเบียนใหม่!\nห้อง: {room.room_number}\nชื่อ: {full_name}\nเบอร์โทร: {phone_number}\nกรุณาตรวจสอบใน Dashboard"
+        try: admin_bot_api.push_message(owner.line_user_id, TextSendMessage(text=msg))
+        except: pass
+        
+    return {"status": "Success"}
+
+@app.get("/move-out/{tenant_uuid}", response_class=HTMLResponse)
+async def view_move_out(request: Request, tenant_uuid: str, db: Session = Depends(get_db)):
+    tenant = db.query(models.Tenant).filter(models.Tenant.uuid == tenant_uuid).first()
+    if not tenant or tenant.status != "Active":
+        raise HTTPException(status_code=404, detail="Tenant not found or not active")
+    
+    return templates.TemplateResponse("move_out.html", {"request": request, "tenant": tenant})
+
+@app.post("/move-out/{tenant_uuid}")
+async def submit_move_out(tenant_uuid: str, data: dict, db: Session = Depends(get_db)):
+    tenant = db.query(models.Tenant).filter(models.Tenant.uuid == tenant_uuid).first()
+    if not tenant or tenant.status != "Active":
+        raise HTTPException(status_code=404, detail="Tenant not found or not active")
+    
+    requested_date_str = data.get("requested_date")
+    reason = data.get("reason")
+    
+    if not requested_date_str:
+        raise HTTPException(status_code=400, detail="กรุณาระบุวันที่ต้องการย้ายออก")
+        
+    requested_date = datetime.strptime(requested_date_str, "%Y-%m-%d")
+    
+    # Create request record
+    req = models.MoveOutRequest(
+        tenant_id=tenant.id,
+        room_id=tenant.current_room_id,
+        requested_date=requested_date,
+        reason=reason
+    )
+    db.add(req)
+    
+    # Also update tenant record for quick view
+    tenant.move_out_date = requested_date
+    tenant.move_out_reason = reason
+    db.commit()
+    
+    # Notify Owner
+    owner = db.query(models.Owner).first()
+    if owner and owner.line_user_id and admin_bot_api:
+        msg = f"🚪 แจ้งย้ายออกใหม่!\nห้อง: {tenant.room.room_number if tenant.room else 'N/A'}\nชื่อ: {tenant.full_name}\nวันที่ต้องการย้าย: {requested_date.strftime('%d/%m/%Y')}"
+        try: admin_bot_api.push_message(owner.line_user_id, TextSendMessage(text=msg))
+        except: pass
+        
+    return {"status": "Success"}
+
+@app.get("/api/buildings/{bid}/vacant-rooms")
+async def get_vacant_rooms(bid: int, db: Session = Depends(get_db)):
+    rooms = db.query(models.Room).filter(models.Room.building_id == bid, models.Room.status == "Vacant").all()
+    return [{"id": r.id, "room_number": r.room_number} for r in rooms]
+
 @app.get("/bill/{invoice_uuid}", response_class=HTMLResponse)
 async def view_bill(request: Request, invoice_uuid: str, db: Session = Depends(get_db)):
     invoice = db.query(models.Invoice).filter(models.Invoice.uuid == invoice_uuid).first()
@@ -756,6 +761,7 @@ async def admin_dashboard(
     # List tenants currently mapped to rooms, eager loading residents
     active_tenants = db.query(models.Tenant).options(joinedload(models.Tenant.residents)).filter(models.Tenant.status == "Active", models.Tenant.current_room_id != None).all()
     pending_registrations = db.query(models.Tenant).filter(models.Tenant.status == "Pending").all()
+    move_out_requests = db.query(models.MoveOutRequest).filter(models.MoveOutRequest.status == "Pending").all()
     
     all_rooms = db.query(models.Room).all()
     all_buildings = db.query(models.Building).all()
@@ -771,6 +777,7 @@ async def admin_dashboard(
         "recent_repairs": recent_repairs,
         "active_tenants": active_tenants,
         "pending_registrations": pending_registrations,
+        "move_out_requests": move_out_requests,
         "all_rooms": all_rooms,
         "all_buildings": all_buildings,
         "owner": owner,

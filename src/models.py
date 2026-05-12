@@ -94,9 +94,24 @@ class Tenant(Base):
     current_room_id = Column(Integer, ForeignKey("rooms.id"))
     status = Column(String, default="Pending") # Pending, Active, Rejected, AwaitingBuilding, AwaitingRoom, AwaitingName, AwaitingPhone
     temp_building_id = Column(Integer, ForeignKey("buildings.id")) # Temporary storage during registration
+    move_out_date = Column(DateTime) # Requested move-out date
+    move_out_reason = Column(String)
     
     room = relationship("Room")
     residents = relationship("Resident", back_populates="tenant", cascade="all, delete-orphan")
+
+class MoveOutRequest(Base):
+    __tablename__ = "move_out_requests"
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
+    room_id = Column(Integer, ForeignKey("rooms.id"), nullable=False)
+    requested_date = Column(DateTime, nullable=False)
+    reason = Column(Text)
+    status = Column(String, default="Pending") # Pending, Approved, Cancelled
+    created_at = Column(DateTime, server_default=func.now())
+    
+    room = relationship("Room")
+    tenant = relationship("Tenant")
 
 class Resident(Base):
     __tablename__ = "residents"
