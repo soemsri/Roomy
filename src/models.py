@@ -88,10 +88,11 @@ class Tenant(Base):
     __tablename__ = "tenants"
     id = Column(Integer, primary_key=True, index=True)
     uuid = Column(String, unique=True, index=True, default=lambda: str(uuid.uuid4()))
-    line_user_id = Column(String, unique=True, index=True, nullable=False)
+    line_user_id = Column(String, index=True, nullable=False)
     full_name = Column(String)
     phone_number = Column(String)
     current_room_id = Column(Integer, ForeignKey("rooms.id"))
+    rich_menu_id = Column(String)
     status = Column(String, default="Pending") # Pending, Active, Rejected, AwaitingBuilding, AwaitingRoom, AwaitingName, AwaitingPhone
     temp_building_id = Column(Integer, ForeignKey("buildings.id")) # Temporary storage during registration
     move_out_date = Column(DateTime) # Requested move-out date

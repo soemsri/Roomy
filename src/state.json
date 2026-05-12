@@ -1,12 +1,12 @@
 {
   "status": "active",
   "current_phase": 10,
-  "last_action": "Fixed invoice status display bug where 'Draft' invoices appeared as 'Paid' to tenants.",
-  "summary": "Phase 10: Bug Fixing and UX Translation. Resolved a critical logic error in the tenant-facing invoice template (bill.html) where 'Draft' status was defaulting to 'Paid' display. Added explicit handling for 'Draft', 'Paid', and unknown statuses. Updated the payment history view (history.html) with Thai translations for all invoice statuses and improved color coding for better user clarity.",
+  "last_action": "Implemented Multi-Room support (1 LINE ID per multiple rooms) with dynamic Rich Menu and room selection logic.",
+  "summary": "Phase 10: Bug Fixing and UX Translation. Enhanced the system architecture to support multiple rooms per single LINE User ID. Removed unique constraint on tenant LINE IDs and refactored bot logic to handle multi-tenant contexts. Implemented a dynamic Rich Menu that switches between 1-click URI access (single room) and guided message-based selection (multi-room). Tenants with multiple rooms now receive separate Flex Message bills and a room selection UI for repairs and history requests.",
   "next_steps": [
-    "Verify the display of 'Draft' invoices in the tenant interface using a test case.",
-    "Check for any other hardcoded status strings in the tenant-facing templates.",
+    "Monitor LINE webhook logs for any issues with the new PostbackEvent handler.",
+    "Verify the 'openKeyboard' behavior on actual mobile devices (iOS/Android).",
     "Prepare for Phase 11: Final user acceptance testing and documentation updates."
   ],
-  "timestamp": "2026-05-12T10:00:00"
+  "timestamp": "2026-05-12T10:30:00"
 }
