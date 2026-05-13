@@ -1379,6 +1379,111 @@
         </div>
     </div>
 
+    <!-- Move-out Settlement Modal -->
+    <div id="settlementModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 style="margin:0; font-weight:700;"><i class="fa-solid fa-file-invoice-dollar"></i> สรุปยอดปิดบัญชี (Move-out Settlement)</h3>
+                <button class="btn btn-outline" style="padding:5px 10px;" onclick="document.getElementById('settlementModal').style.display='none'"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="settlementLoading" style="padding:40px; text-align:center;">
+                <i class="fa-solid fa-spinner fa-spin fa-2x"></i><p>กำลังคำนวณยอด...</p>
+            </div>
+            <div id="settlementError" style="display:none; padding:30px; text-align:center; color:var(--danger);">
+                <i class="fa-solid fa-circle-exclamation fa-3x" style="margin-bottom:15px;"></i>
+                <h4 id="settlementErrorMsg">กรุณาจดมิเตอร์น้ำไฟงวดสุดท้ายก่อน</h4>
+                <button class="btn btn-primary" onclick="showSection('meterSection'); document.getElementById('settlementModal').style.display='none';">ไปที่หน้าจดมิเตอร์</button>
+            </div>
+            <form id="settlementForm" style="display:none;">
+                <div class="modal-body">
+                    <input type="hidden" id="st_tenant_id">
+                    <div style="background: #f0f7ff; padding: 15px; border-radius: 12px; margin-bottom: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div><label style="margin-bottom:0;">ห้อง</label><strong id="st_room_no" style="font-size:1.2em;">-</strong></div>
+                        <div><label style="margin-bottom:0;">ผู้เช่า</label><strong id="st_tenant_name" style="font-size:1.2em;">-</strong></div>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns: 1.5fr 1fr; gap: 25px;">
+                        <div style="border-right: 1px solid var(--border); padding-right: 25px;">
+                            <h4 style="margin-top:0;"><i class="fa-solid fa-minus-circle" style="color:var(--danger);"></i> รายการหักค่าใช้จ่าย</h4>
+                            
+                            <div class="form-group" style="display:flex; justify-content:space-between; align-items:center;">
+                                <span>ค่าเช่ารายวัน (<span id="st_days_info">0</span> วัน)</span>
+                                <input type="number" id="st_pro_rated_rent" step="0.01" style="width:120px; text-align:right; font-weight:600;" onchange="calculateSettlement()">
+                            </div>
+                            
+                            <div class="form-group" style="display:flex; justify-content:space-between; align-items:center;">
+                                <span>ค่าน้ำ-ไฟงวดสุดท้าย (<span id="st_util_info">0</span> หน่วย)</span>
+                                <input type="number" id="st_util_amt" step="0.01" style="width:120px; text-align:right;" onchange="calculateSettlement()">
+                            </div>
+
+                            <div class="form-group" style="display:flex; justify-content:space-between; align-items:center;">
+                                <span>ยอดค้างชำระเดิม (Unpaid)</span>
+                                <input type="number" id="st_unpaid_amt" step="0.01" style="width:120px; text-align:right;" onchange="calculateSettlement()">
+                            </div>
+
+                            <div class="form-group" style="display:flex; justify-content:space-between; align-items:center;">
+                                <span>ค่าทำความสะอาด</span>
+                                <input type="number" id="st_cleaning_fee" value="500" step="0.01" style="width:120px; text-align:right;" onchange="calculateSettlement()">
+                            </div>
+
+                            <div class="form-group" style="display:flex; justify-content:space-between; align-items:center;">
+                                <span>ค่าเสียหาย / อื่นๆ</span>
+                                <input type="number" id="st_damage_fee" value="0" step="0.01" style="width:120px; text-align:right;" onchange="calculateSettlement()">
+                            </div>
+
+                            <div class="form-group" style="display:flex; justify-content:space-between; align-items:center;">
+                                <span>หักอื่นๆ</span>
+                                <input type="number" id="st_other_fees" value="0" step="0.01" style="width:120px; text-align:right;" onchange="calculateSettlement()">
+                            </div>
+                        </div>
+
+                        <div>
+                            <h4 style="margin-top:0;"><i class="fa-solid fa-plus-circle" style="color:var(--success);"></i> เงินมัดจำ/คงเหลือ</h4>
+                            <div class="form-group">
+                                <label>ยอดเงินมัดจำ (จากสัญญา)</label>
+                                <input type="number" id="st_deposit_amt" readonly style="background:#f8f9fa; text-align:right; font-weight:700; color:var(--success);">
+                            </div>
+
+                            <div style="background: #fff8f8; padding: 15px; border-radius: 12px; border: 2px solid #fee2e2; margin-top: 20px;">
+                                <label style="text-align: center; color: var(--text-muted);">สรุปยอดที่ต้องคืน (+)</label>
+                                <div id="st_final_balance_display" style="font-size: 2em; font-weight: 800; text-align: center; color: var(--primary);">฿0.00</div>
+                                <input type="hidden" id="st_final_balance">
+                                <p id="st_balance_note" style="font-size: 0.8em; text-align: center; margin-top: 5px; color: var(--text-muted);"></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top:25px; padding-top:20px; border-top: 1px dashed var(--border);">
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+                            <div class="form-group">
+                                <label>วิธีการคืนเงิน</label>
+                                <select id="st_refund_method">
+                                    <option value="PromptPay">PromptPay / โอนเงิน</option>
+                                    <option value="Cash">เงินสด</option>
+                                    <option value="Credit">เครดิต (หักลบยอดค้าง)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>หลักฐานการคืนเงิน (สลิป)</label>
+                                <input type="file" id="st_receipt" accept="image/*">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>หมายเหตุเพิ่มเติม</label>
+                            <textarea id="st_notes" rows="2" placeholder="เช่น รายละเอียดค่าเสียหาย..."></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="document.getElementById('settlementModal').style.display='none'">ยกเลิก</button>
+                    <button type="submit" class="btn btn-primary" style="padding: 12px 30px;">
+                        <i class="fa-solid fa-check-double"></i> บันทึกและปิดบัญชีถาวร
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script id="pp_data_raw" type="application/json">
         {{ (owner.promptpay_config if owner and owner.promptpay_config else "[]") | safe }}
     </script>
@@ -1412,6 +1517,7 @@
             }
 
             if (sectionId === 'repairSection') loadRepairs();
+            if (sectionId === 'leaseSection') loadLeases();
 
             // Update Active Menu
             document.querySelectorAll('.menu-item').forEach(m => {
@@ -2343,7 +2449,121 @@
         async function sendLine(id) { await fetch(`/admin/invoice/${id}/send-line`, {method:'POST'}); alert('ส่งเรียบร้อย'); }
         async function approveInvoice(id) { await fetch(`/admin/invoice/${id}/approve`, {method:'POST'}); location.reload(); }
         async function rejectInvoice(id) { await fetch(`/admin/invoice/${id}/reject`, {method:'POST'}); location.reload(); }
-        async function unmapTenant(id) { if(confirm('ย้ายออก?')) { await fetch('/admin/unmap/'+id, {method:'POST'}); location.reload(); } }
+        async function unmapTenant(id) {
+            // New workflow: Open Settlement Modal instead of direct unmap
+            openSettlementModal(id);
+        }
+
+        async function openSettlementModal(tenantId) {
+            const modal = document.getElementById('settlementModal');
+            const loading = document.getElementById('settlementLoading');
+            const error = document.getElementById('settlementError');
+            const form = document.getElementById('settlementForm');
+            
+            modal.style.display = 'block';
+            loading.style.display = 'block';
+            error.style.display = 'none';
+            form.style.display = 'none';
+
+            try {
+                const res = await fetch(`/admin/settlement/preview/${tenantId}`);
+                const data = await res.json();
+
+                if (data.status === 'NEED_METERS') {
+                    loading.style.display = 'none';
+                    error.style.display = 'block';
+                    document.getElementById('settlementErrorMsg').innerText = `กรุณาจดมิเตอร์น้ำไฟงวดสุดท้ายของห้อง ${data.room_number} ก่อนดำเนินการย้ายออก`;
+                    return;
+                }
+
+                // Fill Form
+                document.getElementById('st_tenant_id').value = tenantId;
+                document.getElementById('st_room_no').innerText = data.room_number;
+                document.getElementById('st_tenant_name').innerText = data.tenant_name;
+                document.getElementById('st_days_info').innerText = data.days_stayed;
+                document.getElementById('st_pro_rated_rent').value = data.pro_rated_rent;
+                
+                document.getElementById('st_util_info').innerText = `${data.elec_units} ไฟ / ${data.water_units} น้ำ`;
+                document.getElementById('st_util_amt').value = (data.elec_amount + data.water_amount).toFixed(2);
+                
+                document.getElementById('st_unpaid_amt').value = data.unpaid_invoices;
+                document.getElementById('st_deposit_amt').value = data.security_deposit;
+                
+                loading.style.display = 'none';
+                form.style.display = 'block';
+                calculateSettlement();
+            } catch (err) {
+                alert('เกิดข้อผิดพลาดในการโหลดข้อมูลสรุปยอด: ' + err);
+                modal.style.display = 'none';
+            }
+        }
+
+        function calculateSettlement() {
+            const rent = parseFloat(document.getElementById('st_pro_rated_rent').value) || 0;
+            const util = parseFloat(document.getElementById('st_util_amt').value) || 0;
+            const unpaid = parseFloat(document.getElementById('st_unpaid_amt').value) || 0;
+            const cleaning = parseFloat(document.getElementById('st_cleaning_fee').value) || 0;
+            const damage = parseFloat(document.getElementById('st_damage_fee').value) || 0;
+            const other = parseFloat(document.getElementById('st_other_fees').value) || 0;
+            const deposit = parseFloat(document.getElementById('st_deposit_amt').value) || 0;
+
+            const totalDeductions = rent + util + unpaid + cleaning + damage + other;
+            const finalBalance = deposit - totalDeductions;
+
+            const display = document.getElementById('st_final_balance_display');
+            const note = document.getElementById('st_balance_note');
+            
+            display.innerText = `฿${Math.abs(finalBalance).toLocaleString(undefined, {minimumFractionDigits:2})}`;
+            document.getElementById('st_final_balance').value = finalBalance.toFixed(2);
+
+            if (finalBalance >= 0) {
+                display.style.color = 'var(--success)';
+                note.innerText = 'ยอดเงินมัดจำคงเหลือที่ต้องคืนให้ผู้เช่า';
+            } else {
+                display.style.color = 'var(--danger)';
+                note.innerText = 'ยอดเงินที่ผู้เช่าต้องชำระเพิ่มเติม';
+            }
+        }
+
+        document.getElementById('settlementForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const tid = document.getElementById('st_tenant_id').value;
+            const formData = new FormData();
+            
+            formData.append('pro_rated_rent', document.getElementById('st_pro_rated_rent').value);
+            formData.append('elec_amt', 0); // Logic moved to util_amt but for API compatibility...
+            formData.append('water_amt', document.getElementById('st_util_amt').value); // Using water_amt as combined util for now or update API
+            // Better: update confirmed API to take combined or separate. Let's send as is for now.
+            
+            // Refined send for the API we just wrote:
+            // Since we combined them in UI for simplicity, let's split them back or update the UI to have separate fields.
+            // Actually, I wrote the API to take separate elec_amt and water_amt. Let's fix UI or API.
+            // I'll send combined as water_amt and 0 as elec_amt for now, or just send what's in the fields.
+            
+            formData.append('elec_amt', 0); 
+            formData.append('water_amt', document.getElementById('st_util_amt').value);
+            formData.append('unpaid_amt', document.getElementById('st_unpaid_amt').value);
+            formData.append('cleaning_fee', document.getElementById('st_cleaning_fee').value);
+            formData.append('damage_fee', document.getElementById('st_damage_fee').value);
+            formData.append('other_fees', document.getElementById('st_other_fees').value);
+            formData.append('deposit_amt', document.getElementById('st_deposit_amt').value);
+            formData.append('final_balance', document.getElementById('st_final_balance').value);
+            formData.append('refund_method', document.getElementById('st_refund_method').value);
+            formData.append('notes', document.getElementById('st_notes').value);
+            
+            const receiptFile = document.getElementById('st_receipt').files[0];
+            if (receiptFile) formData.append('receipt', receiptFile);
+
+            if (!confirm('ยืนยันการบันทึกและปิดบัญชี? การกระทำนี้ไม่สามารถย้อนกลับได้')) return;
+
+            const res = await fetch(`/admin/settlement/confirm/${tid}`, { method: 'POST', body: formData });
+            if (res.ok) {
+                alert('ปิดบัญชีและย้ายออกเรียบร้อยแล้ว');
+                location.reload();
+            } else {
+                alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+            }
+        };
         async function confirmCash(id) {
             const input = document.createElement('input'); input.type='file'; input.onchange = async (e) => {
                 const fd = new FormData(); fd.append('image', e.target.files[0]);

@@ -1069,6 +1069,170 @@ async def reject_registration(tenant_id: int, db: Session = Depends(get_db), adm
         
     return {"status": "Success"}
 
+@app.get("/admin/settlement/preview/{tenant_id}")
+async def preview_settlement(tenant_id: int, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
+    if not tenant: raise HTTPException(status_code=404, detail="Tenant not found")
+    
+    room = tenant.room
+    lease = db.query(models.Lease).filter(models.Lease.tenant_id == tenant.id, models.Lease.status == "Active").first()
+    
+    # 1. Pro-rated Rent Calculation
+    now = datetime.now()
+    import calendar
+    days_in_month = calendar.monthrange(now.year, now.month)[1]
+    days_stayed = now.day
+    base_rent = room.base_rent if room else 0
+    pro_rated_rent = round((base_rent / days_in_month) * days_stayed, 2)
+    
+    # 2. Utility Check
+    # Check if meters are recorded for this month
+    reading = db.query(models.MeterReading).filter(
+        models.MeterReading.room_id == room.id,
+        models.MeterReading.billing_month == now.month,
+        models.MeterReading.billing_year == now.year
+    ).first()
+    
+    if not reading:
+        return {"status": "NEED_METERS", "room_number": room.room_number if room else "N/A"}
+        
+    # Calculate utility costs based on the reading
+    # Need previous reading for units
+    prev_reading = db.query(models.MeterReading).filter(
+        models.MeterReading.room_id == room.id
+    ).filter(
+        (models.MeterReading.billing_year < now.year) | 
+        ((models.MeterReading.billing_year == now.year) & (models.MeterReading.billing_month < now.month))
+    ).order_by(models.MeterReading.billing_year.desc(), models.MeterReading.billing_month.desc()).first()
+    
+    prev_elec = prev_reading.electricity_reading if prev_reading else 0
+    prev_water = prev_reading.water_reading if prev_reading else 0
+    
+    elec_units = max(0, reading.electricity_reading - prev_elec)
+    water_units = max(0, reading.water_reading - prev_water)
+    elec_amt = round(elec_units * (room.electricity_rate or 0), 2)
+    water_amt = round(water_units * (room.water_rate or 0), 2)
+    
+    # 3. Security Deposit
+    deposit = 0
+    if lease and lease.initial_fees:
+        try:
+            fees = json.loads(lease.initial_fees)
+            # Find fee that looks like deposit
+            for f in fees:
+                if "ประกัน" in f.get('name', '') or "deposit" in f.get('name', '').lower():
+                    deposit = f.get('amount', 0)
+                    break
+        except: pass
+        
+    # 4. Unpaid Invoices
+    unpaid_total = db.query(func.sum(models.Invoice.total_amount)).filter(
+        models.Invoice.tenant_id == tenant.id,
+        models.Invoice.status == "Unpaid"
+    ).scalar() or 0
+    
+    return {
+        "status": "READY",
+        "room_number": room.room_number if room else "N/A",
+        "tenant_name": tenant.full_name,
+        "month": now.month,
+        "year": now.year,
+        "days_stayed": days_stayed,
+        "days_in_month": days_in_month,
+        "pro_rated_rent": pro_rated_rent,
+        "elec_units": elec_units,
+        "elec_amount": elec_amt,
+        "water_units": water_units,
+        "water_amount": water_amt,
+        "unpaid_invoices": unpaid_total,
+        "security_deposit": deposit
+    }
+
+@app.post("/admin/settlement/confirm/{tenant_id}")
+async def confirm_settlement(
+    tenant_id: int, 
+    pro_rated_rent: float = Form(...),
+    elec_amt: float = Form(...),
+    water_amt: float = Form(...),
+    unpaid_amt: float = Form(...),
+    cleaning_fee: float = Form(...),
+    damage_fee: float = Form(...),
+    other_fees: float = Form(...),
+    deposit_amt: float = Form(...),
+    final_balance: float = Form(...),
+    refund_method: str = Form(...),
+    notes: str = Form(None),
+    receipt: UploadFile = File(None),
+    db: Session = Depends(get_db), 
+    admin: bool = Depends(get_admin)
+):
+    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
+    if not tenant: raise HTTPException(status_code=404, detail="Tenant not found")
+    
+    lease = db.query(models.Lease).filter(models.Lease.tenant_id == tenant.id, models.Lease.status == "Active").first()
+    if not lease: raise HTTPException(status_code=400, detail="No active lease found")
+
+    # Save Receipt Image
+    receipt_url = None
+    if receipt:
+        os.makedirs("uploads", exist_ok=True)
+        ext = os.path.splitext(receipt.filename)[1]
+        filename = f"refund_{tenant.id}_{uuid.uuid4().hex}{ext}"
+        filepath = os.path.join("uploads", filename)
+        with open(filepath, "wb") as buffer:
+            shutil.copyfileobj(receipt.file, buffer)
+        receipt_url = f"/uploads/{filename}"
+
+    # Create Settlement Record
+    total_deductions = pro_rated_rent + elec_amt + water_amt + unpaid_amt + cleaning_fee + damage_fee + other_fees
+    
+    settlement = models.Settlement(
+        tenant_id=tenant.id,
+        room_id=tenant.current_room_id,
+        lease_id=lease.id,
+        pro_rated_rent=pro_rated_rent,
+        electricity_amount=elec_amt,
+        water_amount=water_amt,
+        unpaid_invoices_amount=unpaid_amt,
+        cleaning_fee=cleaning_fee,
+        damage_fee=damage_fee,
+        other_fees=other_fees,
+        total_deductions=total_deductions,
+        security_deposit_amount=deposit_amt,
+        final_balance=final_balance,
+        refund_method=refund_method,
+        refund_receipt_img=receipt_url,
+        notes=notes
+    )
+    db.add(settlement)
+    
+    # Close Lease and Room
+    lease.status = "Closed"
+    lease.end_date = datetime.now()
+    
+    room = tenant.room
+    if room:
+        room.status = "Vacant"
+        
+    # Preservation of History
+    history = models.TenantHistory(
+        room_number=room.room_number if room else "N/A",
+        tenant_uuid=tenant.uuid,
+        full_name=tenant.full_name,
+        phone_number=tenant.phone_number,
+        start_date=lease.start_date,
+        end_date=datetime.now(),
+        residents_json=json.dumps([{"nickname": r.nickname, "full_name": f"{r.first_name} {r.last_name}"} for r in tenant.residents])
+    )
+    db.add(history)
+    
+    # Soft delete/deactivate tenant
+    tenant.status = "MovedOut"
+    tenant.current_room_id = None
+    
+    db.commit()
+    return {"status": "Success"}
+
 @app.post("/admin/unmap/{tenant_id}")
 async def unmap_tenant(tenant_id: int, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
     tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
@@ -1085,22 +1249,20 @@ async def unmap_tenant(tenant_id: int, db: Session = Depends(get_db), admin: boo
         lease.status = "Closed"
         lease.end_date = datetime.now()
         
-        # Save History for all residents
-        for res in tenant.residents:
-            history = models.TenantHistory(
-                room_number=room.room_number if room else "N/A",
-                tenant_uuid=tenant.uuid,
-                first_name=res.first_name,
-                last_name=res.last_name,
-                nickname=res.nickname,
-                phone_number=res.phone_number,
-                workplace=res.workplace,
-                start_date=lease.start_date,
-                end_date=lease.end_date
-            )
-            db.add(history)
+        # Save History
+        history = models.TenantHistory(
+            room_number=room.room_number if room else "N/A",
+            tenant_uuid=tenant.uuid,
+            full_name=tenant.full_name,
+            phone_number=tenant.phone_number,
+            start_date=lease.start_date,
+            end_date=datetime.now(),
+            residents_json=json.dumps([{"nickname": r.nickname, "full_name": f"{r.first_name} {r.last_name}"} for r in tenant.residents])
+        )
+        db.add(history)
         
     tenant.current_room_id = None
+    tenant.status = "MovedOut"
     db.commit()
     return {"status": "Success"}
 

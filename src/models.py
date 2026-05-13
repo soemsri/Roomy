@@ -131,13 +131,44 @@ class TenantHistory(Base):
     id = Column(Integer, primary_key=True, index=True)
     room_number = Column(String)
     tenant_uuid = Column(String)
-    first_name = Column(String)
-    last_name = Column(String)
-    nickname = Column(String)
+    full_name = Column(String)
     phone_number = Column(String)
-    workplace = Column(String)
     start_date = Column(DateTime)
     end_date = Column(DateTime)
+    residents_json = Column(Text) # JSON list of residents at time of move-out
+
+class Settlement(Base):
+    __tablename__ = "settlements"
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
+    room_id = Column(Integer, ForeignKey("rooms.id"), nullable=False)
+    lease_id = Column(Integer, ForeignKey("leases.id"), nullable=False)
+    settlement_date = Column(DateTime, server_default=func.now())
+    
+    # Financial Details
+    pro_rated_rent = Column(Float, default=0.0)
+    electricity_units = Column(Float, default=0.0)
+    electricity_amount = Column(Float, default=0.0)
+    water_units = Column(Float, default=0.0)
+    water_amount = Column(Float, default=0.0)
+    unpaid_invoices_amount = Column(Float, default=0.0)
+    
+    cleaning_fee = Column(Float, default=0.0)
+    damage_fee = Column(Float, default=0.0)
+    other_fees = Column(Float, default=0.0)
+    
+    total_deductions = Column(Float, default=0.0)
+    security_deposit_amount = Column(Float, default=0.0)
+    final_balance = Column(Float, default=0.0) # Refund if positive, Payment due if negative
+    
+    refund_method = Column(String) # Cash, PromptPay, Transfer
+    refund_receipt_img = Column(String)
+    status = Column(String, default="Completed")
+    notes = Column(Text)
+
+    room = relationship("Room")
+    tenant = relationship("Tenant")
+    lease = relationship("Lease")
 
 class Lease(Base):
     __tablename__ = "leases"

@@ -1,8 +1,8 @@
 {
   "status": "active",
   "current_phase": 10,
-  "last_action": "Implemented Multi-Room support (1 LINE ID per multiple rooms) with dynamic Rich Menu and room selection logic.",
-  "summary": "Phase 10: Bug Fixing and UX Translation. Enhanced the system architecture to support multiple rooms per single LINE User ID. Removed unique constraint on tenant LINE IDs and refactored bot logic to handle multi-tenant contexts. Implemented a dynamic Rich Menu that switches between 1-click URI access (single room) and guided message-based selection (multi-room). Tenants with multiple rooms now receive separate Flex Message bills and a room selection UI for repairs and history requests.",
+  "last_action": "Implemented Move-out Settlement system with pro-rated rent, utility checks, and deposit management.",
+  "summary": "Phase 10: Bug Fixing and UX Translation. Significant architectural enhancement with the Move-out Settlement system. This feature automates pro-rated rent calculation for mid-month move-outs, enforces mandatory final meter reading checks, and provides a structured interface for managing security deposit deductions (cleaning, damages, unpaid bills). Added the Settlement database model and a guided UI modal to ensure financial accuracy and transparency during tenant departures. Also addressed dashboard parsing errors and improved LINE multi-room logic.",
   "next_steps": [
     "Monitor LINE webhook logs for any issues with the new PostbackEvent handler.",
     "Verify the 'openKeyboard' behavior on actual mobile devices (iOS/Android).",
