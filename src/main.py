@@ -552,36 +552,56 @@ def handle_tenant_message(event, *args, **kwargs):
 async def view_registration(request: Request, tenant_uuid: str, db: Session = Depends(get_db)):
     tenant = db.query(models.Tenant).filter(models.Tenant.uuid == tenant_uuid).first()
     if not tenant: raise HTTPException(status_code=404, detail="Tenant not found")
-    
-    buildings = db.query(models.Building).all()
-    return templates.TemplateResponse("register.html", {"request": request, "tenant_uuid": tenant_uuid, "buildings": buildings})
 
+    # Try to find default data from previous stays
+    default_data = None
+
+    # 1. Check TenantHistory for this line_user_id
+    # Note: TenantHistory doesn't have line_user_id directly, it has tenant_uuid. 
+    # We might need to find other Tenants with same line_user_id first.
+    prev_tenant = db.query(models.Tenant).filter(
+        models.Tenant.line_user_id == tenant.line_user_id,
+        models.Tenant.id != tenant.id
+    ).order_by(models.Tenant.id.desc()).first()
+
+    if prev_tenant:
+        default_data = {
+            "full_name": prev_tenant.full_name,
+            "phone_number": prev_tenant.phone_number,
+            "citizen_id": prev_tenant.citizen_id
+        }
+    else:
+        # 2. Check TenantHistory by joining or searching by uuid of prev tenants
+        # But searching by line_user_id in Tenant table is usually enough if we don't delete tenants.
+        pass
+
+    return templates.TemplateResponse("register.html", {
+        "request": request, 
+        "tenant_uuid": tenant_uuid,
+        "default_data": default_data
+    })
 @app.post("/register/{tenant_uuid}")
 async def submit_registration(tenant_uuid: str, data: dict, db: Session = Depends(get_db)):
     tenant = db.query(models.Tenant).filter(models.Tenant.uuid == tenant_uuid).first()
     if not tenant: raise HTTPException(status_code=404, detail="Tenant not found")
     
-    room_id = data.get("room_id")
     full_name = data.get("full_name")
     phone_number = data.get("phone_number")
+    citizen_id = data.get("citizen_id")
     
-    if not all([room_id, full_name, phone_number]):
+    if not all([full_name, phone_number, citizen_id]):
         raise HTTPException(status_code=400, detail="กรุณากรอกข้อมูลให้ครบถ้วน")
         
-    room = db.query(models.Room).filter(models.Room.id == room_id).first()
-    if not room or room.status != "Vacant":
-        raise HTTPException(status_code=400, detail="ห้องไม่ว่างหรือไม่มีอยู่จริง")
-        
-    tenant.current_room_id = room.id
     tenant.full_name = full_name
     tenant.phone_number = phone_number
+    tenant.citizen_id = citizen_id
     tenant.status = "Pending"
     db.commit()
     
     # Notify Owner
     owner = db.query(models.Owner).first()
     if owner and owner.line_user_id and admin_bot_api:
-        msg = f"🔔 มีผู้ลงทะเบียนใหม่!\nห้อง: {room.room_number}\nชื่อ: {full_name}\nเบอร์โทร: {phone_number}\nกรุณาตรวจสอบใน Dashboard"
+        msg = f"🔔 มีผู้ลงทะเบียนใหม่!\nชื่อ: {full_name}\nบัตร ปชช: {citizen_id}\nเบอร์โทร: {phone_number}\nกรุณาเลือกห้องและอนุมัติใน Dashboard"
         try: admin_bot_api.push_message(owner.line_user_id, TextSendMessage(text=msg))
         except: pass
         
@@ -965,14 +985,18 @@ async def admin_dashboard(
     })
 
 @app.post("/admin/registration/{tenant_id}/approve")
-async def approve_registration(tenant_id: int, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+async def approve_registration(tenant_id: int, room_id: int = Form(...), db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
     tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
     if not tenant: raise HTTPException(status_code=404, detail="Tenant not found")
     
-    room = tenant.room
-    if not room: raise HTTPException(status_code=400, detail="No room assigned to this request")
+    room = db.query(models.Room).filter(models.Room.id == room_id).first()
+    if not room or room.status != "Vacant":
+        raise HTTPException(status_code=400, detail="ห้องไม่ว่างหรือไม่พบข้อมูลห้อง")
     
     owner = db.query(models.Owner).first()
+    
+    # Assign room to tenant
+    tenant.current_room_id = room.id
     
     # Calculate Initial Fees
     applied_fees = []
@@ -2143,6 +2167,27 @@ async def broadcast_announcement(message: str = Form(...), db: Session = Depends
         count = len(tenants)
         
     return {"status": "Success", "sent_count": count}
+
+@app.post("/admin/tenants/{tenant_id}/send-line")
+async def send_direct_line(tenant_id: int, message: str = Form(...), db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    
+    if not tenant.line_user_id:
+        raise HTTPException(status_code=400, detail="ผู้เช่ายังไม่ได้ลงทะเบียน LINE")
+
+    if tenant_bot_api:
+        from linebot.models import TextSendMessage
+        try:
+            tenant_bot_api.push_message(tenant.line_user_id, TextSendMessage(text=message))
+        except Exception as e:
+            print(f"Direct Message Error to {tenant.line_user_id}: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to send LINE message: {str(e)}")
+    else:
+        print(f"MOCK DIRECT MESSAGE to {tenant.line_user_id}: {message}")
+        
+    return {"status": "Success"}
 
 @app.get("/admin/report/export")
 async def export_report(month: int, year: int, building_id: int = None, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):

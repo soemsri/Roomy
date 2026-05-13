@@ -2,7 +2,9 @@ import uuid
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+from sqlalchemy.ext.hybrid import hybrid_property
 from database import Base
+from security import encrypt_value, decrypt_value
 
 class Owner(Base):
     __tablename__ = "owners"
@@ -91,6 +93,16 @@ class Tenant(Base):
     line_user_id = Column(String, index=True, nullable=False)
     full_name = Column(String)
     phone_number = Column(String)
+    _citizen_id = Column("citizen_id", String) # Encrypted National ID
+
+    @hybrid_property
+    def citizen_id(self):
+        return decrypt_value(self._citizen_id)
+
+    @citizen_id.setter
+    def citizen_id(self, value):
+        self._citizen_id = encrypt_value(value)
+
     current_room_id = Column(Integer, ForeignKey("rooms.id"))
     rich_menu_id = Column(String)
     status = Column(String, default="Pending") # Pending, Active, Rejected, AwaitingBuilding, AwaitingRoom, AwaitingName, AwaitingPhone
@@ -133,6 +145,16 @@ class TenantHistory(Base):
     tenant_uuid = Column(String)
     full_name = Column(String)
     phone_number = Column(String)
+    _citizen_id = Column("citizen_id", String)
+
+    @hybrid_property
+    def citizen_id(self):
+        return decrypt_value(self._citizen_id)
+
+    @citizen_id.setter
+    def citizen_id(self, value):
+        self._citizen_id = encrypt_value(value)
+
     start_date = Column(DateTime)
     end_date = Column(DateTime)
     residents_json = Column(Text) # JSON list of residents at time of move-out

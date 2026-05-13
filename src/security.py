@@ -1,7 +1,6 @@
 import os
 from cryptography.fernet import Fernet
 from sqlalchemy.orm import Session
-import models
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -44,6 +43,7 @@ def get_system_config(db: Session, key: str, default=None) -> str:
     """
     Get configuration from database (encrypted).
     """
+    import models
     config = db.query(models.SystemConfig).filter(models.SystemConfig.key == key).first()
     if config:
         return decrypt_value(config.value)
@@ -55,6 +55,7 @@ def set_system_config(db: Session, key: str, value: str, description: str = None
     """
     Save configuration to database (encrypted).
     """
+    import models
     encrypted_val = encrypt_value(value)
     config = db.query(models.SystemConfig).filter(models.SystemConfig.key == key).first()
     if config:

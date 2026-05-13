@@ -447,8 +447,9 @@
                     <thead>
                         <tr>
                             <th>ชื่อ-นามสกุล</th>
+                            <th>เลขบัตรประชาชน</th>
                             <th>เบอร์โทร</th>
-                            <th>ขอจองห้อง</th>
+                            <th>เลือกห้องให้ผู้เช่า</th>
                             <th>จัดการ</th>
                         </tr>
                     </thead>
@@ -456,8 +457,16 @@
                         {% for p in pending_registrations %}
                         <tr>
                             <td style="font-weight: 600;">{{ p.full_name or 'N/A' }}</td>
+                            <td>{{ p.citizen_id or '-' }}</td>
                             <td>{{ p.phone_number or 'N/A' }}</td>
-                            <td><span class="badge badge-info">{{ p.room.room_number if p.room else 'N/A' }}</span></td>
+                            <td>
+                                <select id="reg_room_{{ p.id }}" class="form-control" style="width: auto;">
+                                    <option value="">-- เลือกห้อง --</option>
+                                    {% for r in all_rooms if r.status == 'Vacant' %}
+                                    <option value="{{ r.id }}">ห้อง {{ r.room_number }} (ชั้น {{ r.floor }})</option>
+                                    {% endfor %}
+                                </select>
+                            </td>
                             <td>
                                 <button class="btn btn-primary" style="background: var(--success);" onclick="approveReg({{ p.id }})">อนุมัติ</button>
                                 <button class="btn btn-danger" onclick="rejectReg({{ p.id }})">ปฏิเสธ</button>
@@ -902,12 +911,17 @@
                                 </div>
                             </td>
                             <td>
-                                <button class="btn btn-outline" onclick="manageResidents({{ t.id }}, '{{ t.room.room_number if t.room else 'N/A' }}')">
-                                    <i class="fa-solid fa-users-gear"></i> จัดการรายชื่อ
-                                </button>
-                                <button class="btn btn-danger" onclick="unmapTenant({{ t.id }})">
-                                    <i class="fa-solid fa-door-open"></i> ย้ายออก
-                                </button>
+                                <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                                    <button class="btn btn-outline" onclick="manageResidents({{ t.id }}, '{{ t.room.room_number if t.room else 'N/A' }}')">
+                                        <i class="fa-solid fa-users-gear"></i> จัดการรายชื่อ
+                                    </button>
+                                    <button class="btn btn-outline" style="color: #06c755; border-color: #06c755;" onclick="sendDirectLine({{ t.id }}, '{{ t.full_name }}')">
+                                        <i class="fa-brands fa-line"></i> ส่งข้อความ
+                                    </button>
+                                    <button class="btn btn-danger" onclick="unmapTenant({{ t.id }})">
+                                        <i class="fa-solid fa-door-open"></i> ย้ายออก
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                         {% endfor %}
@@ -1671,6 +1685,29 @@
                 loadRepairHistory();
             } else {
                 alert('เกิดข้อผิดพลาดในการบันทึก');
+            }
+        }
+
+        async function sendDirectLine(tenantId, tenantName) {
+            const message = prompt(`พิมพ์ข้อความที่ต้องการส่งหาคุณ ${tenantName}:`);
+            if (!message || message.trim() === '') return;
+            
+            const formData = new FormData();
+            formData.append('message', message);
+            
+            try {
+                const res = await fetch(`/admin/tenants/${tenantId}/send-line`, { 
+                    method: 'POST', 
+                    body: formData 
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    alert('ส่งข้อความเรียบร้อยแล้ว');
+                } else {
+                    alert('เกิดข้อผิดพลาด: ' + (data.detail || 'ไม่สามารถส่งข้อความได้'));
+                }
+            } catch (err) {
+                alert('เกิดข้อผิดพลาดในการเชื่อมต่อ: ' + err);
             }
         }
 
@@ -2445,7 +2482,28 @@
         }
 
         async function cancelInvoice(id) { if(confirm('ยกเลิก?')) await fetch(`/admin/invoice/${id}/cancel`, {method:'POST'}); location.reload(); }
-        async function approveReg(id) { await fetch(`/admin/registration/${id}/approve`, {method:'POST'}); location.reload(); }
+        async function approveReg(id) {
+            const roomId = document.getElementById(`reg_room_${id}`).value;
+            if (!roomId) {
+                alert('กรุณาเลือกห้องพักก่อนอนุมัติ');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('room_id', roomId);
+            
+            const res = await fetch(`/admin/registration/${id}/approve`, {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (res.ok) {
+                location.reload();
+            } else {
+                const err = await res.json();
+                alert('Error: ' + (err.detail || 'ไม่สามารถอนุมัติได้'));
+            }
+        }
         async function rejectReg(id) { await fetch(`/admin/registration/${id}/reject`, {method:'POST'}); location.reload(); }
         async function sendLine(id) { await fetch(`/admin/invoice/${id}/send-line`, {method:'POST'}); alert('ส่งเรียบร้อย'); }
         async function approveInvoice(id) { await fetch(`/admin/invoice/${id}/approve`, {method:'POST'}); location.reload(); }

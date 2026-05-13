@@ -100,29 +100,18 @@
         <div class="form-content" id="formContent">
             <form id="regForm">
                 <div class="form-group">
-                    <label>อาคาร</label>
-                    <select id="building_id" required onchange="loadRooms()">
-                        <option value="">เลือกอาคาร</option>
-                        {% for b in buildings %}
-                        <option value="{{ b.id }}">{{ b.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>เลขห้อง</label>
-                    <select id="room_id" required disabled>
-                        <option value="">กรุณาเลือกอาคารก่อน</option>
-                    </select>
-                </div>
-                <div class="form-group">
                     <label>ชื่อ-นามสกุล</label>
-                    <input type="text" id="full_name" placeholder="ชื่อจริง - นามสกุล" required>
+                    <input type="text" id="full_name" placeholder="ชื่อจริง - นามสกุล" value="{{ default_data.full_name if default_data else '' }}" required>
+                </div>
+                <div class="form-group">
+                    <label>เลขบัตรประชาชน</label>
+                    <input type="text" id="citizen_id" placeholder="เลขบัตรประชาชน 13 หลัก" maxlength="13" pattern="\d{13}" title="กรุณากรอกตัวเลข 13 หลัก" value="{{ default_data.citizen_id if default_data else '' }}" required>
                 </div>
                 <div class="form-group">
                     <label>เบอร์โทรศัพท์</label>
-                    <input type="tel" id="phone_number" placeholder="08x-xxx-xxxx" required>
+                    <input type="tel" id="phone_number" placeholder="08x-xxx-xxxx" value="{{ default_data.phone_number if default_data else '' }}" required>
                 </div>
-                <button type="submit" class="btn">ส่งข้อมูลเพื่ออนุมัติ</button>
+                <button type="submit" class="btn">ส่งข้อมูลเพื่อลงทะเบียน</button>
             </form>
         </div>
         <div class="success-view" id="successView">
@@ -154,34 +143,6 @@
             }, 300);
         }
         
-        async function loadRooms() {
-            const bid = document.getElementById('building_id').value;
-            const roomSelect = document.getElementById('room_id');
-            
-            if (!bid) {
-                roomSelect.innerHTML = '<option value="">กรุณาเลือกอาคารก่อน</option>';
-                roomSelect.disabled = true;
-                return;
-            }
-
-            roomSelect.innerHTML = '<option value="">กำลังโหลด...</option>';
-            roomSelect.disabled = false;
-
-            try {
-                const res = await fetch(`/api/buildings/${bid}/vacant-rooms`);
-                const rooms = await res.json();
-                
-                if (rooms.length === 0) {
-                    roomSelect.innerHTML = '<option value="">ไม่มีห้องว่างในอาคารนี้</option>';
-                } else {
-                    roomSelect.innerHTML = '<option value="">เลือกห้อง</option>' + 
-                        rooms.map(r => `<option value="${r.id}">ห้อง ${r.room_number}</option>`).join('');
-                }
-            } catch (err) {
-                roomSelect.innerHTML = '<option value="">เกิดข้อผิดพลาด</option>';
-            }
-        }
-
         document.getElementById('regForm').onsubmit = async (e) => {
             e.preventDefault();
             const btn = e.target.querySelector('button');
@@ -189,8 +150,8 @@
             btn.innerText = 'กำลังส่งข้อมูล...';
 
             const data = {
-                room_id: document.getElementById('room_id').value,
                 full_name: document.getElementById('full_name').value,
+                citizen_id: document.getElementById('citizen_id').value,
                 phone_number: document.getElementById('phone_number').value
             };
 
@@ -208,12 +169,12 @@
                     const err = await res.json();
                     alert(err.detail || 'เกิดข้อผิดพลาด');
                     btn.disabled = false;
-                    btn.innerText = 'ส่งข้อมูลเพื่ออนุมัติ';
+                    btn.innerText = 'ส่งข้อมูลเพื่อลงทะเบียน';
                 }
             } catch (err) {
                 alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
                 btn.disabled = false;
-                btn.innerText = 'ส่งข้อมูลเพื่ออนุมัติ';
+                btn.innerText = 'ส่งข้อมูลเพื่อลงทะเบียน';
             }
         };
     </script>
