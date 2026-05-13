@@ -609,14 +609,40 @@ async def submit_move_out(tenant_uuid: str, data: dict, db: Session = Depends(ge
         
     requested_date = datetime.strptime(requested_date_str, "%Y-%m-%d")
     
-    # Create request record
-    req = models.MoveOutRequest(
-        tenant_id=tenant.id,
-        room_id=tenant.current_room_id,
-        requested_date=requested_date,
-        reason=reason
-    )
-    db.add(req)
+    # Ensure room_id is present (safety for data integrity issues)
+    room_id = tenant.current_room_id
+    if not room_id:
+        # Try to recover from active lease
+        active_lease = db.query(models.Lease).filter(
+            models.Lease.tenant_id == tenant.id,
+            models.Lease.status == "Active"
+        ).first()
+        if active_lease:
+            room_id = active_lease.room_id
+            tenant.current_room_id = room_id
+        else:
+            raise HTTPException(status_code=400, detail="ไม่พบข้อมูลห้องที่ท่านพักอยู่ กรุณาติดต่อเจ้าหน้าที่")
+
+    # Prevent duplicate pending requests
+    existing_req = db.query(models.MoveOutRequest).filter(
+        models.MoveOutRequest.tenant_id == tenant.id,
+        models.MoveOutRequest.status == "Pending"
+    ).first()
+    if existing_req:
+        # Update existing request instead of creating new one
+        existing_req.requested_date = requested_date
+        existing_req.reason = reason
+        existing_req.room_id = room_id
+        req = existing_req
+    else:
+        # Create request record
+        req = models.MoveOutRequest(
+            tenant_id=tenant.id,
+            room_id=room_id,
+            requested_date=requested_date,
+            reason=reason
+        )
+        db.add(req)
     
     # Also update tenant record for quick view
     tenant.move_out_date = requested_date
@@ -1075,6 +1101,9 @@ async def preview_settlement(tenant_id: int, db: Session = Depends(get_db), admi
     if not tenant: raise HTTPException(status_code=404, detail="Tenant not found")
     
     room = tenant.room
+    if not room:
+        return {"status": "ERROR", "message": "ไม่พบข้อมูลห้องพักที่ผูกกับผู้เช่ารายนี้ อาจมีการย้ายออกไปแล้ว"}
+    
     lease = db.query(models.Lease).filter(models.Lease.tenant_id == tenant.id, models.Lease.status == "Active").first()
     
     # 1. Pro-rated Rent Calculation
@@ -1226,6 +1255,14 @@ async def confirm_settlement(
     )
     db.add(history)
     
+    # Mark MoveOutRequest as Approved if exists
+    mo_req = db.query(models.MoveOutRequest).filter(
+        models.MoveOutRequest.tenant_id == tenant.id,
+        models.MoveOutRequest.status == "Pending"
+    ).order_by(models.MoveOutRequest.id.desc()).first()
+    if mo_req:
+        mo_req.status = "Approved"
+
     # Soft delete/deactivate tenant
     tenant.status = "MovedOut"
     tenant.current_room_id = None
@@ -1261,9 +1298,48 @@ async def unmap_tenant(tenant_id: int, db: Session = Depends(get_db), admin: boo
         )
         db.add(history)
         
+    # Mark MoveOutRequest as Approved if exists
+    mo_req = db.query(models.MoveOutRequest).filter(
+        models.MoveOutRequest.tenant_id == tenant.id,
+        models.MoveOutRequest.status == "Pending"
+    ).order_by(models.MoveOutRequest.id.desc()).first()
+    if mo_req:
+        mo_req.status = "Approved"
+
     tenant.current_room_id = None
     tenant.status = "MovedOut"
     db.commit()
+    return {"status": "Success"}
+
+@app.post("/admin/move-out/cancel/{tenant_id}")
+async def cancel_move_out(tenant_id: int, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    # Update latest pending move-out request
+    req = db.query(models.MoveOutRequest).filter(
+        models.MoveOutRequest.tenant_id == tenant.id,
+        models.MoveOutRequest.status == "Pending"
+    ).order_by(models.MoveOutRequest.id.desc()).first()
+
+    if req:
+        req.status = "Cancelled"
+
+    # Clear tenant move-out info
+    tenant.move_out_date = None
+    tenant.move_out_reason = None
+
+    db.commit()
+
+    # Notify tenant via LINE
+    if tenant.line_user_id and tenant_bot_api:
+        try:
+            msg = f"📢 แจ้งเตือน: คำขอย้ายออกของคุณได้รับการยกเลิกโดยเจ้าของหอพัก (สถานะห้อง {tenant.room.room_number if tenant.room else ''} ยังคงเป็นปกติ)"
+            tenant_bot_api.push_message(tenant.line_user_id, TextSendMessage(text=msg))
+        except Exception as e:
+            print(f"LINE Push Error (Cancel Move-out): {e}")
+
     return {"status": "Success"}
 
 @app.get("/admin/buildings/list")

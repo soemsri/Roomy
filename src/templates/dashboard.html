@@ -493,6 +493,7 @@
                             <td style="font-size: 0.85em; color: var(--text-muted);">{{ r.reason or '-' }}</td>
                             <td>
                                 <button class="btn btn-danger" onclick="unmapTenant({{ r.tenant.id }})">ย้ายออก (ยืนยัน)</button>
+                                <button class="btn btn-outline" style="color: var(--text-muted); border-color: var(--border);" onclick="cancelMoveOut({{ r.tenant.id }})">ยกเลิก</button>
                             </td>
                         </tr>
                         {% endfor %}
@@ -2452,6 +2453,17 @@
         async function unmapTenant(id) {
             // New workflow: Open Settlement Modal instead of direct unmap
             openSettlementModal(id);
+        }
+
+        async function cancelMoveOut(id) {
+            if(confirm('ยืนยันการยกเลิกการขอย้ายออก?')) {
+                const res = await fetch(`/admin/move-out/cancel/${id}`, {method: 'POST'});
+                if(res.ok) {
+                    location.reload();
+                } else {
+                    alert('เกิดข้อผิดพลาดในการยกเลิก');
+                }
+            }
         }
 
         async function openSettlementModal(tenantId) {
