@@ -3,3 +3,6 @@ src/LINE_API_INFO.txt
 src/.env
 doc/contract_example.pdf
 src/.env
+
+.gemini/
+gha-creds-*.json

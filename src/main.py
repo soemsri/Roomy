@@ -15,6 +15,7 @@ from fastapi import FastAPI, Request, HTTPException, Depends, Form, File, Upload
 from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
