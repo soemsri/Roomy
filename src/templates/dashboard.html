@@ -437,7 +437,17 @@
         </div>
 
         <!-- Pending Registrations -->
-        <div class="section-card" id="pendingSection" style="{% if pending_registrations|length == 0 and move_out_requests|length == 0 %}display:none;{% endif %} border-top: 4px solid var(--warning);">
+        <div class="section-card" id="pendingSection" style="border-top: 4px solid var(--warning);">
+            {% if pending_registrations|length == 0 and move_out_requests|length == 0 %}
+            <div style="text-align: center; padding: 60px 20px;">
+                <i class="fa-solid fa-clipboard-check" style="font-size: 4em; color: #d1d5db; margin-bottom: 20px; display: block;"></i>
+                <h3 style="color: var(--text-main); margin-bottom: 10px;">ไม่มีรายการรออนุมัติ</h3>
+                <p style="color: var(--text-muted); font-size: 0.95em; max-width: 400px; margin: 0 auto;">
+                    เมื่อมีผู้เช่าลงทะเบียนใหม่หรือแจ้งย้ายออก ข้อมูลจะปรากฏที่นี่เพื่อรอการจัดการจากคุณ
+                </p>
+            </div>
+            {% endif %}
+
             {% if pending_registrations|length > 0 %}
             <div class="section-header">
                 <h2><i class="fa-solid fa-user-plus" style="color: var(--warning);"></i> การอนุมัติลงทะเบียนใหม่</h2>
@@ -1950,9 +1960,9 @@
                             ${l.status === 'Active' ? `<button class="btn btn-danger" onclick="unmapTenant(${l.tenant_id})">ย้ายออก</button>` : ''}
                         </td>
                     </tr>
-                `).join('') || '<tr><td colspan="5" style="text-align:center;">ไม่พบข้อมูลสัญญา</td></tr>';
-            }
-        }
+                `).join('') || '<tr><td colspan="5" style="text-align:center; padding: 40px; color: var(--text-muted);"><i class="fa-solid fa-file-circle-exclamation" style="font-size: 3em; margin-bottom: 15px; display: block; color: #d1d5db;"></i>ยังไม่มีข้อมูลสัญญาเช่าที่บันทึกในระบบ</td></tr>';
+                }
+                }
 
         function viewLease(id) { window.open(`/admin/leases/${id}/view`, '_blank'); }
 

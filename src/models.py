@@ -203,6 +203,9 @@ class Lease(Base):
     status = Column(String, default="Active")
     lease_content = Column(Text) # Snapshotted contract content
     initial_fees = Column(Text) # JSON of fees applied at start
+    
+    room = relationship("Room")
+    tenant = relationship("Tenant")
 
 class MeterReading(Base):
     __tablename__ = "meter_readings"

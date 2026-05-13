@@ -1093,16 +1093,30 @@ async def approve_registration(tenant_id: int, room_ids: str = Form(...), db: Se
 
 @app.get("/admin/leases/list")
 async def list_leases(db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
-    leases = db.query(models.Lease).order_by(models.Lease.id.desc()).all()
+    from sqlalchemy.orm import joinedload
+    # Use joinedload to ensure relationships are loaded efficiently
+    leases = db.query(models.Lease).options(
+        joinedload(models.Lease.room),
+        joinedload(models.Lease.tenant)
+    ).order_by(models.Lease.id.desc()).all()
+    
     results = []
     for l in leases:
         try:
+            # Defensive date handling for SQLite
+            s_date = l.start_date
+            if isinstance(s_date, str):
+                try:
+                    s_date = datetime.fromisoformat(s_date.replace('Z', '').split('.')[0])
+                except:
+                    s_date = None
+            
             results.append({
                 "id": l.id,
                 "room_number": l.room.room_number if l.room else "N/A",
                 "tenant_name": l.tenant.full_name if l.tenant else "N/A",
                 "tenant_id": l.tenant_id,
-                "start_date": l.start_date.strftime("%d/%m/%Y") if l.start_date else "-",
+                "start_date": s_date.strftime("%d/%m/%Y") if s_date else "-",
                 "status": l.status
             })
         except Exception as e:
