@@ -26,6 +26,9 @@ def migrate():
         # Tenants table
         "ALTER TABLE tenants ADD COLUMN status TEXT DEFAULT 'Active'", # Default to Active for existing tenants
         "ALTER TABLE tenants ADD COLUMN temp_building_id INTEGER REFERENCES buildings(id)",
+        "ALTER TABLE tenants ADD COLUMN requested_move_in_date DATETIME",
+        "ALTER TABLE tenants ADD COLUMN move_out_date DATETIME",
+        "ALTER TABLE tenants ADD COLUMN move_out_reason TEXT",
         
         # Room PromptPay assignment
         "ALTER TABLE rooms ADD COLUMN promptpay_id TEXT",

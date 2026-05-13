@@ -588,20 +588,22 @@ async def submit_registration(tenant_uuid: str, data: dict, db: Session = Depend
     full_name = data.get("full_name")
     phone_number = data.get("phone_number")
     citizen_id = data.get("citizen_id")
+    requested_move_in_date_str = data.get("requested_move_in_date")
     
-    if not all([full_name, phone_number, citizen_id]):
+    if not all([full_name, phone_number, citizen_id, requested_move_in_date_str]):
         raise HTTPException(status_code=400, detail="กรุณากรอกข้อมูลให้ครบถ้วน")
         
     tenant.full_name = full_name
     tenant.phone_number = phone_number
     tenant.citizen_id = citizen_id
+    tenant.requested_move_in_date = datetime.strptime(requested_move_in_date_str, "%Y-%m-%d")
     tenant.status = "Pending"
     db.commit()
     
     # Notify Owner
     owner = db.query(models.Owner).first()
     if owner and owner.line_user_id and admin_bot_api:
-        msg = f"🔔 มีผู้ลงทะเบียนใหม่!\nชื่อ: {full_name}\nบัตร ปชช: {citizen_id}\nเบอร์โทร: {phone_number}\nกรุณาเลือกห้องและอนุมัติใน Dashboard"
+        msg = f"🔔 มีผู้ลงทะเบียนใหม่!\nชื่อ: {full_name}\nบัตร ปชช: {citizen_id}\nเบอร์โทร: {phone_number}\nวันที่เข้าพัก: {requested_move_in_date_str}\nกรุณาเลือกห้องและอนุมัติใน Dashboard"
         try: admin_bot_api.push_message(owner.line_user_id, TextSendMessage(text=msg))
         except: pass
         
@@ -956,8 +958,12 @@ async def admin_dashboard(
     }
     recent_invoices = db.query(models.Invoice).options(joinedload(models.Invoice.tenant)).order_by(models.Invoice.id.desc()).limit(10).all()
     recent_repairs = db.query(models.MaintenanceRequest).order_by(models.MaintenanceRequest.id.desc()).limit(5).all()
-    # List tenants currently mapped to rooms, eager loading residents
-    active_tenants = db.query(models.Tenant).options(joinedload(models.Tenant.residents)).filter(models.Tenant.status == "Active", models.Tenant.current_room_id != None).all()
+    # List tenants currently mapped to rooms, eager loading residents, newest first
+    active_tenants = db.query(models.Tenant)\
+        .options(joinedload(models.Tenant.residents))\
+        .filter(models.Tenant.status == "Active", models.Tenant.current_room_id != None)\
+        .order_by(models.Tenant.id.desc())\
+        .all()
     pending_registrations = db.query(models.Tenant).filter(models.Tenant.status == "Pending").all()
     move_out_requests = db.query(models.MoveOutRequest).filter(models.MoveOutRequest.status == "Pending").all()
     
@@ -985,70 +991,102 @@ async def admin_dashboard(
     })
 
 @app.post("/admin/registration/{tenant_id}/approve")
-async def approve_registration(tenant_id: int, room_id: int = Form(...), db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+async def approve_registration(tenant_id: int, room_ids: str = Form(...), db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
     tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
     if not tenant: raise HTTPException(status_code=404, detail="Tenant not found")
     
-    room = db.query(models.Room).filter(models.Room.id == room_id).first()
-    if not room or room.status != "Vacant":
-        raise HTTPException(status_code=400, detail="ห้องไม่ว่างหรือไม่พบข้อมูลห้อง")
+    id_list = [int(rid.strip()) for rid in room_ids.split(",") if rid.strip()]
+    if not id_list:
+        raise HTTPException(status_code=400, detail="กรุณาเลือกอย่างน้อย 1 ห้อง")
     
     owner = db.query(models.Owner).first()
+    start_date = tenant.requested_move_in_date if tenant.requested_move_in_date else datetime.now()
     
-    # Assign room to tenant
-    tenant.current_room_id = room.id
+    success_rooms = []
+    first_iter = True
     
-    # Calculate Initial Fees
-    applied_fees = []
-    total_initial = 0
-    fees_text = ""
-    if owner and owner.move_in_fees_config:
-        try:
-            config = json.loads(owner.move_in_fees_config)
-            for f in config:
-                amt = f['value'] * room.base_rent if f.get('is_multiplier') else f['value']
-                applied_fees.append({"name": f['name'], "amount": amt})
-                total_initial += amt
-                fees_text += f"<li>{f['name']}: {amt:,.2f} บาท</li>"
-        except: pass
-    
-    if fees_text:
-        fees_text = f"<ul>{fees_text}</ul><p><strong>รวมเงินมัดจำและค่าแรกเข้า: {total_initial:,.2f} บาท</strong></p>"
+    for rid in id_list:
+        room = db.query(models.Room).filter(models.Room.id == rid).first()
+        if not room or room.status != "Vacant":
+            continue
+            
+        target_tenant = tenant
+        if not first_iter:
+            # Create a clone for subsequent rooms
+            target_tenant = models.Tenant(
+                line_user_id=tenant.line_user_id,
+                full_name=tenant.full_name,
+                phone_number=tenant.phone_number,
+                citizen_id=tenant.citizen_id,
+                requested_move_in_date=tenant.requested_move_in_date,
+                status="Active"
+            )
+            db.add(target_tenant)
+            db.flush()
+        
+        target_tenant.current_room_id = room.id
+        room.status = "Occupied"
+        
+        # Calculate Initial Fees
+        applied_fees = []
+        total_initial = 0
+        fees_text = ""
+        if owner and owner.move_in_fees_config:
+            try:
+                config = json.loads(owner.move_in_fees_config)
+                for f in config:
+                    amt = f['value'] * room.base_rent if f.get('is_multiplier') else f['value']
+                    applied_fees.append({"name": f['name'], "amount": amt})
+                    total_initial += amt
+                    fees_text += f"<li>{f['name']}: {amt:,.2f} บาท</li>"
+            except: pass
+        
+        if fees_text:
+            fees_text = f"<ul>{fees_text}</ul><p><strong>รวมเงินมัดจำและค่าแรกเข้า: {total_initial:,.2f} บาท</strong></p>"
 
-    lease_content = ""
-    if owner and owner.lease_template:
-        lease_content = owner.lease_template
-        replacements = {
-            "{tenant_name}": tenant.full_name,
-            "{room_number}": room.room_number,
-            "{floor}": str(room.floor),
-            "{base_rent}": f"{room.base_rent:,.2f}",
-            "{start_date}": datetime.now().strftime("%d/%m/%Y"),
-            "{initial_fees}": fees_text
-        }
-        for placeholder, value in replacements.items():
-            lease_content = lease_content.replace(placeholder, value)
+        lease_content = ""
+        if owner and owner.lease_template:
+            lease_content = owner.lease_template
+            replacements = {
+                "{tenant_name}": target_tenant.full_name,
+                "{room_number}": room.room_number,
+                "{floor}": str(room.floor),
+                "{base_rent}": f"{room.base_rent:,.2f}",
+                "{start_date}": start_date.strftime("%d/%m/%Y"),
+                "{initial_fees}": fees_text
+            }
+            for placeholder, value in replacements.items():
+                lease_content = lease_content.replace(placeholder, value)
 
-    room.status = "Occupied"
-    new_lease = models.Lease(
-        room_id=room.id, 
-        tenant_id=tenant.id, 
-        start_date=datetime.now(),
-        lease_content=lease_content,
-        initial_fees=json.dumps(applied_fees)
-    )
-    db.add(new_lease)
-    tenant.status = "Active"
+            new_lease = models.Lease(
+                room_id=room.id, 
+                tenant_id=target_tenant.id, 
+                start_date=start_date,
+                lease_content=lease_content,
+                initial_fees=json.dumps(applied_fees)
+            )
+            db.add(new_lease)
+            
+        target_tenant.status = "Active"
+        success_rooms.append(room.room_number)
+        
+        # Setup Personal Rich Menu (1-Click) - Only needed for the primary/original one usually, 
+        # but safe to run for all to ensure they have the right view.
+        setup_personal_rich_menu(target_tenant, db)
+        
+        first_iter = False
+
+    if not success_rooms:
+        raise HTTPException(status_code=400, detail="ไม่สามารถอนุมัติห้องที่เลือกได้ (ห้องอาจไม่ว่าง)")
+        
     db.commit()
-    
-    # Setup Personal Rich Menu (1-Click)
-    setup_personal_rich_menu(tenant, db)
     
     # Notify tenant
     if line_bot_api:
         from linebot.models import TextSendMessage
+        rooms_str = ", ".join(success_rooms)
         try:
-            line_bot_api.push_message(tenant.line_user_id, TextSendMessage(text=f"ยินดีด้วย! การลงทะเบียนเข้าพักห้อง {room.room_number} ของคุณได้รับการอนุมัติแล้ว"))
+            line_bot_api.push_message(tenant.line_user_id, TextSendMessage(text=f"ยินดีด้วย! การลงทะเบียนเข้าพักห้อง {rooms_str} ของคุณได้รับการอนุมัติแล้ว"))
         except: pass
         
     return {"status": "Success"}

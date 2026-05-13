@@ -111,6 +111,10 @@
                     <label>เบอร์โทรศัพท์</label>
                     <input type="tel" id="phone_number" placeholder="08x-xxx-xxxx" value="{{ default_data.phone_number if default_data else '' }}" required>
                 </div>
+                <div class="form-group">
+                    <label>วันที่ต้องการเข้าพัก</label>
+                    <input type="date" id="requested_move_in_date" required>
+                </div>
                 <button type="submit" class="btn">ส่งข้อมูลเพื่อลงทะเบียน</button>
             </form>
         </div>
@@ -118,31 +122,12 @@
             <i class="fa-solid fa-circle-check"></i>
             <h3>ส่งข้อมูลเรียบร้อยแล้ว!</h3>
             <p>กรุณารอเจ้าของหอพักตรวจสอบและอนุมัติการเข้าพัก ระบบจะแจ้งเตือนคุณผ่าน LINE เมื่อมีการอัปเดต</p>
-            <button class="btn" onclick="closeWindow()">ปิดหน้านี้</button>
-            <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 15px;">(หากปุ่มไม่ทำงาน สามารถกดปุ่ม X ที่มุมบนเพื่อปิดได้เลยครับ)</p>
         </div>
     </div>
 
     <script>
         const tenant_uuid = "{{ tenant_uuid }}";
 
-        function closeWindow() {
-            // Try standard window.close
-            window.close();
-            
-            // For LINE In-App Browser, sometimes this helps trigger close
-            if (window.MessengerExtensions) {
-                MessengerExtensions.requestCloseBrowser(function success() {}, function error(err) {});
-            }
-            
-            // Fallback for LINE
-            setTimeout(() => {
-                // If it's still open, try common URL schemes to 'go back' or close
-                // But most secure way is to just let user know
-                console.log("Window did not close automatically.");
-            }, 300);
-        }
-        
         document.getElementById('regForm').onsubmit = async (e) => {
             e.preventDefault();
             const btn = e.target.querySelector('button');
@@ -152,7 +137,8 @@
             const data = {
                 full_name: document.getElementById('full_name').value,
                 citizen_id: document.getElementById('citizen_id').value,
-                phone_number: document.getElementById('phone_number').value
+                phone_number: document.getElementById('phone_number').value,
+                requested_move_in_date: document.getElementById('requested_move_in_date').value
             };
 
             try {

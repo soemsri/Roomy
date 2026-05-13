@@ -449,7 +449,9 @@
                             <th>ชื่อ-นามสกุล</th>
                             <th>เลขบัตรประชาชน</th>
                             <th>เบอร์โทร</th>
-                            <th>เลือกห้องให้ผู้เช่า</th>
+                            <th>วันที่ต้องการเข้า</th>
+                            <th>ตึก</th>
+                            <th>ห้อง</th>
                             <th>จัดการ</th>
                         </tr>
                     </thead>
@@ -460,12 +462,28 @@
                             <td>{{ p.citizen_id or '-' }}</td>
                             <td>{{ p.phone_number or 'N/A' }}</td>
                             <td>
-                                <select id="reg_room_{{ p.id }}" class="form-control" style="width: auto;">
-                                    <option value="">-- เลือกห้อง --</option>
-                                    {% for r in all_rooms if r.status == 'Vacant' %}
-                                    <option value="{{ r.id }}">ห้อง {{ r.room_number }} (ชั้น {{ r.floor }})</option>
+                                {% if p.requested_move_in_date %}
+                                    {% if p.requested_move_in_date is string %}
+                                        {{ p.requested_move_in_date }}
+                                    {% else %}
+                                        {{ p.requested_move_in_date.strftime('%d/%m/%Y') }}
+                                    {% endif %}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                <select id="reg_building_{{ p.id }}" class="form-control" style="width: auto;" onchange="filterRoomsForReg({{ p.id }}, this.value)">
+                                    <option value="">-- เลือกตึก --</option>
+                                    {% for b in all_buildings %}
+                                    <option value="{{ b.id }}">{{ b.name }}</option>
                                     {% endfor %}
                                 </select>
+                            </td>
+                            <td>
+                                <div id="reg_rooms_container_{{ p.id }}" style="max-height: 120px; overflow-y: auto; border: 1px solid #ddd; padding: 5px; border-radius: 4px; min-width: 160px; background: #fff;">
+                                    <span style="color: #888; font-size: 0.85rem;">-- เลือกตึกก่อน --</span>
+                                </div>
                             </td>
                             <td>
                                 <button class="btn btn-primary" style="background: var(--success);" onclick="approveReg({{ p.id }})">อนุมัติ</button>
@@ -1508,8 +1526,42 @@
     <script id="bulk_recurring_raw" type="application/json">
         {{ (owner.default_recurring_charges if owner and owner.default_recurring_charges else "[]") | safe }}
     </script>
+    <script id="vacant_rooms_data" type="application/json">
+        [
+            {% for r in all_rooms if r.status == 'Vacant' %}
+            {"id": {{ r.id }}, "room_number": "{{ r.room_number }}", "floor": {{ r.floor }}, "building_id": {{ r.building_id or 'null' }}}{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ]
+    </script>
 
     <script>
+        function filterRoomsForReg(tenantId, buildingId) {
+            const container = document.getElementById(`reg_rooms_container_${tenantId}`);
+            const vacantRoomsDataEl = document.getElementById('vacant_rooms_data');
+            if (!vacantRoomsDataEl) return;
+            
+            const allVacantRooms = JSON.parse(vacantRoomsDataEl.textContent);
+            
+            if (!buildingId) {
+                container.innerHTML = '<span style="color: #888; font-size: 0.85rem;">-- เลือกตึกก่อน --</span>';
+                return;
+            }
+            
+            const filtered = allVacantRooms.filter(r => r.building_id == buildingId);
+            
+            if (filtered.length === 0) {
+                container.innerHTML = '<span style="color: var(--danger); font-size: 0.85rem;">-- ไม่พบห้องว่างในตึกนี้ --</span>';
+                return;
+            }
+
+            container.innerHTML = filtered.map(r => `
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
+                    <input type="checkbox" class="reg-room-checkbox-${tenantId}" value="${r.id}" id="room_${tenantId}_${r.id}" style="width: 16px; height: 16px; margin: 0;">
+                    <label for="room_${tenantId}_${r.id}" style="margin: 0; font-size: 0.9rem; cursor: pointer;">ห้อง ${r.room_number} (ชั้น ${r.floor})</label>
+                </div>
+            `).join('');
+        }
+
         // Sidebar Navigation
         function showSection(sectionId) {
             const sections = document.querySelectorAll('.section-card, .grid');
@@ -2483,14 +2535,16 @@
 
         async function cancelInvoice(id) { if(confirm('ยกเลิก?')) await fetch(`/admin/invoice/${id}/cancel`, {method:'POST'}); location.reload(); }
         async function approveReg(id) {
-            const roomId = document.getElementById(`reg_room_${id}`).value;
-            if (!roomId) {
-                alert('กรุณาเลือกห้องพักก่อนอนุมัติ');
+            const checkboxes = document.querySelectorAll(`.reg-room-checkbox-${id}:checked`);
+            const roomIds = Array.from(checkboxes).map(cb => cb.value);
+            
+            if (roomIds.length === 0) {
+                alert('กรุณาเลือกอย่างน้อย 1 ห้องพักก่อนอนุมัติ');
                 return;
             }
             
             const formData = new FormData();
-            formData.append('room_id', roomId);
+            formData.append('room_ids', roomIds.join(','));
             
             const res = await fetch(`/admin/registration/${id}/approve`, {
                 method: 'POST',
@@ -2498,7 +2552,8 @@
             });
             
             if (res.ok) {
-                location.reload();
+                window.location.href = '/admin/dashboard#tenantSection';
+                window.location.reload();
             } else {
                 const err = await res.json();
                 alert('Error: ' + (err.detail || 'ไม่สามารถอนุมัติได้'));

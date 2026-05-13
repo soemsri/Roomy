@@ -107,6 +107,7 @@ class Tenant(Base):
     rich_menu_id = Column(String)
     status = Column(String, default="Pending") # Pending, Active, Rejected, AwaitingBuilding, AwaitingRoom, AwaitingName, AwaitingPhone
     temp_building_id = Column(Integer, ForeignKey("buildings.id")) # Temporary storage during registration
+    requested_move_in_date = Column(DateTime)
     move_out_date = Column(DateTime) # Requested move-out date
     move_out_reason = Column(String)
     
