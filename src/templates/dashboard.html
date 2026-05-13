@@ -1697,7 +1697,23 @@
             const body = document.getElementById('settlementDetailBody');
             
             if (!h.settlement) {
-                body.innerHTML = '<p style="text-align:center; padding:20px; color:var(--text-muted);">ไม่มีข้อมูลการเงินบันทึกไว้สำหรับประวัตินี้</p>';
+                body.innerHTML = `
+                    <div style="background:#f8f9fa; padding:20px; border-radius:12px; margin-bottom:20px;">
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-bottom:15px;">
+                            <div><label>ห้อง</label><strong>${h.room_number}</strong></div>
+                            <div><label>ผู้เช่า</label><strong>${h.full_name}</strong></div>
+                            <div><label>วันที่เข้า</label><strong>${h.start_date}</strong></div>
+                            <div><label>วันที่ออก</label><strong>${h.end_date}</strong></div>
+                        </div>
+                    </div>
+                    <div style="margin-top:20px; border-top:1px solid var(--border); padding-top:15px;">
+                        <h4 style="margin-top:0;"><i class="fa-solid fa-users"></i> ผู้อยู่อาศัยร่วม</h4>
+                        <div style="font-size:0.9em; color:var(--text-muted);">
+                            ${h.residents.map(r => `<div>- ${r.nickname} (${r.full_name})</div>`).join('') || 'ไม่มีข้อมูลผู้อยู่อาศัยร่วม'}
+                        </div>
+                    </div>
+                    <p style="text-align:center; padding:20px; color:var(--text-muted); border-top:1px solid var(--border); margin-top:15px;">ไม่มีข้อมูลการเงินบันทึกไว้สำหรับประวัตินี้</p>
+                `;
                 modal.style.display = 'block';
                 return;
             }
@@ -1710,6 +1726,7 @@
                         <div><label>ผู้เช่า</label><strong>${h.full_name}</strong></div>
                         <div><label>วันที่เข้า</label><strong>${h.start_date}</strong></div>
                         <div><label>วันที่ออก</label><strong>${h.end_date}</strong></div>
+                        <div><label>วันสรุปยอด</label><strong>${s.settlement_date}</strong></div>
                     </div>
                 </div>
 
@@ -1719,7 +1736,10 @@
                         <span>ค่าเช่ารายวัน (Pro-rated)</span><span>${s.pro_rated_rent.toLocaleString()} บาท</span>
                     </div>
                     <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:0.9em;">
-                        <span>ค่าน้ำ-ไฟงวดสุดท้าย</span><span>${(s.electricity_amount + s.water_amount).toLocaleString()} บาท</span>
+                        <span>ค่าไฟ (${s.electricity_units.toFixed(1)} หน่วย)</span><span>${s.electricity_amount.toLocaleString()} บาท</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:0.9em;">
+                        <span>ค่าน้ำ (${s.water_units.toFixed(1)} หน่วย)</span><span>${s.water_amount.toLocaleString()} บาท</span>
                     </div>
                     <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:0.9em;">
                         <span>ยอดค้างชำระเดิม</span><span>${s.unpaid_invoices_amount.toLocaleString()} บาท</span>
@@ -1727,8 +1747,12 @@
                     <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:0.9em;">
                         <span>ค่าทำความสะอาด</span><span>${s.cleaning_fee.toLocaleString()} บาท</span>
                     </div>
-                    ${s.damage_fee > 0 ? `<div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:0.9em;"><span>ค่าเสียหาย</span><span>${s.damage_fee.toLocaleString()} บาท</span></div>` : ''}
-                    ${s.other_fees > 0 ? `<div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:0.9em;"><span>อื่นๆ</span><span>${s.other_fees.toLocaleString()} บาท</span></div>` : ''}
+                    <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:0.9em;">
+                        <span>ค่าเสียหาย / อื่นๆ</span><span>${s.damage_fee.toLocaleString()} บาท</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:0.9em;">
+                        <span>หักอื่นๆ</span><span>${s.other_fees.toLocaleString()} บาท</span>
+                    </div>
                 </div>
 
                 <div style="border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:15px;">
@@ -1748,7 +1772,19 @@
                     </div>
                 </div>
 
-                ${s.notes ? `<div style="margin-top:15px; font-size:0.85em; color:var(--text-muted);"><strong>หมายเหตุ:</strong> ${s.notes}</div>` : ''}
+                <div style="margin-top:20px; border-top:1px solid var(--border); padding-top:15px;">
+                    <h4 style="margin-top:0;"><i class="fa-solid fa-users"></i> ผู้อยู่อาศัยร่วมขณะนั้น</h4>
+                    <div style="font-size:0.9em; color:var(--text-muted);">
+                        ${h.residents.map(r => `<div>- ${r.nickname} (${r.full_name})</div>`).join('') || 'ไม่มีข้อมูลผู้อยู่อาศัยร่วม'}
+                    </div>
+                </div>
+
+                <div style="margin-top:15px; border-top:1px solid var(--border); padding-top:10px;">
+                    <strong>หมายเหตุเพิ่มเติม:</strong>
+                    <div style="font-size:0.9em; color:var(--text-muted); margin-top:5px;">
+                        ${s.notes || 'ไม่มีหมายเหตุ'}
+                    </div>
+                </div>
                 ${s.refund_receipt_img ? `<div style="margin-top:15px;"><a href="${s.refund_receipt_img}" target="_blank" class="btn btn-outline" style="width:100%; justify-content:center;"><i class="fa-solid fa-image"></i> ดูหลักฐานการคืนเงิน (สลิป)</a></div>` : ''}
             `;
             modal.style.display = 'block';

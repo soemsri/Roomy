@@ -2373,8 +2373,11 @@ async def get_tenant_history(db: Session = Depends(get_db), admin: bool = Depend
             
             if settlement:
                 settlement_data = {
+                    "settlement_date": settlement.settlement_date.strftime("%d/%m/%Y %H:%M") if settlement.settlement_date else "-",
                     "pro_rated_rent": settlement.pro_rated_rent,
+                    "electricity_units": settlement.electricity_units,
                     "electricity_amount": settlement.electricity_amount,
+                    "water_units": settlement.water_units,
                     "water_amount": settlement.water_amount,
                     "unpaid_invoices_amount": settlement.unpaid_invoices_amount,
                     "cleaning_fee": settlement.cleaning_fee,
