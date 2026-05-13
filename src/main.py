@@ -1219,16 +1219,12 @@ async def preview_settlement(tenant_id: int, db: Session = Depends(get_db), admi
     elec_amt = round(elec_units * (room.electricity_rate or 0), 2)
     water_amt = round(water_units * (room.water_rate or 0), 2)
     
-    # 3. Security Deposit
+    # 3. Security Deposit (Total Move-in Fees)
     deposit = 0
     if lease and lease.initial_fees:
         try:
             fees = json.loads(lease.initial_fees)
-            # Find fee that looks like deposit
-            for f in fees:
-                if "ประกัน" in f.get('name', '') or "deposit" in f.get('name', '').lower():
-                    deposit = f.get('amount', 0)
-                    break
+            deposit = sum(float(f.get('amount', 0)) for f in fees)
         except: pass
         
     # 4. Unpaid Invoices
@@ -2358,6 +2354,22 @@ async def delete_resident(resident_id: int, db: Session = Depends(get_db), admin
     db.delete(resident)
     db.commit()
     return {"status": "Success"}
+
+@app.get("/admin/tenants/history")
+async def get_tenant_history(db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+    history = db.query(models.TenantHistory).order_by(models.TenantHistory.end_date.desc()).all()
+    results = []
+    for h in history:
+        results.append({
+            "id": h.id,
+            "room_number": h.room_number,
+            "full_name": h.full_name,
+            "phone_number": h.phone_number,
+            "start_date": h.start_date.strftime("%d/%m/%Y") if h.start_date else "-",
+            "end_date": h.end_date.strftime("%d/%m/%Y") if h.end_date else "-",
+            "residents": json.loads(h.residents_json) if h.residents_json else []
+        })
+    return results
 
 @app.get("/admin/tenants/search")
 async def search_tenants(q: str = "", db: Session = Depends(get_db), admin: bool = Depends(get_admin)):

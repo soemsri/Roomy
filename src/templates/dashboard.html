@@ -345,6 +345,7 @@
                 {% endif %}
             </a>
             <a href="#tenantSection" class="menu-item"><i class="fa-solid fa-users"></i> ผู้เช่า</a>
+            <a href="#tenantHistorySection" class="menu-item"><i class="fa-solid fa-clock-rotate-left"></i> ประวัติการเข้าพัก</a>
             <a href="#settingsSection" class="menu-item"><i class="fa-solid fa-gears"></i> ตั้งค่าระบบ</a>
             <a href="/admin/logout" class="menu-item" style="margin-top: auto; color: var(--danger);"><i class="fa-solid fa-right-from-bracket"></i> ออกจากระบบ</a>
         </nav>
@@ -953,6 +954,30 @@
                             </td>
                         </tr>
                         {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Move-out History Section -->
+        <div class="section-card" id="tenantHistorySection" style="margin-top: 30px; display: none;">
+            <div class="section-header">
+                <h2><i class="fa-solid fa-clock-rotate-left"></i> ประวัติการเข้าพัก (อดีตผู้เช่า)</h2>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ห้อง</th>
+                            <th>ชื่อ-นามสกุล</th>
+                            <th>เบอร์โทร</th>
+                            <th>วันที่เข้า</th>
+                            <th>วันที่ออก</th>
+                            <th>ผู้อยู่อาศัยร่วม</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tenantHistoryList">
+                        <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">กำลังโหลดข้อมูล...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -1599,6 +1624,7 @@
 
             if (sectionId === 'repairSection') loadRepairs();
             if (sectionId === 'leaseSection') loadLeases();
+            if (sectionId === 'tenantHistorySection') loadTenantHistory();
 
             // Update Active Menu
             document.querySelectorAll('.menu-item').forEach(m => {
@@ -1607,6 +1633,39 @@
                     m.classList.add('active');
                 }
             });
+        }
+
+        async function loadTenantHistory() {
+            const list = document.getElementById('tenantHistoryList');
+            if (!list) return;
+            list.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px;">กำลังโหลดข้อมูล...</td></tr>';
+
+            try {
+                const res = await fetch('/admin/tenants/history');
+                const data = await res.json();
+                
+                if (data.length === 0) {
+                    list.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:40px; color:var(--text-muted);"><i class="fa-solid fa-clock-rotate-left" style="font-size:3em; margin-bottom:15px; display:block; color:#d1d5db;"></i>ยังไม่มีประวัติการย้ายออก</td></tr>';
+                    return;
+                }
+
+                list.innerHTML = data.map(h => `
+                    <tr>
+                        <td style="font-weight:700; color:var(--primary);">${h.room_number}</td>
+                        <td style="font-weight:600;">${h.full_name}</td>
+                        <td>${h.phone_number || '-'}</td>
+                        <td>${h.start_date}</td>
+                        <td style="font-weight:600; color:var(--danger);">${h.end_date}</td>
+                        <td>
+                            <div style="font-size:0.85em; color:var(--text-muted);">
+                                ${h.residents.map(r => r.nickname).join(', ') || '-'}
+                            </div>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (e) {
+                list.innerHTML = '<tr><td colspan="6" style="color:var(--danger); text-align:center;">ไม่สามารถโหลดข้อมูลได้: ' + e + '</td></tr>';
+            }
         }
 
         function renderRepairRows(data) {
