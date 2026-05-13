@@ -1,12 +1,12 @@
 {
   "status": "active",
-  "current_phase": 10,
-  "last_action": "Implemented Move-out Settlement system with pro-rated rent, utility checks, and deposit management.",
-  "summary": "Phase 10: Bug Fixing and UX Translation. Significant architectural enhancement with the Move-out Settlement system. This feature automates pro-rated rent calculation for mid-month move-outs, enforces mandatory final meter reading checks, and provides a structured interface for managing security deposit deductions (cleaning, damages, unpaid bills). Added the Settlement database model and a guided UI modal to ensure financial accuracy and transparency during tenant departures. Also addressed dashboard parsing errors and improved LINE multi-room logic.",
+  "current_phase": 11,
+  "last_action": "Implemented Move-out Request bug fix, Direct LINE messaging, Registration Flow refactor with National ID and Encryption.",
+  "summary": "Phase 11: Security & Process Refinement. Fixed a critical NOT NULL constraint error in move-out requests by adding recovery logic from active leases. Implemented a direct LINE messaging feature from the owner dashboard to individual tenants. Significantly refactored the registration flow: added mandatory National ID (citizen_id) with transparent database encryption, implemented data auto-fill for returning tenants, and shifted room assignment control from tenants to admins during the approval process. Resolved circular dependencies in the security module to support clean model-level encryption.",
   "next_steps": [
-    "Monitor LINE webhook logs for any issues with the new PostbackEvent handler.",
-    "Verify the 'openKeyboard' behavior on actual mobile devices (iOS/Android).",
-    "Prepare for Phase 11: Final user acceptance testing and documentation updates."
+    "Verify encryption/decryption performance with a larger dataset.",
+    "User Acceptance Testing (UAT) for the new admin-led room assignment flow.",
+    "Update project documentation to reflect the new registration and messaging features."
   ],
-  "timestamp": "2026-05-12T10:30:00"
+  "timestamp": "2026-05-13T16:45:00"
 }
