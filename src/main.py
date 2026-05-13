@@ -2012,6 +2012,7 @@ async def save_settings(
     lease_template: str = Form(None),
     move_in_fees_config: str = Form("[]"),
     magic_link_duration_min: int = Form(5),
+    meter_history_page_size: int = Form(10),
     db: Session = Depends(get_db),
     admin: bool = Depends(get_admin)
 ):
@@ -2045,6 +2046,7 @@ async def save_settings(
         owner.lease_template = lease_template
     
     owner.magic_link_duration_min = magic_link_duration_min
+    owner.meter_history_page_size = meter_history_page_size
     
     db.commit()
     return {"status": "Success"}
@@ -2473,12 +2475,20 @@ async def get_current_meter(room_id: int, month: int, year: int, db: Session = D
     }
 
 @app.get("/admin/meters/history")
-async def get_meter_history(room_id: int = None, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+async def get_meter_history(room_id: int = None, page: int = 1, page_size: int = None, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+    owner = db.query(models.Owner).first()
+    if page_size is None:
+        page_size = owner.meter_history_page_size if owner else 10
+        
     query = db.query(models.MeterReading).join(models.Room)
     if room_id:
         query = query.filter(models.MeterReading.room_id == room_id)
 
-    readings = query.order_by(models.MeterReading.billing_year.desc(), models.MeterReading.billing_month.desc()).all()
+    total_count = query.count()
+    total_pages = (total_count + page_size - 1) // page_size if page_size > 0 else 1
+
+    readings = query.order_by(models.MeterReading.billing_year.desc(), models.MeterReading.billing_month.desc())\
+        .offset((page - 1) * page_size).limit(page_size).all()
 
     results = []
     for r in readings:
@@ -2500,7 +2510,14 @@ async def get_meter_history(room_id: int = None, db: Session = Depends(get_db), 
             "recorded_at": r.recorded_at.strftime("%d/%m/%Y %H:%M"),
             "invoice_status": invoice.status if invoice else "No Invoice"
         })
-    return results
+        
+    return {
+        "items": results,
+        "total_count": total_count,
+        "total_pages": total_pages,
+        "current_page": page,
+        "page_size": page_size
+    }
 @app.get("/admin/repair/history")
 async def get_repair_history(room_id: int = None, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
     query = db.query(models.MaintenanceRequest).join(models.Room)

@@ -1009,6 +1009,10 @@
                         <p style="font-size: 0.75em; color: var(--text-muted); margin-top: 5px;">ลิงก์ที่ส่งจาก LINE จะใช้งานได้ภายในเวลาที่กำหนดนี้เท่านั้น (สูงสุด 1,440 นาที หรือ 24 ชม.)</p>
                     </div>
                     <div class="form-group">
+                        <label>จำนวนรายการประวัติมิเตอร์ต่อหน้า</label>
+                        <input type="number" id="meter_history_page_size" value="{{ owner.meter_history_page_size if owner and owner.meter_history_page_size else 10 }}" min="1" max="100">
+                    </div>
+                    <div class="form-group">
                         <label>เปิดรับชำระผ่าน QR Code</label>
                         <select id="qr_enabled">
                             <option value="1" {% if owner and owner.qr_payment_enabled == 1 %}selected{% endif %}>เปิดการใช้งาน</option>
@@ -1658,12 +1662,15 @@
             }
         }
 
-        async function loadMeterHistory() {
+        let currentMeterHistoryPage = 1;
+
+        async function loadMeterHistory(page = 1) {
+            currentMeterHistoryPage = page;
             const roomId = document.getElementById('history_room_filter').value;
             const list = document.getElementById('meterHistoryList');
             const table = document.getElementById('meterHistoryTable');
             
-            // Set Table Header if needed (assuming it might be empty or needs resetting)
+            // Set Table Header
             table.innerHTML = `
                 <thead>
                     <tr>
@@ -1681,15 +1688,18 @@
             const newList = document.getElementById('meterHistoryList');
 
             try {
-                const res = await fetch(`/admin/meters/history${roomId ? '?room_id='+roomId : ''}`);
+                const res = await fetch(`/admin/meters/history?page=${page}${roomId ? '&room_id='+roomId : ''}`);
                 const data = await res.json();
                 
-                if (data.length === 0) {
+                if (!data.items || data.items.length === 0) {
                     newList.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">ไม่พบข้อมูลมิเตอร์</td></tr>';
+                    // Remove existing pagination if any
+                    const existingPager = document.getElementById('meterHistoryPagination');
+                    if (existingPager) existingPager.remove();
                     return;
                 }
 
-                newList.innerHTML = data.map(m => `
+                newList.innerHTML = data.items.map(m => `
                     <tr>
                         <td><strong>${m.room_number}</strong></td>
                         <td>${m.month}/${m.year}</td>
@@ -1698,9 +1708,46 @@
                         <td><span class="badge ${m.invoice_status === 'Paid' ? 'badge-success' : 'badge-warning'}">${m.invoice_status}</span></td>
                     </tr>
                 `).join('');
+
+                // Render Pagination Controls
+                renderMeterHistoryPagination(data.total_pages, data.current_page);
+
             } catch (e) {
                 newList.innerHTML = '<tr><td colspan="5" style="color:var(--danger); text-align:center;">ไม่สามารถโหลดข้อมูลได้: ' + e + '</td></tr>';
             }
+        }
+
+        function renderMeterHistoryPagination(totalPages, currentPage) {
+            let pager = document.getElementById('meterHistoryPagination');
+            if (!pager) {
+                pager = document.createElement('div');
+                pager.id = 'meterHistoryPagination';
+                pager.style.cssText = 'display:flex; justify-content:center; gap:5px; margin-top:20px; padding:10px;';
+                document.getElementById('meterHistorySection').appendChild(pager);
+            }
+
+            if (totalPages <= 1) {
+                pager.innerHTML = '';
+                return;
+            }
+
+            let html = '';
+            // Prev
+            html += `<button class="btn btn-outline" style="padding:5px 10px;" ${currentPage === 1 ? 'disabled' : ''} onclick="loadMeterHistory(${currentPage - 1})"><i class="fa-solid fa-chevron-left"></i></button>`;
+            
+            // Pages
+            for (let i = 1; i <= totalPages; i++) {
+                if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
+                    html += `<button class="btn ${i === currentPage ? 'btn-primary' : 'btn-outline'}" style="padding:5px 12px;" onclick="loadMeterHistory(${i})">${i}</button>`;
+                } else if (i === currentPage - 3 || i === currentPage + 3) {
+                    html += '<span style="padding:5px; color:var(--text-muted);">...</span>';
+                }
+            }
+
+            // Next
+            html += `<button class="btn btn-outline" style="padding:5px 10px;" ${currentPage === totalPages ? 'disabled' : ''} onclick="loadMeterHistory(${currentPage + 1})"><i class="fa-solid fa-chevron-right"></i></button>`;
+            
+            pager.innerHTML = html;
         }
 
         function viewRepairDetails(repair) {
@@ -2127,6 +2174,8 @@
             formData.append('late_fee_enabled', document.getElementById('late_fee_enabled').checked ? "1" : "0");
             formData.append('due_day', document.getElementById('due_day').value);
             formData.append('late_fee_per_day', document.getElementById('late_fee_per_day').value);
+            formData.append('magic_link_duration_min', document.getElementById('magic_link_duration_min').value);
+            formData.append('meter_history_page_size', document.getElementById('meter_history_page_size').value);
             
             const leaseEd = document.getElementById('lease_template_editor');
             if (leaseEd) formData.append('lease_template', leaseEd.value);

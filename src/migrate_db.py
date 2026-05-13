@@ -19,6 +19,7 @@ def migrate():
         "ALTER TABLE owners ADD COLUMN lease_template TEXT",
         "ALTER TABLE owners ADD COLUMN move_in_fees_config TEXT DEFAULT '[]'",
         "ALTER TABLE owners ADD COLUMN default_recurring_charges TEXT DEFAULT '[]'",
+        "ALTER TABLE owners ADD COLUMN meter_history_page_size INTEGER DEFAULT 10",
         
         # Invoices table
         "ALTER TABLE invoices ADD COLUMN late_fee REAL DEFAULT 0.0",

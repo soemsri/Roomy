@@ -25,6 +25,7 @@ class Owner(Base):
     lease_template = Column(Text) # HTML Template for contracts
     move_in_fees_config = Column(Text, default='[]') # JSON: [{"name": "...", "value": 0, "is_multiplier": bool}]
     default_recurring_charges = Column(Text, default='[]') # Template for bulk setup
+    meter_history_page_size = Column(Integer, default=10)
 
 class PasswordResetToken(Base):
     __tablename__ = "password_reset_tokens"
