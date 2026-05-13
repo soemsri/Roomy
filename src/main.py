@@ -2360,6 +2360,34 @@ async def get_tenant_history(db: Session = Depends(get_db), admin: bool = Depend
     history = db.query(models.TenantHistory).order_by(models.TenantHistory.end_date.desc()).all()
     results = []
     for h in history:
+        # Try to find the settlement for this tenant history record
+        # We can match by tenant_uuid and settlement_date roughly or just find the latest settlement for that tenant
+        tenant = db.query(models.Tenant).filter(models.Tenant.uuid == h.tenant_uuid).first()
+        settlement_data = None
+        if tenant:
+            # Find settlement that happened around the same time as h.end_date
+            # or just the most recent settlement for this tenant
+            settlement = db.query(models.Settlement).filter(
+                models.Settlement.tenant_id == tenant.id
+            ).order_by(models.Settlement.settlement_date.desc()).first()
+            
+            if settlement:
+                settlement_data = {
+                    "pro_rated_rent": settlement.pro_rated_rent,
+                    "electricity_amount": settlement.electricity_amount,
+                    "water_amount": settlement.water_amount,
+                    "unpaid_invoices_amount": settlement.unpaid_invoices_amount,
+                    "cleaning_fee": settlement.cleaning_fee,
+                    "damage_fee": settlement.damage_fee,
+                    "other_fees": settlement.other_fees,
+                    "total_deductions": settlement.total_deductions,
+                    "security_deposit_amount": settlement.security_deposit_amount,
+                    "final_balance": settlement.final_balance,
+                    "refund_method": settlement.refund_method,
+                    "refund_receipt_img": settlement.refund_receipt_img,
+                    "notes": settlement.notes
+                }
+
         results.append({
             "id": h.id,
             "room_number": h.room_number,
@@ -2367,7 +2395,8 @@ async def get_tenant_history(db: Session = Depends(get_db), admin: bool = Depend
             "phone_number": h.phone_number,
             "start_date": h.start_date.strftime("%d/%m/%Y") if h.start_date else "-",
             "end_date": h.end_date.strftime("%d/%m/%Y") if h.end_date else "-",
-            "residents": json.loads(h.residents_json) if h.residents_json else []
+            "residents": json.loads(h.residents_json) if h.residents_json else [],
+            "settlement": settlement_data
         })
     return results
 

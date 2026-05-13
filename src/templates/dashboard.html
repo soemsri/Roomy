@@ -970,10 +970,9 @@
                         <tr>
                             <th>ห้อง</th>
                             <th>ชื่อ-นามสกุล</th>
-                            <th>เบอร์โทร</th>
-                            <th>วันที่เข้า</th>
-                            <th>วันที่ออก</th>
-                            <th>ผู้อยู่อาศัยร่วม</th>
+                            <th>วันที่เข้า/ออก</th>
+                            <th>ยอดปิดบัญชี</th>
+                            <th>รายละเอียด</th>
                         </tr>
                     </thead>
                     <tbody id="tenantHistoryList">
@@ -1556,6 +1555,22 @@
         </div>
     </div>
 
+    <!-- Settlement Detail Modal (History) -->
+    <div id="settlementDetailModal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3 style="margin:0; font-weight:700;"><i class="fa-solid fa-file-invoice-dollar"></i> รายละเอียดการปิดบัญชี</h3>
+                <button class="btn btn-outline" style="padding:5px 10px;" onclick="document.getElementById('settlementDetailModal').style.display='none'"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body" id="settlementDetailBody">
+                <!-- Data filled by JS -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="document.getElementById('settlementDetailModal').style.display='none'">ปิดหน้าต่าง</button>
+            </div>
+        </div>
+    </div>
+
     <script id="pp_data_raw" type="application/json">
         {{ (owner.promptpay_config if owner and owner.promptpay_config else "[]") | safe }}
     </script>
@@ -1638,14 +1653,14 @@
         async function loadTenantHistory() {
             const list = document.getElementById('tenantHistoryList');
             if (!list) return;
-            list.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px;">กำลังโหลดข้อมูล...</td></tr>';
+            list.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px;">กำลังโหลดข้อมูล...</td></tr>';
 
             try {
                 const res = await fetch('/admin/tenants/history');
                 const data = await res.json();
                 
                 if (data.length === 0) {
-                    list.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:40px; color:var(--text-muted);"><i class="fa-solid fa-clock-rotate-left" style="font-size:3em; margin-bottom:15px; display:block; color:#d1d5db;"></i>ยังไม่มีประวัติการย้ายออก</td></tr>';
+                    list.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:40px; color:var(--text-muted);"><i class="fa-solid fa-clock-rotate-left" style="font-size:3em; margin-bottom:15px; display:block; color:#d1d5db;"></i>ยังไม่มีประวัติการย้ายออก</td></tr>';
                     return;
                 }
 
@@ -1653,19 +1668,90 @@
                     <tr>
                         <td style="font-weight:700; color:var(--primary);">${h.room_number}</td>
                         <td style="font-weight:600;">${h.full_name}</td>
-                        <td>${h.phone_number || '-'}</td>
-                        <td>${h.start_date}</td>
-                        <td style="font-weight:600; color:var(--danger);">${h.end_date}</td>
+                        <td style="font-size:0.85em;">
+                            <div><i class="fa-solid fa-calendar-check" style="color:var(--success);"></i> ${h.start_date}</div>
+                            <div style="margin-top:4px;"><i class="fa-solid fa-calendar-xmark" style="color:var(--danger);"></i> ${h.end_date}</div>
+                        </td>
                         <td>
-                            <div style="font-size:0.85em; color:var(--text-muted);">
-                                ${h.residents.map(r => r.nickname).join(', ') || '-'}
-                            </div>
+                            ${h.settlement ? `
+                                <div style="font-weight:700; color:${h.settlement.final_balance >= 0 ? 'var(--success)' : 'var(--danger)'};">
+                                    ${h.settlement.final_balance >= 0 ? 'คืน' : 'ค้าง'} ฿${Math.abs(h.settlement.final_balance).toLocaleString()}
+                                </div>
+                                <div style="font-size:0.75em; color:var(--text-muted);">${h.settlement.refund_method || '-'}</div>
+                            ` : '<span style="color:var(--text-muted);">ไม่มีข้อมูลยอด</span>'}
+                        </td>
+                        <td>
+                            <button class="btn btn-outline" style="padding:5px 10px; font-size:0.85em;" onclick='showSettlementDetail(${JSON.stringify(h)})'>
+                                <i class="fa-solid fa-circle-info"></i> ดูรายละเอียด
+                            </button>
                         </td>
                     </tr>
                 `).join('');
             } catch (e) {
-                list.innerHTML = '<tr><td colspan="6" style="color:var(--danger); text-align:center;">ไม่สามารถโหลดข้อมูลได้: ' + e + '</td></tr>';
+                list.innerHTML = '<tr><td colspan="5" style="color:var(--danger); text-align:center;">ไม่สามารถโหลดข้อมูลได้: ' + e + '</td></tr>';
             }
+        }
+
+        function showSettlementDetail(h) {
+            const modal = document.getElementById('settlementDetailModal');
+            const body = document.getElementById('settlementDetailBody');
+            
+            if (!h.settlement) {
+                body.innerHTML = '<p style="text-align:center; padding:20px; color:var(--text-muted);">ไม่มีข้อมูลการเงินบันทึกไว้สำหรับประวัตินี้</p>';
+                modal.style.display = 'block';
+                return;
+            }
+
+            const s = h.settlement;
+            body.innerHTML = `
+                <div style="background:#f8f9fa; padding:20px; border-radius:12px; margin-bottom:20px;">
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-bottom:15px;">
+                        <div><label>ห้อง</label><strong>${h.room_number}</strong></div>
+                        <div><label>ผู้เช่า</label><strong>${h.full_name}</strong></div>
+                        <div><label>วันที่เข้า</label><strong>${h.start_date}</strong></div>
+                        <div><label>วันที่ออก</label><strong>${h.end_date}</strong></div>
+                    </div>
+                </div>
+
+                <div style="border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:15px;">
+                    <h4 style="margin-top:0;"><i class="fa-solid fa-minus-circle" style="color:var(--danger);"></i> รายการหัก</h4>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:0.9em;">
+                        <span>ค่าเช่ารายวัน (Pro-rated)</span><span>${s.pro_rated_rent.toLocaleString()} บาท</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:0.9em;">
+                        <span>ค่าน้ำ-ไฟงวดสุดท้าย</span><span>${(s.electricity_amount + s.water_amount).toLocaleString()} บาท</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:0.9em;">
+                        <span>ยอดค้างชำระเดิม</span><span>${s.unpaid_invoices_amount.toLocaleString()} บาท</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:0.9em;">
+                        <span>ค่าทำความสะอาด</span><span>${s.cleaning_fee.toLocaleString()} บาท</span>
+                    </div>
+                    ${s.damage_fee > 0 ? `<div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:0.9em;"><span>ค่าเสียหาย</span><span>${s.damage_fee.toLocaleString()} บาท</span></div>` : ''}
+                    ${s.other_fees > 0 ? `<div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:0.9em;"><span>อื่นๆ</span><span>${s.other_fees.toLocaleString()} บาท</span></div>` : ''}
+                </div>
+
+                <div style="border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:15px;">
+                    <h4 style="margin-top:0;"><i class="fa-solid fa-plus-circle" style="color:var(--success);"></i> เงินมัดจำ</h4>
+                    <div style="display:flex; justify-content:space-between; font-weight:700;">
+                        <span>ยอดเงินมัดจำรวมที่บันทึกไว้</span><span>${s.security_deposit_amount.toLocaleString()} บาท</span>
+                    </div>
+                </div>
+
+                <div style="background:#f0f7ff; padding:15px; border-radius:12px; display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <div style="font-size:0.85em; color:var(--text-muted);">${s.final_balance >= 0 ? 'ยอดที่คืนให้ผู้เช่า' : 'ยอดที่ผู้เช่าต้องจ่ายเพิ่ม'}</div>
+                        <div style="font-weight:700; color:var(--primary); font-size:0.85em;">วิธีคืน: ${s.refund_method}</div>
+                    </div>
+                    <div style="font-size:1.5em; font-weight:800; color:${s.final_balance >= 0 ? 'var(--success)' : 'var(--danger)'};">
+                        ${s.final_balance >= 0 ? '+' : ''}${s.final_balance.toLocaleString()} บาท
+                    </div>
+                </div>
+
+                ${s.notes ? `<div style="margin-top:15px; font-size:0.85em; color:var(--text-muted);"><strong>หมายเหตุ:</strong> ${s.notes}</div>` : ''}
+                ${s.refund_receipt_img ? `<div style="margin-top:15px;"><a href="${s.refund_receipt_img}" target="_blank" class="btn btn-outline" style="width:100%; justify-content:center;"><i class="fa-solid fa-image"></i> ดูหลักฐานการคืนเงิน (สลิป)</a></div>` : ''}
+            `;
+            modal.style.display = 'block';
         }
 
         function renderRepairRows(data) {
