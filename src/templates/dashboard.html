@@ -987,6 +987,20 @@
             <div class="section-header">
                 <h2><i class="fa-solid fa-sliders"></i> ตั้งค่าระบบ (System Settings)</h2>
             </div>
+
+            <!-- Move-in Fees Configuration -->
+            <div style="margin-bottom: 30px; border-bottom: 2px solid var(--border); padding-bottom: 30px;">
+                <div class="section-header">
+                    <h2 style="font-size: 1.1em; color: var(--primary);"><i class="fa-solid fa-hand-holding-dollar"></i> ตั้งค่าเงินแรกเข้า (Move-in Fees)</h2>
+                    <button class="btn btn-outline" style="padding: 5px 15px;" onclick="addFeeField()"><i class="fa-solid fa-plus"></i> เพิ่มรายการ</button>
+                </div>
+                <p style="font-size: 0.85em; color: var(--text-muted); margin-bottom: 15px;">กำหนดค่าธรรมเนียมที่เรียกเก็บครั้งแรกเมื่อย้ายเข้า (เช่น ค่าประกัน, ค่าเช่าล่วงหน้า)</p>
+                <div id="fee_container" style="max-width: 700px;">
+                    <!-- Filled by JS -->
+                </div>
+                <button class="btn btn-primary" style="margin-top: 20px;" onclick="saveMoveInFees()"><i class="fa-solid fa-save"></i> บันทึกรายการเงินแรกเข้า</button>
+            </div>
+
             <form id="settingsForm" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px;">
                 <div class="left-col">
                     <div class="form-group">
@@ -1113,16 +1127,6 @@
                 </div>
             </div>
 
-            <!-- Move-in Fees Configuration -->
-            <div style="margin-top: 30px; border-top: 2px solid var(--border); padding-top: 30px;">
-                <div class="section-header">
-                    <h2><i class="fa-solid fa-hand-holding-dollar"></i> ตั้งค่าเงินแรกเข้า (Move-in Fees)</h2>
-                    <button class="btn btn-outline" onclick="addFeeField()"><i class="fa-solid fa-plus"></i> เพิ่มรายการ</button>
-                </div>
-                <div id="fee_container" style="max-width: 700px;">
-                    <!-- Filled by JS -->
-                </div>
-                <button class="btn btn-primary" style="margin-top: 20px;" onclick="saveMoveInFees()"><i class="fa-solid fa-save"></i> บันทึกรายการเงินแรกเข้า</button>
             </div>
         </div>
 
@@ -1147,6 +1151,7 @@
                     </tbody>
                 </table>
             </div>
+            <div id="leasePagination" style="display:flex; justify-content:center; gap:5px; margin-top:20px; padding:10px;"></div>
         </div>
     </div>
 
@@ -2225,12 +2230,14 @@
             if (res.ok) alert('บันทึกเทมเพลตสัญญาเช่าเรียบร้อยแล้ว');
         }
 
-        async function loadLeases() {
-            const res = await fetch('/admin/leases/list');
+        let currentLeasePage = 1;
+        async function loadLeases(page = 1) {
+            currentLeasePage = page;
+            const res = await fetch(`/admin/leases/list?page=${page}&page_size=10`);
             const data = await res.json();
             const list = document.getElementById('leaseList');
             if (list) {
-                list.innerHTML = data.map(l => `
+                list.innerHTML = data.items.map(l => `
                     <tr>
                         <td style="font-weight:700;">${l.room_number}</td>
                         <td>${l.tenant_name}</td>
@@ -2258,6 +2265,20 @@
                         </td>
                     </tr>
                 `).join('') || '<tr><td colspan="5" style="text-align:center; padding: 40px; color: var(--text-muted);"><i class="fa-solid fa-file-circle-exclamation" style="font-size: 3em; margin-bottom: 15px; display: block; color: #d1d5db;"></i>ยังไม่มีข้อมูลสัญญาเช่าที่บันทึกในระบบ</td></tr>';
+                
+                // Pagination Controls
+                const pagination = document.getElementById('leasePagination');
+                if (pagination) {
+                    let html = '';
+                    if (data.total_pages > 1) {
+                        html = `
+                            <button class="btn btn-outline" ${data.current_page === 1 ? 'disabled' : ''} onclick="loadLeases(${data.current_page - 1})">ก่อนหน้า</button>
+                            <span style="margin: 0 15px; align-self: center;">หน้า ${data.current_page} จาก ${data.total_pages}</span>
+                            <button class="btn btn-outline" ${data.current_page === data.total_pages ? 'disabled' : ''} onclick="loadLeases(${data.current_page + 1})">ถัดไป</button>
+                        `;
+                    }
+                    pagination.innerHTML = html;
+                }
             }
         }
 

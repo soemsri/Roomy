@@ -994,7 +994,8 @@ async def admin_dashboard(
 @app.post("/admin/registration/{tenant_id}/approve")
 async def approve_registration(tenant_id: int, room_ids: str = Form(...), db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
     tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
-    if not tenant: raise HTTPException(status_code=404, detail="Tenant not found")
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
     
     id_list = [int(rid.strip()) for rid in room_ids.split(",") if rid.strip()]
     if not id_list:
@@ -1005,6 +1006,12 @@ async def approve_registration(tenant_id: int, room_ids: str = Form(...), db: Se
     
     success_rooms = []
     first_iter = True
+    
+    # Initialize grand totals for multiple rooms
+    g_total = 0.0
+    g_deposit = 0.0
+    g_advance = 0.0
+    g_other = 0.0
     
     for rid in id_list:
         room = db.query(models.Room).filter(models.Room.id == rid).first()
@@ -1028,30 +1035,37 @@ async def approve_registration(tenant_id: int, room_ids: str = Form(...), db: Se
         target_tenant.current_room_id = room.id
         room.status = "Occupied"
         
-        # Calculate Initial Fees
-        security_deposit = room.base_rent
-        advance_rent = room.base_rent
+        # Calculate Initial Fees - ONLY from config
+        security_deposit = 0.0
+        advance_rent = 0.0
+        applied_fees = []
+        room_total = 0.0
+        fees_text = ""
         
-        applied_fees = [
-            {"name": "ค่าประกัน", "amount": security_deposit},
-            {"name": "ค่าเช่าล่วงหน้า", "amount": advance_rent}
-        ]
-        total_initial = security_deposit + advance_rent
-        fees_text = f"<li>ค่าประกัน: {security_deposit:,.2f} บาท</li><li>ค่าเช่าล่วงหน้า: {advance_rent:,.2f} บาท</li>"
-        
-        # Add additional fees from config
         if owner and owner.move_in_fees_config:
             try:
                 config = json.loads(owner.move_in_fees_config)
                 for f in config:
                     amt = f['value'] * room.base_rent if f.get('is_multiplier') else f['value']
                     applied_fees.append({"name": f['name'], "amount": amt})
-                    total_initial += amt
+                    room_total += amt
                     fees_text += f"<li>{f['name']}: {amt:,.2f} บาท</li>"
-            except: pass
+                    
+                    if "ประกัน" in f['name']:
+                        security_deposit += amt
+                    elif "ล่วงหน้า" in f['name']:
+                        advance_rent += amt
+            except:
+                pass
         
         if fees_text:
-            fees_text = f"<ul>{fees_text}</ul><p><strong>รวมเงินมัดจำและค่าแรกเข้า: {total_initial:,.2f} บาท</strong></p>"
+            fees_text = f"<ul>{fees_text}</ul><p><strong>รวมเงินมัดจำและค่าแรกเข้าห้อง {room.room_number}: {room_total:,.2f} บาท</strong></p>"
+
+        # Accumulate totals
+        g_deposit += security_deposit
+        g_advance += advance_rent
+        g_other += (room_total - security_deposit - advance_rent)
+        g_total += room_total
 
         lease_content = ""
         if owner and owner.lease_template:
@@ -1081,11 +1095,7 @@ async def approve_registration(tenant_id: int, room_ids: str = Form(...), db: Se
             
         target_tenant.status = "Active"
         success_rooms.append(room.room_number)
-        
-        # Setup Personal Rich Menu (1-Click) - Only needed for the primary/original one usually, 
-        # but safe to run for all to ensure they have the right view.
         setup_personal_rich_menu(target_tenant, db)
-        
         first_iter = False
 
     if not success_rooms:
@@ -1093,36 +1103,41 @@ async def approve_registration(tenant_id: int, room_ids: str = Form(...), db: Se
         
     db.commit()
     
-    # Notify tenant with detailed breakdown
+    # Notify tenant via LINE
     if line_bot_api:
         from linebot.models import TextSendMessage
         rooms_str = ", ".join(success_rooms)
         try:
             msg = f"ยินดีด้วย! การลงทะเบียนเข้าพักห้อง {rooms_str} ของคุณได้รับการอนุมัติแล้ว\n\n"
-            msg += f"ยอดเงินแรกเข้าที่ต้องชำระ:\n"
-            msg += f"- ค่าประกัน: {security_deposit:,.2f} บาท\n"
-            msg += f"- ค่าเช่าล่วงหน้า: {advance_rent:,.2f} บาท\n"
+            msg += f"ยอดเงินแรกเข้าที่ต้องชำระ (รวม {len(success_rooms)} ห้อง):\n"
+            msg += f"- ค่าประกันรวม: {g_deposit:,.2f} บาท\n"
+            msg += f"- ค่าเช่าล่วงหน้ารวม: {g_advance:,.2f} บาท\n"
             
-            # Show other fees if any
-            other_fees_total = total_initial - security_deposit - advance_rent
-            if other_fees_total > 0:
-                msg += f"- ค่าธรรมเนียมอื่นๆ: {other_fees_total:,.2f} บาท\n"
+            if g_other > 0:
+                msg += f"- ค่าธรรมเนียมอื่นๆ: {g_other:,.2f} บาท\n"
             
-            msg += f"รวมทั้งสิ้น: {total_initial:,.2f} บาท\n\n"
+            msg += f"รวมทั้งสิ้น: {g_total:,.2f} บาท\n\n"
             msg += f"กรุณาชำระเงินและแจ้งหลักฐานการโอนที่เมนู 'ข้อมูลที่พัก' ของคุณ"
             line_bot_api.push_message(tenant.line_user_id, TextSendMessage(text=msg))
-        except: pass
+        except:
+            pass
         
     return {"status": "Success"}
 
 @app.get("/admin/leases/list")
-async def list_leases(db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+async def list_leases(page: int = 1, page_size: int = 10, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
     from sqlalchemy.orm import joinedload
-    # Use joinedload to ensure relationships are loaded efficiently
-    leases = db.query(models.Lease).options(
+    
+    query = db.query(models.Lease).options(
         joinedload(models.Lease.room),
         joinedload(models.Lease.tenant)
-    ).order_by(models.Lease.id.desc()).all()
+    )
+    
+    total_count = query.count()
+    total_pages = (total_count + page_size - 1) // page_size if page_size > 0 else 1
+    
+    leases = query.order_by(models.Lease.id.desc())\
+        .offset((page - 1) * page_size).limit(page_size).all()
     
     results = []
     for l in leases:
@@ -1141,12 +1156,20 @@ async def list_leases(db: Session = Depends(get_db), admin: bool = Depends(get_a
                 "tenant_name": l.tenant.full_name if l.tenant else "N/A",
                 "tenant_id": l.tenant_id,
                 "start_date": s_date.strftime("%d/%m/%Y") if s_date else "-",
-                "status": l.status
+                "status": l.status,
+                "initial_payment_status": l.initial_payment_status
             })
         except Exception as e:
             print(f"Error processing lease {l.id}: {e}")
             continue
-    return results
+            
+    return {
+        "items": results,
+        "total_count": total_count,
+        "total_pages": total_pages,
+        "current_page": page,
+        "page_size": page_size
+    }
 
 @app.get("/admin/leases/{lease_id}/view", response_class=HTMLResponse)
 async def view_lease_contract(lease_id: int, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
@@ -1381,9 +1404,14 @@ async def confirm_settlement(
     total_deductions = pro_rated_rent + elec_amt + water_amt + unpaid_amt + cleaning_fee + damage_fee + other_fees
     advance_rent = lease.advance_rent_amount if lease else 0
     
+    # Determine room_id: use tenant's current room, or fall back to lease's room
+    final_room_id = tenant.current_room_id
+    if not final_room_id and lease:
+        final_room_id = lease.room_id
+
     settlement = models.Settlement(
         tenant_id=tenant.id,
-        room_id=tenant.current_room_id,
+        room_id=final_room_id,
         lease_id=lease.id if lease else None,
         pro_rated_rent=pro_rated_rent,
         electricity_amount=elec_amt,
