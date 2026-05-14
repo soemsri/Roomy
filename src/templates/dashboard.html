@@ -980,6 +980,7 @@
                     </tbody>
                 </table>
             </div>
+            <div id="historyPagination" style="display:flex; justify-content:center; gap:5px; margin-top:20px; padding:10px;"></div>
         </div>
 
         <!-- System Settings -->
@@ -1708,21 +1709,23 @@
             });
         }
 
-        async function loadTenantHistory() {
+        let currentHistoryPage = 1;
+        async function loadTenantHistory(page = 1) {
+            currentHistoryPage = page;
             const list = document.getElementById('tenantHistoryList');
             if (!list) return;
             list.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px;">กำลังโหลดข้อมูล...</td></tr>';
 
             try {
-                const res = await fetch('/admin/tenants/history');
+                const res = await fetch(`/admin/tenants/history?page=${page}&page_size=10`);
                 const data = await res.json();
                 
-                if (data.length === 0) {
+                if (data.items.length === 0) {
                     list.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:40px; color:var(--text-muted);"><i class="fa-solid fa-clock-rotate-left" style="font-size:3em; margin-bottom:15px; display:block; color:#d1d5db;"></i>ยังไม่มีประวัติการย้ายออก</td></tr>';
                     return;
                 }
 
-                list.innerHTML = data.map(h => `
+                list.innerHTML = data.items.map(h => `
                     <tr>
                         <td style="font-weight:700; color:var(--primary);">${h.room_number}</td>
                         <td style="font-weight:600;">${h.full_name}</td>
@@ -1745,6 +1748,20 @@
                         </td>
                     </tr>
                 `).join('');
+
+                // Pagination Controls
+                const pagination = document.getElementById('historyPagination');
+                if (pagination) {
+                    let html = '';
+                    if (data.total_pages > 1) {
+                        html = `
+                            <button class="btn btn-outline" ${data.current_page === 1 ? 'disabled' : ''} onclick="loadTenantHistory(${data.current_page - 1})">ก่อนหน้า</button>
+                            <span style="margin: 0 15px; align-self: center;">หน้า ${data.current_page} จาก ${data.total_pages}</span>
+                            <button class="btn btn-outline" ${data.current_page === data.total_pages ? 'disabled' : ''} onclick="loadTenantHistory(${data.current_page + 1})">ถัดไป</button>
+                        `;
+                    }
+                    pagination.innerHTML = html;
+                }
             } catch (e) {
                 list.innerHTML = '<tr><td colspan="5" style="color:var(--danger); text-align:center;">ไม่สามารถโหลดข้อมูลได้: ' + e + '</td></tr>';
             }

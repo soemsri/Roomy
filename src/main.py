@@ -2484,17 +2484,21 @@ async def delete_resident(resident_id: int, db: Session = Depends(get_db), admin
     return {"status": "Success"}
 
 @app.get("/admin/tenants/history")
-async def get_tenant_history(db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
-    history = db.query(models.TenantHistory).order_by(models.TenantHistory.end_date.desc()).all()
+async def get_tenant_history(page: int = 1, page_size: int = 10, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+    query = db.query(models.TenantHistory)
+    
+    total_count = query.count()
+    total_pages = (total_count + page_size - 1) // page_size if page_size > 0 else 1
+    
+    history = query.order_by(models.TenantHistory.end_date.desc())\
+        .offset((page - 1) * page_size).limit(page_size).all()
+        
     results = []
     for h in history:
         # Try to find the settlement for this tenant history record
-        # We can match by tenant_uuid and settlement_date roughly or just find the latest settlement for that tenant
         tenant = db.query(models.Tenant).filter(models.Tenant.uuid == h.tenant_uuid).first()
         settlement_data = None
         if tenant:
-            # Find settlement that happened around the same time as h.end_date
-            # or just the most recent settlement for this tenant
             settlement = db.query(models.Settlement).filter(
                 models.Settlement.tenant_id == tenant.id
             ).order_by(models.Settlement.settlement_date.desc()).first()
@@ -2513,6 +2517,7 @@ async def get_tenant_history(db: Session = Depends(get_db), admin: bool = Depend
                     "other_fees": settlement.other_fees,
                     "total_deductions": settlement.total_deductions,
                     "security_deposit_amount": settlement.security_deposit_amount,
+                    "advance_rent_amount": getattr(settlement, 'advance_rent_amount', 0),
                     "final_balance": settlement.final_balance,
                     "refund_method": settlement.refund_method,
                     "refund_receipt_img": settlement.refund_receipt_img,
@@ -2529,7 +2534,14 @@ async def get_tenant_history(db: Session = Depends(get_db), admin: bool = Depend
             "residents": json.loads(h.residents_json) if h.residents_json else [],
             "settlement": settlement_data
         })
-    return results
+        
+    return {
+        "items": results,
+        "total_count": total_count,
+        "total_pages": total_pages,
+        "current_page": page,
+        "page_size": page_size
+    }
 
 @app.get("/admin/tenants/search")
 async def search_tenants(q: str = "", db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
