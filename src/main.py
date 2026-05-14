@@ -1360,8 +1360,9 @@ async def confirm_settlement(
     if not tenant: raise HTTPException(status_code=404, detail="Tenant not found")
     
     lease = db.query(models.Lease).filter(models.Lease.tenant_id == tenant.id, models.Lease.status == "Active").first()
-    if not lease: raise HTTPException(status_code=400, detail="No active lease found")
-
+    # if not lease: raise HTTPException(status_code=400, detail="No active lease found")
+    # Allow proceeding without lease for legacy data, but some features might be limited
+    
     # Save Receipt Image
     receipt_url = None
     if receipt:
@@ -1378,12 +1379,12 @@ async def confirm_settlement(
     # final_balance = (Security Deposit + Advance Rent Credit) - Deductions
     
     total_deductions = pro_rated_rent + elec_amt + water_amt + unpaid_amt + cleaning_fee + damage_fee + other_fees
-    advance_rent = lease.advance_rent_amount or 0
+    advance_rent = lease.advance_rent_amount if lease else 0
     
     settlement = models.Settlement(
         tenant_id=tenant.id,
         room_id=tenant.current_room_id,
-        lease_id=lease.id,
+        lease_id=lease.id if lease else None,
         pro_rated_rent=pro_rated_rent,
         electricity_amount=elec_amt,
         water_amount=water_amt,
@@ -1402,20 +1403,26 @@ async def confirm_settlement(
     db.add(settlement)
     
     # Close Lease and Room
-    lease.status = "Closed"
-    lease.end_date = datetime.now()
+    if lease:
+        lease.status = "Closed"
+        lease.end_date = datetime.now()
     
     room = tenant.room
     if room:
         room.status = "Vacant"
         
+    # Determine start_date with fallback
+    hist_start_date = datetime.now()
+    if lease and lease.start_date:
+        hist_start_date = lease.start_date
+
     # Preservation of History
     history = models.TenantHistory(
         room_number=room.room_number if room else "N/A",
         tenant_uuid=tenant.uuid,
         full_name=tenant.full_name,
         phone_number=tenant.phone_number,
-        start_date=lease.start_date,
+        start_date=hist_start_date,
         end_date=datetime.now(),
         residents_json=json.dumps([{"nickname": r.nickname, "full_name": f"{r.first_name} {r.last_name}"} for r in tenant.residents])
     )

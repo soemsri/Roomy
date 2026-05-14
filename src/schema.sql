@@ -120,7 +120,7 @@ CREATE TABLE settlements (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     tenant_id INTEGER NOT NULL,
     room_id INTEGER NOT NULL,
-    lease_id INTEGER NOT NULL,
+    lease_id INTEGER, -- Optional for legacy data
     settlement_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     pro_rated_rent REAL DEFAULT 0.0,
     electricity_units REAL DEFAULT 0.0,

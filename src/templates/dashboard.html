@@ -3023,24 +3023,17 @@
             const tid = document.getElementById('st_tenant_id').value;
             const formData = new FormData();
             
-            formData.append('pro_rated_rent', document.getElementById('st_pro_rated_rent').value);
-            formData.append('elec_amt', 0); // Logic moved to util_amt but for API compatibility...
-            formData.append('water_amt', document.getElementById('st_util_amt').value); // Using water_amt as combined util for now or update API
-            // Better: update confirmed API to take combined or separate. Let's send as is for now.
-            
-            // Refined send for the API we just wrote:
-            // Since we combined them in UI for simplicity, let's split them back or update the UI to have separate fields.
-            // Actually, I wrote the API to take separate elec_amt and water_amt. Let's fix UI or API.
-            // I'll send combined as water_amt and 0 as elec_amt for now, or just send what's in the fields.
-            
+            const getVal = (id) => document.getElementById(id).value || 0;
+
+            formData.append('pro_rated_rent', getVal('st_pro_rated_rent'));
             formData.append('elec_amt', 0); 
-            formData.append('water_amt', document.getElementById('st_util_amt').value);
-            formData.append('unpaid_amt', document.getElementById('st_unpaid_amt').value);
-            formData.append('cleaning_fee', document.getElementById('st_cleaning_fee').value);
-            formData.append('damage_fee', document.getElementById('st_damage_fee').value);
-            formData.append('other_fees', document.getElementById('st_other_fees').value);
-            formData.append('deposit_amt', document.getElementById('st_deposit_amt').value);
-            formData.append('final_balance', document.getElementById('st_final_balance').value);
+            formData.append('water_amt', getVal('st_util_amt'));
+            formData.append('unpaid_amt', getVal('st_unpaid_amt'));
+            formData.append('cleaning_fee', getVal('st_cleaning_fee'));
+            formData.append('damage_fee', getVal('st_damage_fee'));
+            formData.append('other_fees', getVal('st_other_fees'));
+            formData.append('deposit_amt', getVal('st_deposit_amt'));
+            formData.append('final_balance', getVal('st_final_balance'));
             formData.append('refund_method', document.getElementById('st_refund_method').value);
             formData.append('notes', document.getElementById('st_notes').value);
             
@@ -3054,7 +3047,8 @@
                 alert('ปิดบัญชีและย้ายออกเรียบร้อยแล้ว');
                 location.reload();
             } else {
-                alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+                const err = await res.json();
+                alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล: ' + (err.detail || 'ไม่ทราบสาเหตุ'));
             }
         };
         async function confirmCash(id) {

@@ -166,7 +166,7 @@ class Settlement(Base):
     id = Column(Integer, primary_key=True, index=True)
     tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
     room_id = Column(Integer, ForeignKey("rooms.id"), nullable=False)
-    lease_id = Column(Integer, ForeignKey("leases.id"), nullable=False)
+    lease_id = Column(Integer, ForeignKey("leases.id")) # Optional for legacy data
     settlement_date = Column(DateTime, server_default=func.now())
     
     # Financial Details
