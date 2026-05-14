@@ -4,15 +4,42 @@
     <title>ใบแจ้งหนี้ - SukAnan Apartment</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        body { font-family: sans-serif; padding: 20px; background: #f4f4f4; }
-        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .header { border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px; }
-        .row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }
-        .total { font-size: 1.5em; font-weight: bold; color: #2c3e50; }
-        .btn { display: block; width: 100%; padding: 15px; background: #27ae60; color: white; text-align: center; text-decoration: none; border-radius: 5px; margin-top: 20px; font-weight: bold; }
-        .btn-cash { background: #95a5a6; margin-top: 10px; }
-        .qr-section { text-align: center; margin-top: 20px; display: none; }
-        #qr-code { width: 200px; height: 200px; }
+        * { box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 15px; background: #f0f2f5; color: #1c1e21; }
+        .card { max-width: 500px; margin: 0 auto; background: white; padding: 25px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .header { text-align: center; border-bottom: 2px solid #f0f2f5; padding-bottom: 15px; margin-bottom: 20px; }
+        .header h2 { margin: 0; color: #0078d4; font-size: 1.5em; }
+        .header p { margin: 5px 0 0; color: #65676b; font-weight: 600; }
+        
+        .row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f0f2f5; font-size: 0.95em; }
+        .row:last-of-type { border-bottom: none; }
+        .row span:first-child { color: #65676b; }
+        .row span:last-child { font-weight: 600; text-align: right; }
+        
+        .total { font-size: 1.3em; font-weight: 800 !important; color: #1c1e21; border-top: 2px solid #f0f2f5; margin-top: 10px; padding-top: 20px; }
+        .total span:last-child { color: #0078d4; }
+        
+        .btn { 
+            display: flex; justify-content: center; align-items: center; width: 100%; padding: 16px; 
+            background: #0078d4; color: white; text-align: center; text-decoration: none; 
+            border-radius: 12px; margin-top: 15px; font-weight: 700; border: none; cursor: pointer;
+            transition: opacity 0.2s; font-size: 1em;
+        }
+        .btn:active { opacity: 0.8; }
+        .btn-cash { background: #65676b; }
+        
+        .qr-section { text-align: center; margin-top: 25px; display: none; animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        #qr-image { width: 100%; max-width: 250px; height: auto; border: 1px solid #ddd; padding: 10px; border-radius: 12px; margin: 15px 0; }
+        
+        #upload-form { text-align: left; padding: 20px; background: #f7f8fa; border: 2px dashed #ccd0d5; border-radius: 12px; margin-top: 20px; }
+        #upload-form label { font-size: 0.9em; display: block; margin-bottom: 10px; font-weight: 700; color: #1c1e21; }
+        #slip-file { margin-bottom: 15px; font-size: 0.9em; width: 100%; }
+        
+        .status-badge { display: inline-block; padding: 6px 12px; border-radius: 20px; font-size: 0.8em; font-weight: 700; margin-top: 10px; }
+        .status-unpaid { background: #fff1f0; color: #d93025; }
+        .status-paid { background: #e6fffa; color: #00875a; }
     </style>
 </head>
 <body>
@@ -20,6 +47,11 @@
         <div class="header">
             <h2>ห้อง {{ room_number }}</h2>
             <p>รอบบิล: {{ month }}/{{ year }}</p>
+            {% if status == 'Paid' %}
+                <span class="status-badge status-paid"><i class="fa-solid fa-circle-check"></i> ชำระเงินแล้ว</span>
+            {% elif status == 'Unpaid' %}
+                <span class="status-badge status-unpaid">ค้างชำระ</span>
+            {% endif %}
         </div>
         
         <div class="row">
@@ -32,10 +64,8 @@
                 <span>ค่าไฟ (Electricity)</span>
                 <span>{{ "{:,.2f}".format(electricity_amount) }} บาท</span>
             </div>
-            <div style="font-size: 0.85em; color: #7f8c8d; margin-top: 4px;">
-                เลขมิเตอร์: {{ electricity_reading }} - {{ prev_electricity_reading or 0 }} 
-                = {{ (electricity_reading - (prev_electricity_reading or 0)) | round(2) }} หน่วย 
-                (@ {{ room.electricity_rate }} บาท)
+            <div style="font-size: 0.8em; color: #65676b; margin-top: 4px; background: #f0f2f5; padding: 4px 8px; border-radius: 4px; width: 100%;">
+                มิเตอร์: {{ prev_electricity_reading or 0 }} → {{ electricity_reading }} ({{ (electricity_reading - (prev_electricity_reading or 0)) | round(2) }} หน่วย)
             </div>
         </div>
 
@@ -44,10 +74,8 @@
                 <span>ค่าน้ำ (Water)</span>
                 <span>{{ "{:,.2f}".format(water_amount) }} บาท</span>
             </div>
-            <div style="font-size: 0.85em; color: #7f8c8d; margin-top: 4px;">
-                เลขมิเตอร์: {{ water_reading }} - {{ prev_water_reading or 0 }} 
-                = {{ (water_reading - (prev_water_reading or 0)) | round(2) }} หน่วย 
-                (@ {{ room.water_rate }} บาท)
+            <div style="font-size: 0.8em; color: #65676b; margin-top: 4px; background: #f0f2f5; padding: 4px 8px; border-radius: 4px; width: 100%;">
+                มิเตอร์: {{ prev_water_reading or 0 }} → {{ water_reading }} ({{ (water_reading - (prev_water_reading or 0)) | round(2) }} หน่วย)
             </div>
         </div>
 
@@ -62,62 +90,67 @@
         {% endif %}
 
         {% if late_fee and late_fee > 0 %}
-        <div class="row" style="color: #e74c3c;">
+        <div class="row" style="color: #d93025; font-weight: 600;">
             <span>ค่าปรับจ่ายช้า</span>
             <span>{{ "{:,.2f}".format(late_fee) }} บาท</span>
         </div>
         {% endif %}
         
         <div class="row total">
-            <span>รวมทั้งสิ้น</span>
+            <span>รวมที่ต้องชำระ</span>
             <span>{{ "{:,.2f}".format(total_amount) }} บาท</span>
         </div>
 
         {% if status == 'Unpaid' %}
             {% if qr_enabled == 1 %}
-            <a href="#" class="btn" id="pay-qr">ชำระด้วย QR PromptPay</a>
+            <button class="btn" id="pay-qr">ชำระด้วย QR PromptPay</button>
             {% endif %}
-            <a href="#" class="btn btn-cash" onclick="alert('กรุณาชำระเงินสดที่เคาน์เตอร์ออฟฟิศ')">ชำระด้วยเงินสด</a>
+            <button class="btn btn-cash" id="pay-cash-btn" onclick="alert('กรุณาชำระเงินสดที่ออฟฟิศ และขอรับใบเสร็จตัวจริง')">ชำระด้วยเงินสด</button>
         {% elif status == 'Pending Verification' %}
-            <div class="btn" style="background: #f39c12;">รอตรวจสอบการชำระเงิน</div>
-            <p style="text-align: center; color: #7f8c8d; font-size: 0.8em; margin-top: 10px;">เจ้าหน้าที่กำลังตรวจสอบสลิปของคุณ</p>
+            <div class="btn" style="background: #f39c12; cursor: default;">รอตรวจสอบการชำระเงิน</div>
+            <p style="text-align: center; color: #65676b; font-size: 0.85em; margin-top: 15px; line-height: 1.4;">เราได้รับสลิปของคุณแล้ว<br>เจ้าหน้าที่กำลังตรวจสอบข้อมูลครับ</p>
         {% elif status == 'Draft' %}
-            <div class="btn" style="background: #95a5a6;">ยังไม่ออกใบแจ้งหนี้ (Draft)</div>
-            <p style="text-align: center; color: #7f8c8d; font-size: 0.8em; margin-top: 10px;">รายการนี้ยังอยู่ระหว่างการตรวจสอบโดยเจ้าหน้าที่</p>
+            <div class="btn" style="background: #ccd0d5; color: #65676b; cursor: default;">ยังไม่ออกใบแจ้งหนี้</div>
         {% elif status == 'Paid' %}
-            <div class="btn" style="background: #3498db;">ชำระเงินแล้ว</div>
+            <div class="btn" style="background: #00875a; cursor: default;">ชำระเงินเรียบร้อยแล้ว</div>
         {% else %}
-            <div class="btn" style="background: #3498db;">{{ status }}</div>
+            <div class="btn" style="background: #0078d4; cursor: default;">{{ status }}</div>
         {% endif %}
 
         <div class="qr-section" id="qr-container">
-            <p>สแกนเพื่อจ่ายเงิน</p>
+            <p style="margin: 0; font-weight: 700; color: #1c1e21;">สแกน QR Code เพื่อโอนเงิน</p>
             {% if promptpay_name %}
-            <p style="margin-top: -10px; color: #2c3e50; font-weight: bold;">ชื่อบัญชี: {{ promptpay_name }}</p>
+            <p style="margin: 5px 0; color: #0078d4; font-weight: 700; font-size: 1.1em;">ชื่อบัญชี: {{ promptpay_name }}</p>
             {% endif %}
             <img id="qr-image" src="" alt="PromptPay QR">
-            <p style="font-size: 0.8em; color: #7f8c8d; margin-top: 10px; margin-bottom: 15px;">หลังจากโอนแล้ว กรุณาแนบสลิปเพื่อยืนยัน</p>
+            <p style="font-size: 0.85em; color: #65676b; margin: 10px 0 20px; line-height: 1.4;">กรุณาตรวจสอบยอดเงินให้ตรงกับบิล<br>และแนบสลิปด้านล่างเพื่อแจ้งเจ้าหน้าที่</p>
             
-            <form id="upload-form" style="text-align: left; padding: 15px; border: 1px dashed #ccc; border-radius: 8px;">
-                <label style="font-size: 0.9em; display: block; margin-bottom: 8px; font-weight: bold;">แนบสลิปการโอนเงิน:</label>
-                <input type="file" id="slip-file" accept="image/*" required style="width: 100%; margin-bottom: 15px;">
-                <button type="submit" class="btn" style="background: #2980b9; margin-top: 0; padding: 10px;">ส่งสลิปยืนยัน</button>
+            <form id="upload-form">
+                <label>แนบสลิปการโอนเงิน (Image):</label>
+                <input type="file" id="slip-file" accept="image/*" required>
+                <button type="submit" class="btn" style="background: #0078d4; margin-top: 0;">ส่งสลิปยืนยัน</button>
             </form>
+            <button class="btn btn-outline" style="background:none; border:1px solid #ccd0d5; color:#65676b; margin-top:15px; padding:10px;" onclick="location.reload()">ย้อนกลับ</button>
         </div>
     </div>
 
     <script>
-        document.getElementById('pay-qr').addEventListener('click', function(e) {
-            e.preventDefault();
-            const payload = "{{ promptpay_payload }}";
-            if (payload) {
-                const qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=" + encodeURIComponent(payload);
-                document.getElementById('qr-image').src = qrUrl;
-                document.getElementById('qr-container').style.display = 'block';
-                this.style.display = 'none';
-                document.querySelector('.btn-cash').style.display = 'none';
-            }
-        });
+        const payQrBtn = document.getElementById('pay-qr');
+        if (payQrBtn) {
+            payQrBtn.addEventListener('click', function(e) {
+                const payload = "{{ promptpay_payload }}";
+                if (payload) {
+                    const qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" + encodeURIComponent(payload);
+                    document.getElementById('qr-image').src = qrUrl;
+                    document.getElementById('qr-container').style.display = 'block';
+                    this.style.display = 'none';
+                    const cashBtn = document.getElementById('pay-cash-btn');
+                    if (cashBtn) cashBtn.style.display = 'none';
+                    // Scroll to QR
+                    document.getElementById('qr-container').scrollIntoView({ behavior: 'smooth' });
+                }
+            });
+        }
 
         const uploadForm = document.getElementById('upload-form');
         if (uploadForm) {
