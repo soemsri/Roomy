@@ -335,8 +335,8 @@
                 <span class="nav-badge pulse">NEW</span>
                 {% endif %}
             </a>
-            <a href="#meterHistorySection" class="menu-item">
-                <i class="fa-solid fa-faucet-drip"></i> ประวัติมิเตอร์
+            <a href="#historySection" class="menu-item">
+                <i class="fa-solid fa-clock-rotate-left"></i> ประวัติ
             </a>
             <a href="#repairSection" class="menu-item">
                 <i class="fa-solid fa-screwdriver-wrench"></i> แจ้งซ่อม
@@ -345,7 +345,6 @@
                 {% endif %}
             </a>
             <a href="#tenantSection" class="menu-item"><i class="fa-solid fa-users"></i> ผู้เช่า</a>
-            <a href="#tenantHistorySection" class="menu-item"><i class="fa-solid fa-clock-rotate-left"></i> ประวัติการเข้าพัก</a>
             <a href="#settingsSection" class="menu-item"><i class="fa-solid fa-gears"></i> ตั้งค่าระบบ</a>
             <a href="/admin/logout" class="menu-item" style="margin-top: auto; color: var(--danger);"><i class="fa-solid fa-right-from-bracket"></i> ออกจากระบบ</a>
         </nav>
@@ -845,26 +844,61 @@
             </div>
         </div>
 
-        <!-- Meter History Section -->
-        <div class="section-card" id="meterHistorySection" style="margin-top: 30px;">
+        <!-- History Section -->
+        <div class="section-card" id="historySection" style="margin-top: 30px; display: none;">
             <div class="section-header">
-                <h2><i class="fa-solid fa-faucet-drip"></i> ประวัติมิเตอร์</h2>
-                <div style="display:flex; gap:5px;">
-                    <select id="history_room_filter" onchange="loadMeterHistory()" style="width: 100px; padding: 5px;">
-                        <option value="">ทั้งหมด</option>
-                        {% for room in all_rooms %}
-                        <option value="{{ room.id }}">{{ room.room_number }}</option>
-                        {% endfor %}
-                    </select>
-                    <button class="btn btn-outline" onclick="loadMeterHistory()" style="padding: 5px 10px;">ดู</button>
-                </div>
+                <h2><i class="fa-solid fa-clock-rotate-left"></i> ประวัติ</h2>
             </div>
-            <div class="table-container" style="max-height: 400px;">
-                <table id="meterHistoryTable">
-                    <tbody id="meterHistoryList">
-                        <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">เลือกห้องเพื่อดูประวัติ</td></tr>
-                    </tbody>
-                </table>
+            
+            <div class="tabs" style="margin-bottom: 20px;">
+                <div class="tab active" id="tab_history_meter" onclick="switchHistoryTab('meter')">ประวัติมิเตอร์</div>
+                <div class="tab" id="tab_history_tenant" onclick="switchHistoryTab('tenant')">ประวัติการเข้าพัก</div>
+            </div>
+
+            <!-- Meter History Content -->
+            <div id="meterHistoryContent">
+                <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3 style="margin:0; font-size: 1em; color: var(--secondary);">ประวัติมิเตอร์ (แยกตามห้อง)</h3>
+                    <div style="display:flex; gap:5px;">
+                        <select id="history_room_filter" onchange="loadMeterHistory()" style="width: 100px; padding: 5px;">
+                            <option value="">ทั้งหมด</option>
+                            {% for room in all_rooms %}
+                            <option value="{{ room.id }}">{{ room.room_number }}</option>
+                            {% endfor %}
+                        </select>
+                        <button class="btn btn-outline" onclick="loadMeterHistory()" style="padding: 5px 10px;">ดู</button>
+                    </div>
+                </div>
+                <div class="table-container" style="max-height: 400px;">
+                    <table id="meterHistoryTable">
+                        <tbody id="meterHistoryList">
+                            <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">เลือกห้องเพื่อดูประวัติ</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div id="meterHistoryPagination" style="display:flex; justify-content:center; gap:5px; margin-top:20px; padding:10px;"></div>
+            </div>
+
+            <!-- Tenant History Content -->
+            <div id="tenantHistoryContent" style="display: none;">
+                <h3 style="margin-bottom:15px; font-size: 1em; color: var(--secondary);">ประวัติการเข้าพัก (อดีตผู้เช่า)</h3>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ห้อง</th>
+                                <th>ชื่อ-นามสกุล</th>
+                                <th>วันที่เข้า/ออก</th>
+                                <th>ยอดปิดบัญชี</th>
+                                <th>รายละเอียด</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tenantHistoryList">
+                            <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">กำลังโหลดข้อมูล...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div id="historyPagination" style="display:flex; justify-content:center; gap:5px; margin-top:20px; padding:10px;"></div>
             </div>
         </div>
 
@@ -957,30 +991,6 @@
                     </tbody>
                 </table>
             </div>
-        </div>
-
-        <!-- Move-out History Section -->
-        <div class="section-card" id="tenantHistorySection" style="margin-top: 30px; display: none;">
-            <div class="section-header">
-                <h2><i class="fa-solid fa-clock-rotate-left"></i> ประวัติการเข้าพัก (อดีตผู้เช่า)</h2>
-            </div>
-            <div class="table-container">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>ห้อง</th>
-                            <th>ชื่อ-นามสกุล</th>
-                            <th>วันที่เข้า/ออก</th>
-                            <th>ยอดปิดบัญชี</th>
-                            <th>รายละเอียด</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tenantHistoryList">
-                        <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">กำลังโหลดข้อมูล...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-            <div id="historyPagination" style="display:flex; justify-content:center; gap:5px; margin-top:20px; padding:10px;"></div>
         </div>
 
         <!-- System Settings -->
@@ -1698,7 +1708,10 @@
 
             if (sectionId === 'repairSection') loadRepairs();
             if (sectionId === 'leaseSection') loadLeases();
-            if (sectionId === 'tenantHistorySection') loadTenantHistory();
+            if (sectionId === 'historySection') {
+                loadMeterHistory();
+                loadTenantHistory();
+            }
 
             // Update Active Menu
             document.querySelectorAll('.menu-item').forEach(m => {
@@ -1707,6 +1720,15 @@
                     m.classList.add('active');
                 }
             });
+        }
+
+        function switchHistoryTab(type) {
+            const isMeter = type === 'meter';
+            document.getElementById('meterHistoryContent').style.display = isMeter ? 'block' : 'none';
+            document.getElementById('tenantHistoryContent').style.display = isMeter ? 'none' : 'block';
+            
+            document.getElementById('tab_history_meter').classList.toggle('active', isMeter);
+            document.getElementById('tab_history_tenant').classList.toggle('active', !isMeter);
         }
 
         let currentHistoryPage = 1;
@@ -1979,7 +2001,7 @@
                 pager = document.createElement('div');
                 pager.id = 'meterHistoryPagination';
                 pager.style.cssText = 'display:flex; justify-content:center; gap:5px; margin-top:20px; padding:10px;';
-                document.getElementById('meterHistorySection').appendChild(pager);
+                document.getElementById('historySection').appendChild(pager);
             }
 
             if (totalPages <= 1) {
