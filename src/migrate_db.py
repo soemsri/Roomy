@@ -55,6 +55,19 @@ def migrate():
         "CREATE TABLE IF NOT EXISTS leases (id INTEGER PRIMARY KEY AUTOINCREMENT, room_id INTEGER NOT NULL, tenant_id INTEGER NOT NULL, start_date DATETIME NOT NULL, end_date DATETIME, status TEXT DEFAULT 'Active', lease_content TEXT, initial_fees TEXT, FOREIGN KEY (room_id) REFERENCES rooms(id), FOREIGN KEY (tenant_id) REFERENCES tenants(id))",
         "ALTER TABLE leases ADD COLUMN lease_content TEXT",
         "ALTER TABLE leases ADD COLUMN initial_fees TEXT",
+        "ALTER TABLE leases ADD COLUMN security_deposit_amount REAL DEFAULT 0.0",
+        "ALTER TABLE leases ADD COLUMN advance_rent_amount REAL DEFAULT 0.0",
+        "ALTER TABLE leases ADD COLUMN initial_payment_status TEXT DEFAULT 'Pending'",
+        "ALTER TABLE leases ADD COLUMN initial_payment_method TEXT",
+        "ALTER TABLE leases ADD COLUMN initial_payment_date TIMESTAMP",
+        "ALTER TABLE leases ADD COLUMN initial_payment_receipt TEXT",
+
+        # Invoice pro-rata
+        "ALTER TABLE invoices ADD COLUMN is_pro_rata INTEGER DEFAULT 0",
+
+        # Settlements table
+        "CREATE TABLE IF NOT EXISTS settlements (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, room_id INTEGER NOT NULL, lease_id INTEGER NOT NULL, settlement_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, pro_rated_rent REAL DEFAULT 0.0, electricity_units REAL DEFAULT 0.0, electricity_amount REAL DEFAULT 0.0, water_units REAL DEFAULT 0.0, water_amount REAL DEFAULT 0.0, unpaid_invoices_amount REAL DEFAULT 0.0, cleaning_fee REAL DEFAULT 0.0, damage_fee REAL DEFAULT 0.0, other_fees REAL DEFAULT 0.0, total_deductions REAL DEFAULT 0.0, security_deposit_amount REAL DEFAULT 0.0, advance_rent_amount REAL DEFAULT 0.0, final_balance REAL DEFAULT 0.0, refund_method TEXT, refund_receipt_img TEXT, status TEXT DEFAULT 'Completed', notes TEXT, FOREIGN KEY (tenant_id) REFERENCES tenants(id), FOREIGN KEY (room_id) REFERENCES rooms(id), FOREIGN KEY (lease_id) REFERENCES leases(id))",
+        "ALTER TABLE settlements ADD COLUMN advance_rent_amount REAL DEFAULT 0.0",
 
         # Room uniqueness migration (building-scoped)
         "DROP INDEX IF EXISTS ix_rooms_room_number",

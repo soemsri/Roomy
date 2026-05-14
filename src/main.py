@@ -1029,9 +1029,17 @@ async def approve_registration(tenant_id: int, room_ids: str = Form(...), db: Se
         room.status = "Occupied"
         
         # Calculate Initial Fees
-        applied_fees = []
-        total_initial = 0
-        fees_text = ""
+        security_deposit = room.base_rent
+        advance_rent = room.base_rent
+        
+        applied_fees = [
+            {"name": "ค่าประกัน", "amount": security_deposit},
+            {"name": "ค่าเช่าล่วงหน้า", "amount": advance_rent}
+        ]
+        total_initial = security_deposit + advance_rent
+        fees_text = f"<li>ค่าประกัน: {security_deposit:,.2f} บาท</li><li>ค่าเช่าล่วงหน้า: {advance_rent:,.2f} บาท</li>"
+        
+        # Add additional fees from config
         if owner and owner.move_in_fees_config:
             try:
                 config = json.loads(owner.move_in_fees_config)
@@ -1064,7 +1072,10 @@ async def approve_registration(tenant_id: int, room_ids: str = Form(...), db: Se
                 tenant_id=target_tenant.id, 
                 start_date=start_date,
                 lease_content=lease_content,
-                initial_fees=json.dumps(applied_fees)
+                initial_fees=json.dumps(applied_fees),
+                security_deposit_amount=security_deposit,
+                advance_rent_amount=advance_rent,
+                initial_payment_status="Pending"
             )
             db.add(new_lease)
             
@@ -1082,12 +1093,24 @@ async def approve_registration(tenant_id: int, room_ids: str = Form(...), db: Se
         
     db.commit()
     
-    # Notify tenant
+    # Notify tenant with detailed breakdown
     if line_bot_api:
         from linebot.models import TextSendMessage
         rooms_str = ", ".join(success_rooms)
         try:
-            line_bot_api.push_message(tenant.line_user_id, TextSendMessage(text=f"ยินดีด้วย! การลงทะเบียนเข้าพักห้อง {rooms_str} ของคุณได้รับการอนุมัติแล้ว"))
+            msg = f"ยินดีด้วย! การลงทะเบียนเข้าพักห้อง {rooms_str} ของคุณได้รับการอนุมัติแล้ว\n\n"
+            msg += f"ยอดเงินแรกเข้าที่ต้องชำระ:\n"
+            msg += f"- ค่าประกัน: {security_deposit:,.2f} บาท\n"
+            msg += f"- ค่าเช่าล่วงหน้า: {advance_rent:,.2f} บาท\n"
+            
+            # Show other fees if any
+            other_fees_total = total_initial - security_deposit - advance_rent
+            if other_fees_total > 0:
+                msg += f"- ค่าธรรมเนียมอื่นๆ: {other_fees_total:,.2f} บาท\n"
+            
+            msg += f"รวมทั้งสิ้น: {total_initial:,.2f} บาท\n\n"
+            msg += f"กรุณาชำระเงินและแจ้งหลักฐานการโอนที่เมนู 'ข้อมูลที่พัก' ของคุณ"
+            line_bot_api.push_message(tenant.line_user_id, TextSendMessage(text=msg))
         except: pass
         
     return {"status": "Success"}
@@ -1219,13 +1242,18 @@ async def preview_settlement(tenant_id: int, db: Session = Depends(get_db), admi
     elec_amt = round(elec_units * (room.electricity_rate or 0), 2)
     water_amt = round(water_units * (room.water_rate or 0), 2)
     
-    # 3. Security Deposit (Total Move-in Fees)
+    # 3. Security Deposit & Advance Rent
     deposit = 0
-    if lease and lease.initial_fees:
-        try:
-            fees = json.loads(lease.initial_fees)
-            deposit = sum(float(f.get('amount', 0)) for f in fees)
-        except: pass
+    advance_rent = 0
+    if lease:
+        deposit = lease.security_deposit_amount or 0
+        advance_rent = lease.advance_rent_amount or 0
+        # Fallback to initial_fees if specific fields are empty (for old records)
+        if deposit == 0 and lease.initial_fees:
+            try:
+                fees = json.loads(lease.initial_fees)
+                deposit = sum(float(f.get('amount', 0)) for f in fees)
+            except: pass
         
     # 4. Unpaid Invoices
     unpaid_total = db.query(func.sum(models.Invoice.total_amount)).filter(
@@ -1247,7 +1275,67 @@ async def preview_settlement(tenant_id: int, db: Session = Depends(get_db), admi
         "water_units": water_units,
         "water_amount": water_amt,
         "unpaid_invoices": unpaid_total,
-        "security_deposit": deposit
+        "security_deposit": deposit,
+        "advance_rent": advance_rent
+    }
+
+@app.post("/admin/leases/{lease_id}/record-payment")
+async def record_initial_payment(
+    lease_id: int,
+    payment_method: str = Form(...),
+    receipt: UploadFile = File(None),
+    db: Session = Depends(get_db),
+    admin: bool = Depends(get_admin)
+):
+    lease = db.query(models.Lease).filter(models.Lease.id == lease_id).first()
+    if not lease: raise HTTPException(status_code=404, detail="Lease not found")
+    
+    receipt_url = None
+    if receipt and receipt.filename:
+        os.makedirs(uploads_dir, exist_ok=True)
+        ext = os.path.splitext(receipt.filename)[1]
+        filename = f"initial_{lease.id}_{uuid.uuid4().hex}{ext}"
+        filepath = os.path.join(uploads_dir, filename)
+        with open(filepath, "wb") as buffer:
+            shutil.copyfileobj(receipt.file, buffer)
+        receipt_url = f"/uploads/{filename}"
+        
+    lease.initial_payment_status = "Paid"
+    lease.initial_payment_method = payment_method
+    lease.initial_payment_date = datetime.now()
+    lease.initial_payment_receipt = receipt_url
+    db.commit()
+    
+    return {"status": "Success", "receipt": receipt_url}
+
+@app.get("/admin/leases/{lease_id}/details")
+async def get_lease_details(lease_id: int, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+    lease = db.query(models.Lease).filter(models.Lease.id == lease_id).first()
+    if not lease: raise HTTPException(status_code=404, detail="Lease not found")
+    
+    # Calculate total initial fees
+    total_initial = (lease.security_deposit_amount or 0) + (lease.advance_rent_amount or 0)
+    other_fees = []
+    if lease.initial_fees:
+        try:
+            other_fees = json.loads(lease.initial_fees)
+            # Filter out the main ones if they are in initial_fees to avoid double counting in display
+            # (Though in approve_tenant we added them to applied_fees list)
+            # The UI can just show everything in initial_fees if it wants, 
+            # but we'll provide the specific fields too.
+        except: pass
+
+    return {
+        "id": lease.id,
+        "room_number": lease.room.room_number if lease.room else "N/A",
+        "tenant_name": lease.tenant.full_name if lease.tenant else "N/A",
+        "security_deposit": lease.security_deposit_amount,
+        "advance_rent": lease.advance_rent_amount,
+        "initial_fees": other_fees,
+        "status": lease.initial_payment_status,
+        "method": lease.initial_payment_method,
+        "payment_date": lease.initial_payment_date.strftime("%d/%m/%Y %H:%M") if lease.initial_payment_date else None,
+        "receipt": lease.initial_payment_receipt
     }
 
 @app.post("/admin/settlement/confirm/{tenant_id}")
@@ -1286,7 +1374,11 @@ async def confirm_settlement(
         receipt_url = f"/uploads/{filename}"
 
     # Create Settlement Record
+    # Total deductions now include applying the advance rent as a CREDIT
+    # final_balance = (Security Deposit + Advance Rent Credit) - Deductions
+    
     total_deductions = pro_rated_rent + elec_amt + water_amt + unpaid_amt + cleaning_fee + damage_fee + other_fees
+    advance_rent = lease.advance_rent_amount or 0
     
     settlement = models.Settlement(
         tenant_id=tenant.id,
@@ -1301,6 +1393,7 @@ async def confirm_settlement(
         other_fees=other_fees,
         total_deductions=total_deductions,
         security_deposit_amount=deposit_amt,
+        advance_rent_amount=advance_rent,
         final_balance=final_balance,
         refund_method=refund_method,
         refund_receipt_img=receipt_url,

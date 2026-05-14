@@ -1514,6 +1514,10 @@
                                 <label>ยอดเงินมัดจำ (จากสัญญา)</label>
                                 <input type="number" id="st_deposit_amt" readonly style="background:#f8f9fa; text-align:right; font-weight:700; color:var(--success);">
                             </div>
+                            <div class="form-group">
+                                <label>เครดิตค่าเช่าล่วงหน้า (1 เดือน)</label>
+                                <input type="number" id="st_advance_rent_amt" readonly style="background:#f8f9fa; text-align:right; font-weight:700; color:var(--primary);">
+                            </div>
 
                             <div style="background: #fff8f8; padding: 15px; border-radius: 12px; border: 2px solid #fee2e2; margin-top: 20px;">
                                 <label style="text-align: center; color: var(--text-muted);">สรุปยอดที่ต้องคืน (+)</label>
@@ -1568,6 +1572,55 @@
             <div class="modal-footer">
                 <button class="btn btn-primary" onclick="document.getElementById('settlementDetailModal').style.display='none'">ปิดหน้าต่าง</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Initial Payment Modal -->
+    <div id="initialPaymentModal" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3 style="margin:0; font-weight:700;"><i class="fa-solid fa-money-bill-transfer"></i> บันทึกการรับเงินแรกเข้า</h3>
+                <button class="btn btn-outline" style="padding:5px 10px;" onclick="document.getElementById('initialPaymentModal').style.display='none'"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="initialPaymentForm">
+                <div class="modal-body">
+                    <input type="hidden" id="ip_lease_id">
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 12px; margin-bottom: 20px;">
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <div><label style="margin-bottom:0;">ห้อง</label><strong id="ip_room_no" style="font-size:1.1em;">-</strong></div>
+                            <div><label style="margin-bottom:0;">ผู้เช่า</label><strong id="ip_tenant_name" style="font-size:1.1em;">-</strong></div>
+                        </div>
+                    </div>
+
+                    <div id="ip_fees_breakdown" style="border: 1px solid var(--border); border-radius: 12px; padding: 15px; margin-bottom: 20px;">
+                        <h4 style="margin-top:0; font-size:1em; border-bottom:1px solid var(--border); padding-bottom:10px;">รายการที่เรียกเก็บ</h4>
+                        <div id="ip_fees_list" style="font-size: 0.95em;">
+                            <!-- Filled by JS -->
+                        </div>
+                        <div style="display:flex; justify-content:space-between; margin-top:10px; padding-top:10px; border-top:2px solid var(--border); font-weight:800; font-size:1.1em; color:var(--primary);">
+                            <span>รวมยอดทั้งหมด</span><span id="ip_total_amount">0.00 บาท</span>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>วิธีการชำระเงิน</label>
+                        <select id="ip_payment_method" name="payment_method">
+                            <option value="Cash">เงินสด (Cash)</option>
+                            <option value="Transfer">โอนเงิน (Transfer)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>หลักฐานการรับเงิน (ถ้ามี)</label>
+                        <input type="file" id="ip_receipt" accept="image/*">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="document.getElementById('initialPaymentModal').style.display='none'">ยกเลิก</button>
+                    <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">
+                        <i class="fa-solid fa-check"></i> ยืนยันการรับเงิน
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -2182,15 +2235,88 @@
                         <td style="font-weight:700;">${l.room_number}</td>
                         <td>${l.tenant_name}</td>
                         <td>${l.start_date}</td>
-                        <td><span class="badge ${l.status==='Active'?'badge-success':'badge-secondary'}">${l.status}</span></td>
                         <td>
-                            <button class="btn btn-outline" onclick="viewLease(${l.id})"><i class="fa-solid fa-eye"></i> ดูสัญญา</button>
-                            ${l.status === 'Active' ? `<button class="btn btn-danger" onclick="unmapTenant(${l.tenant_id})">ย้ายออก</button>` : ''}
+                            <span class="badge ${l.status==='Active'?'badge-success':'badge-secondary'}">${l.status}</span>
+                            ${l.status === 'Active' ? `
+                                <div style="margin-top:5px;">
+                                    <span class="badge ${l.initial_payment_status==='Paid'?'badge-success':'badge-warning'}" style="font-size:0.7em;">
+                                        แรกเข้า: ${l.initial_payment_status === 'Paid' ? 'จ่ายแล้ว' : 'รอชำระ'}
+                                    </span>
+                                </div>
+                            ` : ''}
+                        </td>
+                        <td>
+                            <div style="display:flex; gap:5px; flex-wrap:wrap;">
+                                <button class="btn btn-outline" style="padding:5px 10px;" onclick="viewLease(${l.id})"><i class="fa-solid fa-eye"></i> ดูสัญญา</button>
+                                ${l.status === 'Active' && l.initial_payment_status !== 'Paid' ? `
+                                    <button class="btn btn-primary" style="padding:5px 10px; background:var(--warning);" onclick="openInitialPaymentModal(${l.id})">
+                                        <i class="fa-solid fa-money-bill-transfer"></i> บันทึกรับเงิน
+                                    </button>
+                                ` : ''}
+                                ${l.status === 'Active' ? `<button class="btn btn-danger" style="padding:5px 10px;" onclick="unmapTenant(${l.tenant_id})">ย้ายออก</button>` : ''}
+                            </div>
                         </td>
                     </tr>
                 `).join('') || '<tr><td colspan="5" style="text-align:center; padding: 40px; color: var(--text-muted);"><i class="fa-solid fa-file-circle-exclamation" style="font-size: 3em; margin-bottom: 15px; display: block; color: #d1d5db;"></i>ยังไม่มีข้อมูลสัญญาเช่าที่บันทึกในระบบ</td></tr>';
+            }
+        }
+
+        async function openInitialPaymentModal(leaseId) {
+            try {
+                const res = await fetch(`/admin/leases/${leaseId}/details`);
+                const data = await res.json();
+                
+                document.getElementById('ip_lease_id').value = leaseId;
+                document.getElementById('ip_room_no').innerText = data.room_number;
+                document.getElementById('ip_tenant_name').innerText = data.tenant_name;
+                
+                const list = document.getElementById('ip_fees_list');
+                let total = 0;
+                let html = '';
+                
+                if (data.security_deposit > 0) {
+                    html += `<div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span>ค่าประกัน (Security Deposit)</span><strong>${data.security_deposit.toLocaleString()} บาท</strong></div>`;
+                    total += data.security_deposit;
                 }
+                if (data.advance_rent > 0) {
+                    html += `<div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span>ค่าเช่าล่วงหน้า (Advance Rent)</span><strong>${data.advance_rent.toLocaleString()} บาท</strong></div>`;
+                    total += data.advance_rent;
                 }
+                
+                // Show other fees if any
+                (data.initial_fees || []).forEach(f => {
+                    // Avoid double counting if they are named the same
+                    if (f.name !== 'ค่าประกัน' && f.name !== 'ค่าเช่าล่วงหน้า') {
+                        html += `<div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span>${f.name}</span><strong>${f.amount.toLocaleString()} บาท</strong></div>`;
+                        total += f.amount;
+                    }
+                });
+                
+                list.innerHTML = html;
+                document.getElementById('ip_total_amount').innerText = `${total.toLocaleString()} บาท`;
+                document.getElementById('initialPaymentModal').style.display = 'block';
+            } catch (err) {
+                alert('Error loading lease details: ' + err);
+            }
+        }
+
+        document.getElementById('initialPaymentForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const leaseId = document.getElementById('ip_lease_id').value;
+            const formData = new FormData();
+            formData.append('payment_method', document.getElementById('ip_payment_method').value);
+            const receiptFile = document.getElementById('ip_receipt').files[0];
+            if (receiptFile) formData.append('receipt', receiptFile);
+            
+            const res = await fetch(`/admin/leases/${leaseId}/record-payment`, { method: 'POST', body: formData });
+            if (res.ok) {
+                alert('บันทึกการรับเงินสำเร็จ');
+                document.getElementById('initialPaymentModal').style.display = 'none';
+                loadLeases();
+            } else {
+                alert('เกิดข้อผิดพลาดในการบันทึก');
+            }
+        };
 
         function viewLease(id) { window.open(`/admin/leases/${id}/view`, '_blank'); }
 
@@ -2853,6 +2979,7 @@
                 
                 document.getElementById('st_unpaid_amt').value = data.unpaid_invoices;
                 document.getElementById('st_deposit_amt').value = data.security_deposit;
+                document.getElementById('st_advance_rent_amt').value = data.advance_rent;
                 
                 loading.style.display = 'none';
                 form.style.display = 'block';
@@ -2871,9 +2998,10 @@
             const damage = parseFloat(document.getElementById('st_damage_fee').value) || 0;
             const other = parseFloat(document.getElementById('st_other_fees').value) || 0;
             const deposit = parseFloat(document.getElementById('st_deposit_amt').value) || 0;
+            const advanceRent = parseFloat(document.getElementById('st_advance_rent_amt').value) || 0;
 
             const totalDeductions = rent + util + unpaid + cleaning + damage + other;
-            const finalBalance = deposit - totalDeductions;
+            const finalBalance = (deposit + advanceRent) - totalDeductions;
 
             const display = document.getElementById('st_final_balance_display');
             const note = document.getElementById('st_balance_note');

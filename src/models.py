@@ -183,6 +183,7 @@ class Settlement(Base):
     
     total_deductions = Column(Float, default=0.0)
     security_deposit_amount = Column(Float, default=0.0)
+    advance_rent_amount = Column(Float, default=0.0)
     final_balance = Column(Float, default=0.0) # Refund if positive, Payment due if negative
     
     refund_method = Column(String) # Cash, PromptPay, Transfer
@@ -204,6 +205,14 @@ class Lease(Base):
     status = Column(String, default="Active")
     lease_content = Column(Text) # Snapshotted contract content
     initial_fees = Column(Text) # JSON of fees applied at start
+    
+    # Financial fields for initial payment
+    security_deposit_amount = Column(Float, default=0.0)
+    advance_rent_amount = Column(Float, default=0.0)
+    initial_payment_status = Column(String, default="Pending") # Pending, Paid
+    initial_payment_method = Column(String) # Cash, Transfer
+    initial_payment_date = Column(DateTime)
+    initial_payment_receipt = Column(String) # Image URL
     
     room = relationship("Room")
     tenant = relationship("Tenant")
@@ -240,6 +249,7 @@ class Invoice(Base):
     payment_method = Column(String)
     payment_receipt_img = Column(String)
     paid_at = Column(DateTime)
+    is_pro_rata = Column(Integer, default=0) # 0 = No, 1 = Yes
     
     room = relationship("Room")
     tenant = relationship("Tenant")

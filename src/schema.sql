@@ -69,6 +69,14 @@ CREATE TABLE leases (
     start_date DATE NOT NULL,
     end_date DATE,
     status TEXT DEFAULT 'Active', -- Active, Closed
+    lease_content TEXT,
+    initial_fees TEXT,
+    security_deposit_amount REAL DEFAULT 0.0,
+    advance_rent_amount REAL DEFAULT 0.0,
+    initial_payment_status TEXT DEFAULT 'Pending',
+    initial_payment_method TEXT,
+    initial_payment_date TIMESTAMP,
+    initial_payment_receipt TEXT,
     FOREIGN KEY (room_id) REFERENCES rooms(id),
     FOREIGN KEY (tenant_id) REFERENCES tenants(id)
 );
@@ -102,8 +110,38 @@ CREATE TABLE invoices (
     payment_method TEXT, -- Cash, QR
     payment_receipt_img TEXT, -- File path
     paid_at TIMESTAMP,
+    is_pro_rata INTEGER DEFAULT 0,
     FOREIGN KEY (room_id) REFERENCES rooms(id),
     FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+);
+
+-- 6.1 Settlements (Move-out)
+CREATE TABLE settlements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id INTEGER NOT NULL,
+    room_id INTEGER NOT NULL,
+    lease_id INTEGER NOT NULL,
+    settlement_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    pro_rated_rent REAL DEFAULT 0.0,
+    electricity_units REAL DEFAULT 0.0,
+    electricity_amount REAL DEFAULT 0.0,
+    water_units REAL DEFAULT 0.0,
+    water_amount REAL DEFAULT 0.0,
+    unpaid_invoices_amount REAL DEFAULT 0.0,
+    cleaning_fee REAL DEFAULT 0.0,
+    damage_fee REAL DEFAULT 0.0,
+    other_fees REAL DEFAULT 0.0,
+    total_deductions REAL DEFAULT 0.0,
+    security_deposit_amount REAL DEFAULT 0.0,
+    advance_rent_amount REAL DEFAULT 0.0,
+    final_balance REAL DEFAULT 0.0,
+    refund_method TEXT,
+    refund_receipt_img TEXT,
+    status TEXT DEFAULT 'Completed',
+    notes TEXT,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(id),
+    FOREIGN KEY (room_id) REFERENCES rooms(id),
+    FOREIGN KEY (lease_id) REFERENCES leases(id)
 );
 
 -- 7. Maintenance Requests

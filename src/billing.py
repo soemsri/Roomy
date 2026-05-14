@@ -110,7 +110,33 @@ def calculate_bill(db: Session, room_id: int, month: int, year: int, other_charg
     other_amount = sum(float(item.get('amount', 0)) for item in final_other_charges)
 
     # Initial Total
-    subtotal = room.base_rent + elec_amount + water_amount + other_amount
+    # Calculate Pro-rata rent if it's the first month
+    import calendar
+    rent_to_charge = room.base_rent
+    is_pro_rata = 0
+    
+    # Find current active lease
+    lease = db.query(models.Lease).filter(
+        models.Lease.room_id == room_id,
+        models.Lease.status == "Active"
+    ).first()
+    
+    if lease:
+        lease_start = lease.start_date
+        # Handle potential string dates from SQLite
+        if isinstance(lease_start, str):
+            try: lease_start = datetime.fromisoformat(lease_start.replace('Z', '').split('.')[0])
+            except: pass
+            
+        if lease_start and lease_start.month == month and lease_start.year == year:
+            # First month! Calculate pro-rata if not starting on the 1st
+            if lease_start.day > 1:
+                days_in_month = calendar.monthrange(year, month)[1]
+                days_stayed = days_in_month - lease_start.day + 1
+                rent_to_charge = (room.base_rent / days_in_month) * days_stayed
+                is_pro_rata = 1
+
+    subtotal = rent_to_charge + elec_amount + water_amount + other_amount
     
     # Calculate Late Fee if applicable
     late_fee = get_late_fee(db, billing_month=month, billing_year=year)
@@ -128,7 +154,7 @@ def calculate_bill(db: Session, room_id: int, month: int, year: int, other_charg
             tenant_id=tenant.id,
             billing_month=month,
             billing_year=year,
-            rent_amount=room.base_rent,
+            rent_amount=rent_to_charge,
             electricity_amount=elec_amount,
             water_amount=water_amount,
             electricity_reading=current_reading.electricity_reading,
@@ -138,7 +164,8 @@ def calculate_bill(db: Session, room_id: int, month: int, year: int, other_charg
             other_charges=json.dumps(final_other_charges) if final_other_charges else None,
             late_fee=late_fee,
             total_amount=total_amount,
-            status="Draft" if save_only else "Unpaid"
+            status="Draft" if save_only else "Unpaid",
+            is_pro_rata=is_pro_rata
         )
         db.add(invoice)
         db.commit()
@@ -146,6 +173,7 @@ def calculate_bill(db: Session, room_id: int, month: int, year: int, other_charg
     else:
         # Update existing invoice if recording again
         if invoice.status != "Paid":
+            invoice.rent_amount = rent_to_charge
             invoice.electricity_amount = elec_amount
             invoice.water_amount = water_amount
             invoice.electricity_reading = current_reading.electricity_reading
@@ -156,6 +184,7 @@ def calculate_bill(db: Session, room_id: int, month: int, year: int, other_charg
                 invoice.other_charges = json.dumps(final_other_charges)
             invoice.late_fee = late_fee
             invoice.total_amount = total_amount
+            invoice.is_pro_rata = is_pro_rata
             # If issuing bill, change Draft to Unpaid
             if not save_only and invoice.status == "Draft":
                 invoice.status = "Unpaid"

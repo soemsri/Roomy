@@ -1,12 +1,12 @@
 {
   "status": "active",
-  "current_phase": 11,
-  "last_action": "Implemented Move-out Request bug fix, Direct LINE messaging, Registration Flow refactor with National ID and Encryption.",
-  "summary": "Phase 11: Security & Process Refinement. Fixed a critical NOT NULL constraint error in move-out requests by adding recovery logic from active leases. Implemented a direct LINE messaging feature from the owner dashboard to individual tenants. Significantly refactored the registration flow: added mandatory National ID (citizen_id) with transparent database encryption, implemented data auto-fill for returning tenants, and shifted room assignment control from tenants to admins during the approval process. Resolved circular dependencies in the security module to support clean model-level encryption.",
+  "current_phase": 12,
+  "last_action": "Fixed SQLAlchemy NameError, refined Move-out settlement calculation, added Admin Move-out History with full financial details.",
+  "summary": "Phase 12: Admin Dashboard & Financial Clarity. Resolved a NameError bug in the settlement preview function. Updated the security deposit logic to aggregate all move-in fees from the lease contract for more accurate settlement calculations. Implemented a comprehensive Move-out History feature in the Admin Dashboard, allowing owners to view past tenants' stay details, resident lists, and full financial breakdowns (deductions, utility units, and refund receipts). Refined UI by removing redundant buttons on the tenant success pages.",
   "next_steps": [
-    "Verify encryption/decryption performance with a larger dataset.",
-    "User Acceptance Testing (UAT) for the new admin-led room assignment flow.",
-    "Update project documentation to reflect the new registration and messaging features."
+    "Test the Move-out History with real-world complex billing scenarios.",
+    "Implement an export feature for the Move-out History data (CSV/PDF).",
+    "Gather feedback on the new initial fee summation logic for settlements."
   ],
-  "timestamp": "2026-05-13T16:45:00"
+  "timestamp": "2026-05-13T18:30:00"
 }
