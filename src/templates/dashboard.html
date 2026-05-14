@@ -497,7 +497,7 @@
                                 </div>
                             </td>
                             <td>
-                                <button class="btn btn-primary" style="background: var(--success);" onclick="approveReg({{ p.id }})">อนุมัติ</button>
+                                <button id="btn_approve_{{ p.id }}" class="btn btn-primary" style="background: var(--success);" onclick="approveReg({{ p.id }})">อนุมัติ</button>
                                 <button class="btn btn-danger" onclick="rejectReg({{ p.id }})">ปฏิเสธ</button>
                             </td>
                         </tr>
@@ -2909,20 +2909,38 @@
                 return;
             }
             
+            const btn = document.getElementById(`btn_approve_${id}`);
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังประมวลผล...';
+            }
+            
             const formData = new FormData();
             formData.append('room_ids', roomIds.join(','));
             
-            const res = await fetch(`/admin/registration/${id}/approve`, {
-                method: 'POST',
-                body: formData
-            });
-            
-            if (res.ok) {
-                window.location.href = '/admin/dashboard#tenantSection';
-                window.location.reload();
-            } else {
-                const err = await res.json();
-                alert('Error: ' + (err.detail || 'ไม่สามารถอนุมัติได้'));
+            try {
+                const res = await fetch(`/admin/registration/${id}/approve`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (res.ok) {
+                    window.location.href = '/admin/dashboard#tenantSection';
+                    window.location.reload();
+                } else {
+                    const err = await res.json();
+                    alert('Error: ' + (err.detail || 'ไม่สามารถอนุมัติได้'));
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = 'อนุมัติ';
+                    }
+                }
+            } catch (e) {
+                alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = 'อนุมัติ';
+                }
             }
         }
         async function rejectReg(id) { await fetch(`/admin/registration/${id}/reject`, {method:'POST'}); location.reload(); }
