@@ -19,7 +19,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
-from linebot.models import MessageEvent, TextMessage, TextSendMessage, FlexSendMessage, FlexContainer, PostbackEvent
+from linebot.models import MessageEvent, TextMessage, TextSendMessage, FlexSendMessage, FlexContainer, PostbackEvent, ImageSendMessage
 
 from database import SessionLocal, engine, get_db
 import models
@@ -2235,15 +2235,17 @@ def send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_oth
     if not bot_api:
         return
     
-    from linebot.models import FlexSendMessage, TextSendMessage
+    from linebot.models import FlexSendMessage, TextSendMessage, ImageSendMessage
     import json
     import promptpay
+    import urllib.parse
     
     rooms_str = ", ".join(success_rooms)
     
     # 1. Payment Method Logic
     qr_enabled = owner.qr_payment_enabled if owner else 1
     payment_instruction_contents = []
+    encoded_payload = ""
     
     if qr_enabled:
         # Get PromptPay ID and Name
@@ -2257,7 +2259,6 @@ def send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_oth
         except: pass
         
         payload = promptpay.generate_promptpay_payload(promptpay_id, g_total)
-        import urllib.parse
         encoded_payload = urllib.parse.quote(payload)
         qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={encoded_payload}"
         
@@ -2273,7 +2274,7 @@ def send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_oth
             })
 
         payment_instruction_contents.extend([
-            {"type": "text", "text": "สแกน QR Code เพื่อชำระเงิน", "size": "sm", "color": "#555555", "align": "center", "margin": "md"},
+            {"type": "text", "text": "👇 กดค้างที่รูป QR ด้านล่างเพื่อบันทึก 👇", "size": "xs", "color": "#e74c3c", "align": "center", "margin": "lg", "weight": "bold"},
             {
                 "type": "image",
                 "url": qr_url,
@@ -2283,18 +2284,53 @@ def send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_oth
             },
             {
                 "type": "button",
-                "style": "secondary",
-                "height": "sm",
+                "style": "primary",
+                "color": "#0078d4",
                 "margin": "md",
                 "action": {
                     "type": "uri",
-                    "label": "ดาวน์โหลด QR Code",
-                    "uri": qr_url
+                    "label": "เลือกแอปธนาคารเพื่อจ่าย",
+                    "uri": "https://liff.line.me/2004245644-8rG6vBy3" 
                 }
             },
             {"type": "text", "text": f"พร้อมเพย์: {promptpay_id}", "size": "xs", "color": "#888888", "align": "center", "margin": "sm"}
         ])
     
+    # We will use a more generic way to open bank apps if LIFF is not setup.
+    # For now, I'll provide a button that opens a selection of links.
+    # Re-evaluating: A direct list of common bank deep links in a horizontal scroll (Carousel) or simple list is better.
+    # Let's adjust the button to a message action or a simple URI that might trigger bank apps.
+    
+    # Updated: Let's use a button that triggers a message to show bank links, 
+    # OR better, include a few small icons for major banks with their deep links.
+    
+    bank_apps_box = {
+        "type": "box",
+        "layout": "vertical",
+        "margin": "md",
+        "contents": [
+            {"type": "text", "text": "เปิดแอปธนาคาร:", "size": "xs", "color": "#888888", "margin": "sm"},
+            {
+                "type": "box",
+                "layout": "horizontal",
+                "margin": "sm",
+                "spacing": "xs",
+                "contents": [
+                    {"type": "button", "action": {"type": "uri", "label": "K Plus", "uri": "kplus://"}, "style": "secondary", "height": "sm", "flex": 1},
+                    {"type": "button", "action": {"type": "uri", "label": "SCB", "uri": "scbeasy://"}, "style": "secondary", "height": "sm", "flex": 1},
+                    {"type": "button", "action": {"type": "uri", "label": "Krungthai", "uri": "ktbnext://"}, "style": "secondary", "height": "sm", "flex": 1}
+                ]
+            }
+        ]
+    }
+    
+    # Replace the single button with bank apps box in payment_instruction_contents if qr_enabled
+    if qr_enabled:
+        # Find and replace the placeholder button I just added above
+        for i, item in enumerate(payment_instruction_contents):
+            if item.get("type") == "button" and item.get("action", {}).get("label") == "เลือกแอปธนาคารเพื่อจ่าย":
+                payment_instruction_contents[i] = bank_apps_box
+
     # Always add cash notice at the bottom of instructions
     payment_instruction_contents.append({
         "type": "box",
@@ -2362,7 +2398,7 @@ def send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_oth
     }
     
     if g_other > 0:
-        flex_json["body"]["contents"][2]["contents"].append({
+        flex_json["body"]["contents"][0]["contents"].append({
             "type": "box",
             "layout": "horizontal",
             "contents": [
@@ -2387,12 +2423,23 @@ def send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_oth
     ])
 
     try:
+        # Send Flex Message first
         bot_api.push_message(tenant.line_user_id, FlexSendMessage(alt_text="ใบแจ้งยอดชำระแรกเข้า", contents=flex_json))
+        
+        # Send Image Message for QR Code (easy to capture/save)
+        if qr_enabled and encoded_payload:
+            # Re-generate larger QR for clear scanning/saving
+            qr_large_url = f"https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data={encoded_payload}"
+            bot_api.push_message(tenant.line_user_id, ImageSendMessage(
+                original_content_url=qr_large_url,
+                preview_image_url=qr_large_url
+            ))
     except Exception as e:
-        print(f"Error sending flex: {e}")
+        print(f"Error sending initial payment flex/image: {e}")
         # Fallback to text
         msg = f"ยินดีด้วย! การลงทะเบียนห้อง {rooms_str} ได้รับการอนุมัติแล้ว\nยอดรวม: {g_total:,.2f} บาท\nกรุณาชำระเงินที่เคาน์เตอร์หรือผ่านเมนูใน LINE"
-        bot_api.push_message(tenant.line_user_id, TextSendMessage(text=msg))
+        try: bot_api.push_message(tenant.line_user_id, TextSendMessage(text=msg))
+        except: pass
 
 def setup_personal_rich_menu(tenant, db: Session, force=False):
     if not tenant or not tenant.line_user_id:
