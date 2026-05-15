@@ -1,8 +1,8 @@
 {
   "status": "active",
   "current_phase": 14,
-  "last_action": "Implemented Pagination for Leases and Tenant History, optimized Bill Mobile UX, and fixed critical settlement bugs.",
-  "summary": "Phase 14: UX Optimization & Scalability. Implemented pagination for Lease Management and Tenant History tables to ensure smooth performance with large datasets. Optimized the Tenant Bill view for mobile devices, resolving layout overflows and improving touch usability. Refined the Tenant Approval flow with immediate visual feedback (Loading state) and fixed calculation bugs for multi-room approvals. Resolved critical database integrity and attribute errors in the settlement process, ensuring robust move-out handling even for legacy data. Standardized fee mapping from Admin settings to correctly identify deposits and advance rent credits.",
+  "last_action": "Implemented 'Download QR Code' button and improved Flex Message for entry payments, including account name display and cash payment notice.",
+  "summary": "Phase 14: UX Optimization & Scalability. Implemented pagination for Lease Management and Tenant History tables. Optimized the Tenant Bill view for mobile devices. Enhanced the Entry Payment Flex Message by removing the owner's name for privacy, adding clear PromptPay account name display, and implementing a 'Download QR Code' button for better usability. Added a cash payment notice as an alternative option. Refined the Tenant Approval flow with immediate visual feedback and fixed calculation bugs for multi-room approvals.",
   "next_steps": [
     "Conduct a full end-to-end test of the pro-rata billing cycle with actual meter readings.",
     "Implement a CSV/PDF export feature for the Tenant History and Settlement records.",

@@ -2261,6 +2261,7 @@ def send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_oth
         payload = promptpay.generate_promptpay_payload(promptpay_id, g_total)
         encoded_payload = urllib.parse.quote(payload)
         qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={encoded_payload}"
+        qr_large_url = f"https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data={encoded_payload}"
         
         if promptpay_name:
             payment_instruction_contents.append({
@@ -2284,52 +2285,18 @@ def send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_oth
             },
             {
                 "type": "button",
-                "style": "primary",
-                "color": "#0078d4",
-                "margin": "md",
                 "action": {
                     "type": "uri",
-                    "label": "เลือกแอปธนาคารเพื่อจ่าย",
-                    "uri": "https://liff.line.me/2004245644-8rG6vBy3" 
-                }
+                    "label": "ดาวน์โหลด QR Code",
+                    "uri": qr_large_url
+                },
+                "style": "secondary",
+                "height": "sm",
+                "margin": "xs"
             },
+            {"type": "text", "text": "💡 ท่านสามารถนำ QR ไปสแกนในแอปธนาคารได้ทันที", "size": "xxs", "color": "#888888", "align": "center", "margin": "md"},
             {"type": "text", "text": f"พร้อมเพย์: {promptpay_id}", "size": "xs", "color": "#888888", "align": "center", "margin": "sm"}
         ])
-    
-    # We will use a more generic way to open bank apps if LIFF is not setup.
-    # For now, I'll provide a button that opens a selection of links.
-    # Re-evaluating: A direct list of common bank deep links in a horizontal scroll (Carousel) or simple list is better.
-    # Let's adjust the button to a message action or a simple URI that might trigger bank apps.
-    
-    # Updated: Let's use a button that triggers a message to show bank links, 
-    # OR better, include a few small icons for major banks with their deep links.
-    
-    bank_apps_box = {
-        "type": "box",
-        "layout": "vertical",
-        "margin": "md",
-        "contents": [
-            {"type": "text", "text": "เปิดแอปธนาคาร:", "size": "xs", "color": "#888888", "margin": "sm"},
-            {
-                "type": "box",
-                "layout": "horizontal",
-                "margin": "sm",
-                "spacing": "xs",
-                "contents": [
-                    {"type": "button", "action": {"type": "uri", "label": "K Plus", "uri": "kplus://"}, "style": "secondary", "height": "sm", "flex": 1},
-                    {"type": "button", "action": {"type": "uri", "label": "SCB", "uri": "scbeasy://"}, "style": "secondary", "height": "sm", "flex": 1},
-                    {"type": "button", "action": {"type": "uri", "label": "Krungthai", "uri": "ktbnext://"}, "style": "secondary", "height": "sm", "flex": 1}
-                ]
-            }
-        ]
-    }
-    
-    # Replace the single button with bank apps box in payment_instruction_contents if qr_enabled
-    if qr_enabled:
-        # Find and replace the placeholder button I just added above
-        for i, item in enumerate(payment_instruction_contents):
-            if item.get("type") == "button" and item.get("action", {}).get("label") == "เลือกแอปธนาคารเพื่อจ่าย":
-                payment_instruction_contents[i] = bank_apps_box
 
     # Always add cash notice at the bottom of instructions
     payment_instruction_contents.append({
