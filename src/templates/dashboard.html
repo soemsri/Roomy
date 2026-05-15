@@ -958,12 +958,13 @@
                         <tr>
                             <th>ห้อง</th>
                             <th>ผู้อยู่อาศัยหลัก/ร่วม</th>
+                            <th>เบอร์โทร</th>
                             <th>จัดการ</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for t in active_tenants %}
-                        <tr>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for t in active_tenants %}
+                            <tr>
                             <td style="font-weight: 700; color: var(--primary);">{{ t.room.room_number if t.room else 'N/A' }}</td>
                             <td>
                                 <div style="font-weight: 600;">{{ t.full_name }}</div>
@@ -973,10 +974,10 @@
                                     {% endfor %}
                                 </div>
                             </td>
-                            <td>
-                                <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                            <td>{{ t.phone_number }}</td>
+                            <td>                                <div style="display: flex; gap: 5px; flex-wrap: wrap;">
                                     <button class="btn btn-outline" onclick="manageResidents({{ t.id }}, '{{ t.room.room_number if t.room else 'N/A' }}')">
-                                        <i class="fa-solid fa-users-gear"></i> จัดการรายชื่อ
+                                        <i class="fa-solid fa-users-gear"></i> ผู้ร่วมอาศัย
                                     </button>
                                     <button class="btn btn-outline" style="color: #06c755; border-color: #06c755;" onclick="sendDirectLine({{ t.id }}, '{{ t.full_name }}')">
                                         <i class="fa-brands fa-line"></i> ส่งข้อความ
