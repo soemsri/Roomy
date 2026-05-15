@@ -228,14 +228,18 @@ def handle_admin_message(event, *args, **kwargs):
                     if action == "APPROVE":
                         room = target_tenant.room
                         if room:
-                            room.status = "Occupied"
-                            new_lease = models.Lease(room_id=room.id, tenant_id=target_tenant.id, start_date=datetime.now())
-                            db.add(new_lease)
-                            target_tenant.status = "Active"
+                            success_rooms, g_deposit, g_advance, g_other, g_total = perform_approval(db, target_tenant, [room.id], owner)
                             db.commit()
-                            reply_text = f"อนุมัติผู้เช่าห้อง {room.room_number} เรียบร้อย"
-                            if tenant_bot_api:
-                                tenant_bot_api.push_message(target_tenant.line_user_id, TextSendMessage(text=f"ยินดีด้วย! การลงทะเบียนเข้าพักห้อง {room.room_number} ของคุณได้รับการอนุมัติแล้ว"))
+                            
+                            if success_rooms:
+                                reply_text = f"อนุมัติผู้เช่าห้อง {room.room_number} เรียบร้อย\n\nอย่าลืมจดมิเตอร์น้ำและไฟฟ้าแรกเข้าด้วยนะครับ"
+                                if tenant_bot_api:
+                                    try:
+                                        send_initial_payment_flex(target_tenant, success_rooms, g_deposit, g_advance, g_other, g_total, owner, tenant_bot_api)
+                                    except Exception as e:
+                                        print(f"Failed to notify tenant from LINE: {e}")
+                            else:
+                                reply_text = f"ไม่สามารถอนุมัติห้อง {room.room_number} ได้ (ห้องอาจไม่ว่าง)"
                         else:
                             reply_text = "ไม่พบข้อมูลห้อง"
                     else:
@@ -1002,101 +1006,7 @@ async def approve_registration(tenant_id: int, room_ids: str = Form(...), db: Se
         raise HTTPException(status_code=400, detail="กรุณาเลือกอย่างน้อย 1 ห้อง")
     
     owner = db.query(models.Owner).first()
-    start_date = tenant.requested_move_in_date if tenant.requested_move_in_date else datetime.now()
-    
-    success_rooms = []
-    first_iter = True
-    
-    # Initialize grand totals for multiple rooms
-    g_total = 0.0
-    g_deposit = 0.0
-    g_advance = 0.0
-    g_other = 0.0
-    
-    for rid in id_list:
-        room = db.query(models.Room).filter(models.Room.id == rid).first()
-        if not room or room.status != "Vacant":
-            continue
-            
-        target_tenant = tenant
-        if not first_iter:
-            # Create a clone for subsequent rooms
-            target_tenant = models.Tenant(
-                line_user_id=tenant.line_user_id,
-                full_name=tenant.full_name,
-                phone_number=tenant.phone_number,
-                citizen_id=tenant.citizen_id,
-                requested_move_in_date=tenant.requested_move_in_date,
-                status="Active"
-            )
-            db.add(target_tenant)
-            db.flush()
-        
-        target_tenant.current_room_id = room.id
-        room.status = "Occupied"
-        
-        # Calculate Initial Fees - ONLY from config
-        security_deposit = 0.0
-        advance_rent = 0.0
-        applied_fees = []
-        room_total = 0.0
-        fees_text = ""
-        
-        if owner and owner.move_in_fees_config:
-            try:
-                config = json.loads(owner.move_in_fees_config)
-                for f in config:
-                    amt = f['value'] * room.base_rent if f.get('is_multiplier') else f['value']
-                    applied_fees.append({"name": f['name'], "amount": amt})
-                    room_total += amt
-                    fees_text += f"<li>{f['name']}: {amt:,.2f} บาท</li>"
-                    
-                    if "ประกัน" in f['name']:
-                        security_deposit += amt
-                    elif "ล่วงหน้า" in f['name']:
-                        advance_rent += amt
-            except:
-                pass
-        
-        if fees_text:
-            fees_text = f"<ul>{fees_text}</ul><p><strong>รวมเงินมัดจำและค่าแรกเข้าห้อง {room.room_number}: {room_total:,.2f} บาท</strong></p>"
-
-        # Accumulate totals
-        g_deposit += security_deposit
-        g_advance += advance_rent
-        g_other += (room_total - security_deposit - advance_rent)
-        g_total += room_total
-
-        lease_content = ""
-        if owner and owner.lease_template:
-            lease_content = owner.lease_template
-            replacements = {
-                "{tenant_name}": target_tenant.full_name,
-                "{room_number}": room.room_number,
-                "{floor}": str(room.floor),
-                "{base_rent}": f"{room.base_rent:,.2f}",
-                "{start_date}": start_date.strftime("%d/%m/%Y"),
-                "{initial_fees}": fees_text
-            }
-            for placeholder, value in replacements.items():
-                lease_content = lease_content.replace(placeholder, value)
-
-            new_lease = models.Lease(
-                room_id=room.id, 
-                tenant_id=target_tenant.id, 
-                start_date=start_date,
-                lease_content=lease_content,
-                initial_fees=json.dumps(applied_fees),
-                security_deposit_amount=security_deposit,
-                advance_rent_amount=advance_rent,
-                initial_payment_status="Pending"
-            )
-            db.add(new_lease)
-            
-        target_tenant.status = "Active"
-        success_rooms.append(room.room_number)
-        setup_personal_rich_menu(target_tenant, db)
-        first_iter = False
+    success_rooms, g_deposit, g_advance, g_other, g_total = perform_approval(db, tenant, id_list, owner)
 
     if not success_rooms:
         raise HTTPException(status_code=400, detail="ไม่สามารถอนุมัติห้องที่เลือกได้ (ห้องอาจไม่ว่าง)")
@@ -1105,22 +1015,23 @@ async def approve_registration(tenant_id: int, room_ids: str = Form(...), db: Se
     
     # Notify tenant via LINE
     if line_bot_api:
-        from linebot.models import TextSendMessage
-        rooms_str = ", ".join(success_rooms)
         try:
-            msg = f"ยินดีด้วย! การลงทะเบียนเข้าพักห้อง {rooms_str} ของคุณได้รับการอนุมัติแล้ว\n\n"
-            msg += f"ยอดเงินแรกเข้าที่ต้องชำระ (รวม {len(success_rooms)} ห้อง):\n"
-            msg += f"- ค่าประกันรวม: {g_deposit:,.2f} บาท\n"
-            msg += f"- ค่าเช่าล่วงหน้ารวม: {g_advance:,.2f} บาท\n"
+            send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_other, g_total, owner, line_bot_api)
+        except Exception as e:
+            print(f"Failed to notify tenant: {e}")
             
-            if g_other > 0:
-                msg += f"- ค่าธรรมเนียมอื่นๆ: {g_other:,.2f} บาท\n"
-            
-            msg += f"รวมทั้งสิ้น: {g_total:,.2f} บาท\n\n"
-            msg += f"กรุณาชำระเงินและแจ้งหลักฐานการโอนที่เมนู 'ข้อมูลที่พัก' ของคุณ"
-            line_bot_api.push_message(tenant.line_user_id, TextSendMessage(text=msg))
-        except:
-            pass
+    # Notify admin via LINE
+    if owner and owner.line_user_id and admin_bot_api:
+        from linebot.models import TextSendMessage
+        try:
+            rooms_str = ", ".join(success_rooms)
+            admin_msg = f"🔔 แจ้งเตือน: มีผู้เช่าใหม่เข้าพัก\n"
+            admin_msg += f"ห้อง: {rooms_str}\n"
+            admin_msg += f"ชื่อผู้เช่า: {tenant.full_name}\n\n"
+            admin_msg += f"กรุณาไปจดมิเตอร์น้ำและไฟฟ้าแรกเข้าเพื่อใช้สำหรับคำนวณค่าไฟในรอบถัดไป"
+            admin_bot_api.push_message(owner.line_user_id, TextSendMessage(text=admin_msg))
+        except Exception as e:
+            print(f"Failed to notify admin: {e}")
         
     return {"status": "Success"}
 
@@ -2218,6 +2129,248 @@ def get_magic_url(owner, db, path=""):
         # For now, let's keep it simple and just go to dashboard.
         pass
     return url
+
+def perform_approval(db: Session, tenant, room_ids: list, owner, start_date=None):
+    if not start_date:
+        start_date = tenant.requested_move_in_date if tenant.requested_move_in_date else datetime.now()
+    
+    success_rooms = []
+    first_iter = True
+    
+    # Initialize grand totals for multiple rooms
+    g_total = 0.0
+    g_deposit = 0.0
+    g_advance = 0.0
+    g_other = 0.0
+    
+    for rid in room_ids:
+        room = db.query(models.Room).filter(models.Room.id == rid).first()
+        if not room or room.status != "Vacant":
+            continue
+            
+        target_tenant = tenant
+        if not first_iter:
+            # Create a clone for subsequent rooms
+            target_tenant = models.Tenant(
+                line_user_id=tenant.line_user_id,
+                full_name=tenant.full_name,
+                phone_number=tenant.phone_number,
+                citizen_id=tenant.citizen_id,
+                requested_move_in_date=tenant.requested_move_in_date,
+                status="Active"
+            )
+            db.add(target_tenant)
+            db.flush()
+        
+        target_tenant.current_room_id = room.id
+        room.status = "Occupied"
+        
+        # Calculate Initial Fees - ONLY from config
+        security_deposit = 0.0
+        advance_rent = 0.0
+        applied_fees = []
+        room_total = 0.0
+        fees_text = ""
+        
+        if owner and owner.move_in_fees_config:
+            try:
+                config = json.loads(owner.move_in_fees_config)
+                for f in config:
+                    amt = f['value'] * room.base_rent if f.get('is_multiplier') else f['value']
+                    applied_fees.append({"name": f['name'], "amount": amt})
+                    room_total += amt
+                    fees_text += f"<li>{f['name']}: {amt:,.2f} บาท</li>"
+                    
+                    if "ประกัน" in f['name']:
+                        security_deposit += amt
+                    elif "ล่วงหน้า" in f['name']:
+                        advance_rent += amt
+            except:
+                pass
+        
+        if fees_text:
+            fees_text = f"<ul>{fees_text}</ul><p><strong>รวมเงินมัดจำและค่าแรกเข้าห้อง {room.room_number}: {room_total:,.2f} บาท</strong></p>"
+
+        # Accumulate totals
+        g_deposit += security_deposit
+        g_advance += advance_rent
+        g_other += (room_total - security_deposit - advance_rent)
+        g_total += room_total
+
+        lease_content = ""
+        if owner and owner.lease_template:
+            lease_content = owner.lease_template
+            replacements = {
+                "{tenant_name}": target_tenant.full_name,
+                "{room_number}": room.room_number,
+                "{floor}": str(room.floor),
+                "{base_rent}": f"{room.base_rent:,.2f}",
+                "{start_date}": start_date.strftime("%d/%m/%Y"),
+                "{initial_fees}": fees_text
+            }
+            for placeholder, value in replacements.items():
+                if value is not None:
+                    lease_content = lease_content.replace(placeholder, str(value))
+
+            new_lease = models.Lease(
+                room_id=room.id, 
+                tenant_id=target_tenant.id, 
+                start_date=start_date,
+                lease_content=lease_content,
+                initial_fees=json.dumps(applied_fees),
+                security_deposit_amount=security_deposit,
+                advance_rent_amount=advance_rent,
+                initial_payment_status="Pending"
+            )
+            db.add(new_lease)
+            
+        target_tenant.status = "Active"
+        success_rooms.append(room.room_number)
+        setup_personal_rich_menu(target_tenant, db)
+        first_iter = False
+        
+    return success_rooms, g_deposit, g_advance, g_other, g_total
+
+def send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_other, g_total, owner, bot_api):
+    if not bot_api:
+        return
+    
+    from linebot.models import FlexSendMessage, TextSendMessage
+    import json
+    import promptpay
+    
+    rooms_str = ", ".join(success_rooms)
+    apt_name = owner.display_name if owner and owner.display_name else "หอพักสุขอนันต์"
+    
+    # 1. Payment Method Logic
+    qr_enabled = owner.qr_payment_enabled if owner else 1
+    payment_instruction_contents = []
+    
+    if qr_enabled:
+        # Get PromptPay ID
+        promptpay_id = "0812345678"
+        try:
+            config_list = json.loads(owner.promptpay_config)
+            if config_list and isinstance(config_list, list) and len(config_list) > 0:
+                promptpay_id = config_list[0].get('id', promptpay_id)
+        except: pass
+        
+        payload = promptpay.generate_promptpay_payload(promptpay_id, g_total)
+        qr_url = f"https://chart.googleapis.com/chart?cht=qr&chs=300x300&chl={payload}"
+        
+        payment_instruction_contents = [
+            {"type": "text", "text": "สแกน QR Code เพื่อชำระเงิน", "size": "sm", "color": "#555555", "align": "center", "margin": "lg"},
+            {
+                "type": "image",
+                "url": qr_url,
+                "size": "xl",
+                "aspectMode": "fit",
+                "margin": "md"
+            },
+            {"type": "text", "text": f"พร้อมเพย์: {promptpay_id}", "size": "xs", "color": "#888888", "align": "center", "margin": "sm"}
+        ]
+    else:
+        payment_instruction_contents = [
+            {
+                "type": "box",
+                "layout": "vertical",
+                "backgroundColor": "#f8f9fa",
+                "paddingAll": "md",
+                "margin": "lg",
+                "contents": [
+                    {"type": "text", "text": "ชำระเป็นเงินสดได้ที่", "size": "sm", "color": "#555555", "align": "center"},
+                    {"type": "text", "text": "หน้าเคาน์เตอร์ออฟฟิศ", "weight": "bold", "size": "md", "color": "#111111", "align": "center", "margin": "xs"}
+                ]
+            }
+        ]
+
+    # 2. Build Flex JSON
+    flex_json = {
+        "type": "bubble",
+        "header": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {"type": "text", "text": "ใบแจ้งยอดชำระแรกเข้า", "weight": "bold", "size": "xl", "color": "#FFFFFF", "align": "center"},
+                {"type": "text", "text": "อนุมัติเข้าพักเรียบร้อยแล้ว", "size": "sm", "color": "#FFFFFF", "align": "center", "margin": "xs"}
+            ],
+            "backgroundColor": "#1DB446",
+            "paddingAll": "20px"
+        },
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {"type": "text", "text": apt_name, "weight": "bold", "size": "md", "margin": "md"},
+                {"type": "separator", "margin": "lg"},
+                {
+                    "type": "box",
+                    "layout": "vertical",
+                    "margin": "lg",
+                    "spacing": "sm",
+                    "contents": [
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "contents": [
+                                {"type": "text", "text": "ห้อง", "size": "sm", "color": "#555555", "flex": 0},
+                                {"type": "text", "text": rooms_str, "size": "sm", "color": "#111111", "align": "end", "wrap": True}
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "contents": [
+                                {"type": "text", "text": "ค่าประกันรวม", "size": "sm", "color": "#555555", "flex": 0},
+                                {"type": "text", "text": f"฿{g_deposit:,.2f}", "size": "sm", "color": "#111111", "align": "end"}
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "contents": [
+                                {"type": "text", "text": "ค่าเช่าล่วงหน้า", "size": "sm", "color": "#555555", "flex": 0},
+                                {"type": "text", "text": f"฿{g_advance:,.2f}", "size": "sm", "color": "#111111", "align": "end"}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+    
+    if g_other > 0:
+        flex_json["body"]["contents"][2]["contents"].append({
+            "type": "box",
+            "layout": "horizontal",
+            "contents": [
+                {"type": "text", "text": "ค่าธรรมเนียมอื่นๆ", "size": "sm", "color": "#555555", "flex": 0},
+                {"type": "text", "text": f"฿{g_other:,.2f}", "size": "sm", "color": "#111111", "align": "end"}
+            ]
+        })
+
+    flex_json["body"]["contents"].extend([
+        {"type": "separator", "margin": "lg"},
+        {
+            "type": "box",
+            "layout": "horizontal",
+            "margin": "lg",
+            "contents": [
+                {"type": "text", "text": "ยอดรวมทั้งสิ้น", "size": "md", "color": "#555555", "flex": 0, "weight": "bold"},
+                {"type": "text", "text": f"฿{g_total:,.2f}", "size": "xl", "color": "#111111", "align": "end", "weight": "bold"}
+            ]
+        },
+        *payment_instruction_contents,
+        {"type": "text", "text": "ขออภัยหากท่านชำระเรียบร้อยแล้ว", "size": "xxs", "color": "#aaaaaa", "margin": "xxl", "align": "center"}
+    ])
+
+    try:
+        bot_api.push_message(tenant.line_user_id, FlexSendMessage(alt_text="ใบแจ้งยอดชำระแรกเข้า", contents=flex_json))
+    except Exception as e:
+        print(f"Error sending flex: {e}")
+        # Fallback to text
+        msg = f"ยินดีด้วย! การลงทะเบียนห้อง {rooms_str} ได้รับการอนุมัติแล้ว\nยอดรวม: {g_total:,.2f} บาท\nกรุณาชำระเงินที่เคาน์เตอร์หรือผ่านเมนูใน LINE"
+        bot_api.push_message(tenant.line_user_id, TextSendMessage(text=msg))
 
 def setup_personal_rich_menu(tenant, db: Session, force=False):
     if not tenant or not tenant.line_user_id:

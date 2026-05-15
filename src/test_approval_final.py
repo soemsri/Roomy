@@ -41,7 +41,14 @@ def run_tests():
     db = TestingSessionLocal()
     
     # 1. Setup
-    owner = models.Owner(line_user_id="OWNER_LINE", display_name="Owner")
+    from security import hash_password
+    pw_hash = hash_password(ADMIN_PASSWORD)
+    owner = models.Owner(
+        line_user_id="OWNER_LINE", 
+        display_name="Owner", 
+        password_hash=pw_hash,
+        lease_template="Contract for {tenant_name} Room {room_number}"
+    )
     room = models.Room(room_number="A001", floor=1, base_rent=3000, status="Vacant")
     db.add(owner)
     db.add(room)
@@ -49,14 +56,20 @@ def run_tests():
     
     # 2. Simulate Registration (Creating Pending Tenant)
     print("Step 1: Creating Pending Tenant...")
-    tenant = models.Tenant(line_user_id="TENANT_LINE", current_room_id=room.id, status="Pending", uuid=str(uuid.uuid4()))
+    tenant = models.Tenant(
+        line_user_id="TENANT_LINE", 
+        full_name="John Doe",
+        current_room_id=room.id, 
+        status="Pending", 
+        uuid=str(uuid.uuid4())
+    )
     db.add(tenant)
     db.commit()
     tenant_id = tenant.id
     
     # 3. Verify Dashboard shows it
     print("Step 2: Verifying Dashboard...")
-    cookies = {"admin_session": ADMIN_PASSWORD}
+    cookies = {"admin_session": pw_hash}
     res = client.get("/admin/dashboard", cookies=cookies)
     assert res.status_code == 200
     assert "Pending Registrations" in res.text
@@ -65,7 +78,7 @@ def run_tests():
     
     # 4. Approve via API
     print("Step 3: Approving via API...")
-    res = client.post(f"/admin/registration/{tenant_id}/approve", cookies=cookies)
+    res = client.post(f"/admin/registration/{tenant_id}/approve", data={"room_ids": str(room.id)}, cookies=cookies)
     assert res.status_code == 200
     
     # 5. Verify status change
