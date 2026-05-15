@@ -88,28 +88,37 @@ def load_db_configs():
     finally:
         db.close()
 
-configs = load_db_configs()
+def refresh_configs():
+    global configs, LINE_ADMIN_CHANNEL_ACCESS_TOKEN, LINE_ADMIN_CHANNEL_SECRET
+    global LINE_TENANT_CHANNEL_ACCESS_TOKEN, LINE_TENANT_CHANNEL_SECRET
+    global LINE_NOTIFY_TOKEN, BASE_URL, ADMIN_PASSWORD
+    global admin_bot_api, admin_handler, tenant_bot_api, tenant_handler, line_bot_api
 
-# LINE Credentials
-LINE_ADMIN_CHANNEL_ACCESS_TOKEN = configs["LINE_ADMIN_CHANNEL_ACCESS_TOKEN"]
-LINE_ADMIN_CHANNEL_SECRET = configs["LINE_ADMIN_CHANNEL_SECRET"]
-LINE_TENANT_CHANNEL_ACCESS_TOKEN = configs["LINE_TENANT_CHANNEL_ACCESS_TOKEN"]
-LINE_TENANT_CHANNEL_SECRET = configs["LINE_TENANT_CHANNEL_SECRET"]
+    configs = load_db_configs()
 
-LINE_NOTIFY_TOKEN = configs["LINE_NOTIFY_TOKEN"]
-BASE_URL = configs["BASE_URL"]
-ADMIN_PASSWORD = configs["ADMIN_PASSWORD"]
+    # LINE Credentials
+    LINE_ADMIN_CHANNEL_ACCESS_TOKEN = configs["LINE_ADMIN_CHANNEL_ACCESS_TOKEN"]
+    LINE_ADMIN_CHANNEL_SECRET = configs["LINE_ADMIN_CHANNEL_SECRET"]
+    LINE_TENANT_CHANNEL_ACCESS_TOKEN = configs["LINE_TENANT_CHANNEL_ACCESS_TOKEN"]
+    LINE_TENANT_CHANNEL_SECRET = configs["LINE_TENANT_CHANNEL_SECRET"]
 
-# Admin Channel
-admin_bot_api = LineBotApi(LINE_ADMIN_CHANNEL_ACCESS_TOKEN) if LINE_ADMIN_CHANNEL_ACCESS_TOKEN else None
-admin_handler = WebhookHandler(LINE_ADMIN_CHANNEL_SECRET) if LINE_ADMIN_CHANNEL_SECRET else None
+    LINE_NOTIFY_TOKEN = configs["LINE_NOTIFY_TOKEN"]
+    BASE_URL = configs["BASE_URL"]
+    ADMIN_PASSWORD = configs["ADMIN_PASSWORD"]
 
-# Tenant Channel
-tenant_bot_api = LineBotApi(LINE_TENANT_CHANNEL_ACCESS_TOKEN) if LINE_TENANT_CHANNEL_ACCESS_TOKEN else None
-tenant_handler = WebhookHandler(LINE_TENANT_CHANNEL_SECRET) if LINE_TENANT_CHANNEL_SECRET else None
+    # Admin Channel
+    admin_bot_api = LineBotApi(LINE_ADMIN_CHANNEL_ACCESS_TOKEN) if LINE_ADMIN_CHANNEL_ACCESS_TOKEN else None
+    admin_handler = WebhookHandler(LINE_ADMIN_CHANNEL_SECRET) if LINE_ADMIN_CHANNEL_SECRET else None
 
-# Compatibility shim (optional, if you want to keep old variable names for some internal logic)
-line_bot_api = tenant_bot_api 
+    # Tenant Channel
+    tenant_bot_api = LineBotApi(LINE_TENANT_CHANNEL_ACCESS_TOKEN) if LINE_TENANT_CHANNEL_ACCESS_TOKEN else None
+    tenant_handler = WebhookHandler(LINE_TENANT_CHANNEL_SECRET) if LINE_TENANT_CHANNEL_SECRET else None
+
+    # Compatibility shim
+    line_bot_api = tenant_bot_api
+
+# Initial load
+refresh_configs()
 
 def send_line_notify(message: str):
     if not LINE_NOTIFY_TOKEN:
@@ -2035,6 +2044,7 @@ async def save_config(
     admin: bool = Depends(get_admin)
 ):
     security.set_system_config(db, key, value, description)
+    refresh_configs()
     return {"status": "Success"}
 
 @app.post("/admin/settings/save")

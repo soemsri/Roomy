@@ -1139,6 +1139,59 @@
                 </div>
             </div>
 
+            <!-- Advanced Settings (Secrets Management) -->
+            <div style="margin-top: 30px; border-top: 2px solid var(--border); padding-top: 30px;">
+                <div class="section-header">
+                    <h2><i class="fa-solid fa-shield-halved"></i> การตั้งค่าขั้นสูง (Advanced Settings)</h2>
+                    <button class="btn btn-outline" onclick="openConfigModal()"><i class="fa-solid fa-plus"></i> เพิ่มค่า Config ใหม่</button>
+                </div>
+                <p style="font-size: 0.85em; color: var(--text-muted); margin-bottom: 15px;">จัดการ API Keys และความลับของระบบ (ข้อมูลจะถูกเข้ารหัสในฐานข้อมูล)</p>
+                
+                <div class="table-container">
+                    <table id="configTable">
+                        <thead>
+                            <tr>
+                                <th>Key</th>
+                                <th>Value (Encrypted)</th>
+                                <th>คำอธิบาย</th>
+                                <th>จัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="configTableBody">
+                            <!-- Filled by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            </div>
+        </div>
+
+        <!-- Config Modal -->
+        <div id="configModal" class="modal">
+            <div class="modal-content" style="max-width: 500px;">
+                <h3 id="configModalTitle">แก้ไขการตั้งค่าระบบ</h3>
+                <form id="configForm">
+                    <div class="form-group">
+                        <label>Key</label>
+                        <input type="text" id="config_key" name="key" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Value</label>
+                        <input type="password" id="config_value" name="value" required placeholder="ใส่ค่า API Key หรือความลับที่นี่">
+                        <div style="margin-top: 5px;">
+                            <input type="checkbox" onclick="togglePassword('config_value')"> <span style="font-size: 0.8em;">แสดงค่า</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>คำอธิบาย</label>
+                        <input type="text" id="config_description" name="description">
+                    </div>
+                    <div style="display: flex; gap: 10px; margin-top: 20px;">
+                        <button type="submit" class="btn btn-primary" style="flex: 1;">บันทึก</button>
+                        <button type="button" class="btn btn-outline" style="flex: 1;" onclick="document.getElementById('configModal').style.display='none'">ยกเลิก</button>
+                    </div>
+                </form>
             </div>
         </div>
 
@@ -3138,7 +3191,7 @@
         }
 
         async function loadSystemConfigs() {
-            const list = document.getElementById('system_configs_list');
+            const list = document.getElementById('configTableBody');
             if (!list) return;
             
             try {
@@ -3153,6 +3206,7 @@
                                 ${c.value ? '••••••••' + c.value.slice(-4) : '(ว่าง)'}
                             </div>
                         </td>
+                        <td>${c.description || '-'}</td>
                         <td>
                             <button class="btn btn-outline" style="padding: 5px 10px; font-size: 0.8em;" onclick='openConfigModal(${JSON.stringify(c)})'>
                                 <i class="fa-solid fa-edit"></i> แก้ไข
@@ -3164,28 +3218,47 @@
         }
 
         function openConfigModal(config) {
-            document.getElementById('conf_key').value = config.key;
-            document.getElementById('conf_value').value = config.value;
-            document.getElementById('conf_desc').innerText = config.description || '-';
-            document.getElementById('configModalTitle').innerText = `แก้ไข: ${config.key}`;
-            document.getElementById('configEditModal').style.display = 'block';
+            if (config) {
+                document.getElementById('config_key').value = config.key;
+                document.getElementById('config_value').value = config.value;
+                document.getElementById('config_description').value = config.description || '';
+                document.getElementById('configModalTitle').innerText = `แก้ไข: ${config.key}`;
+            } else {
+                document.getElementById('config_key').value = '';
+                document.getElementById('config_value').value = '';
+                document.getElementById('config_description').value = '';
+                document.getElementById('configModalTitle').innerText = 'เพิ่มการตั้งค่าระบบ';
+            }
+            document.getElementById('configModal').style.display = 'block';
         }
 
-        async function saveSystemConfig() {
-            const key = document.getElementById('conf_key').value;
-            const value = document.getElementById('conf_value').value;
-            
-            const formData = new FormData();
-            formData.append('key', key);
-            formData.append('value', value);
-            
-            const res = await fetch('/admin/settings/configs/save', { method: 'POST', body: formData });
-            if (res.ok) {
-                alert('บันทึกการตั้งค่าสำเร็จ (อาจต้องรีสตาร์ทระบบเพื่อให้มีผลสมบูรณ์)');
-                document.getElementById('configEditModal').style.display = 'none';
-                loadSystemConfigs();
+        function togglePassword(id) {
+            const x = document.getElementById(id);
+            if (x.type === "password") {
+                x.type = "text";
+            } else {
+                x.type = "password";
             }
         }
+
+        document.getElementById('configForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            
+            try {
+                const res = await fetch('/admin/settings/configs/save', { method: 'POST', body: formData });
+                if (res.ok) {
+                    alert('บันทึกการตั้งค่าสำเร็จ ระบบจะเริ่มใช้งานค่าใหม่ทันที');
+                    document.getElementById('configModal').style.display = 'none';
+                    loadSystemConfigs();
+                } else {
+                    const data = await res.json();
+                    alert('Error: ' + (data.detail || 'ไม่สามารถบันทึกได้'));
+                }
+            } catch (err) {
+                alert('Fetch Error: ' + err);
+            }
+        };
 
         async function openBuildingListModal() {
             const modal = document.getElementById('buildingListModal');
