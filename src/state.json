@@ -1,8 +1,8 @@
 {
   "status": "active",
   "current_phase": 14,
-  "last_action": "Implemented 'Download QR Code' button and improved Flex Message for entry payments, including account name display and cash payment notice.",
-  "summary": "Phase 14: UX Optimization & Scalability. Implemented pagination for Lease Management and Tenant History tables. Optimized the Tenant Bill view for mobile devices. Enhanced the Entry Payment Flex Message by removing the owner's name for privacy, adding clear PromptPay account name display, and implementing a 'Download QR Code' button for better usability. Added a cash payment notice as an alternative option. Refined the Tenant Approval flow with immediate visual feedback and fixed calculation bugs for multi-room approvals.",
+  "last_action": "Implemented secure, encrypted Secret Management via Database with Admin UI; added Phone Number column and renamed Manage Residents button in Dashboard.",
+  "summary": "Phase 14: UX Optimization & Scalability. Implemented pagination for Lease Management and Tenant History. Enhanced the Entry Payment Flex Message with 'Download QR Code' and clear account info. Added a 'Phone Number' column to the Active Tenants list and renamed the 'Manage Residents' button to 'Co-residents' for better clarity. Successfully migrated all sensitive API keys from .env/Code to an encrypted database storage system (AES/Fernet), now manageable via 'Advanced Settings' in the Admin Dashboard with dynamic refreshing.",
   "next_steps": [
     "Conduct a full end-to-end test of the pro-rata billing cycle with actual meter readings.",
     "Implement a CSV/PDF export feature for the Tenant History and Settlement records.",

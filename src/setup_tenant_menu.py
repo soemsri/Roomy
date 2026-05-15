@@ -3,10 +3,26 @@ import os
 import json
 import requests
 from dotenv import load_dotenv
+from database import SessionLocal
+import security
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
 
-CHANNEL_ACCESS_TOKEN = os.getenv("LINE_TENANT_CHANNEL_ACCESS_TOKEN")
+def get_access_token():
+    db = SessionLocal()
+    try:
+        token = security.get_system_config(db, "LINE_TENANT_CHANNEL_ACCESS_TOKEN")
+        if token:
+            return token
+    finally:
+        db.close()
+    return os.getenv("LINE_TENANT_CHANNEL_ACCESS_TOKEN")
+
+CHANNEL_ACCESS_TOKEN = get_access_token()
+if not CHANNEL_ACCESS_TOKEN:
+    print("Error: LINE_TENANT_CHANNEL_ACCESS_TOKEN not found in DB or .env")
+    exit(1)
+
 HEADERS = {
     "Authorization": f"Bearer {CHANNEL_ACCESS_TOKEN}",
     "Content-Type": "application/json"
@@ -43,13 +59,13 @@ def create_tenant_rich_menu():
     print(f"Successfully created Rich Menu ID: {rich_menu_id}")
 
     # 3. Upload Image
-    image_path = "tenant_richmenu.png"
+    image_path = "tenant_richmenu.jpg"
     with open(image_path, "rb") as f:
         img_res = requests.post(
             f"https://api-data.line.me/v2/bot/richmenu/{rich_menu_id}/content",
             headers={
                 "Authorization": f"Bearer {CHANNEL_ACCESS_TOKEN}",
-                "Content-Type": "image/png"
+                "Content-Type": "image/jpeg"
             },
             data=f
         )

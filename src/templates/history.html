@@ -1,35 +1,122 @@
 <!DOCTYPE html>
-<html>
+<html lang="th">
 <head>
+    <meta charset="UTF-8">
     <title>ประวัติการชำระเงิน - SukAnan Apartment</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body { font-family: sans-serif; padding: 20px; background: #f4f4f4; }
-        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 15px; }
-        .row { display: flex; justify-content: space-between; padding: 5px 0; }
-        .status { font-weight: bold; }
-        .Paid { color: #27ae60; }
-        .Unpaid { color: #e67e22; }
-        .Draft { color: #95a5a6; }
-        .Pending { color: #f39c12; }
-        .btn-view { display: inline-block; padding: 5px 10px; background: #3498db; color: white; text-decoration: none; border-radius: 3px; font-size: 0.8em; }
+        * { box-sizing: border-box; }
+        body { 
+            font-family: 'Prompt', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            margin: 0; 
+            padding: 15px; 
+            background: #f0f2f5; 
+            color: #1c1e21; 
+        }
+        .container { max-width: 500px; margin: 0 auto; }
+        .header { 
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 10px 5px;
+        }
+        .header h2 { margin: 0; font-size: 1.4em; color: #1c1e21; font-weight: 600; }
+        
+        .card { 
+            background: white; 
+            padding: 16px; 
+            border-radius: 16px; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05); 
+            margin-bottom: 12px;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid rgba(0,0,0,0.02);
+            transition: transform 0.1s;
+        }
+        .card:active { transform: scale(0.98); }
+        
+        .card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+        .period { font-size: 1.05em; font-weight: 600; color: #1c1e21; }
+        
+        .card-bottom { display: flex; justify-content: space-between; align-items: center; }
+        .amount { font-size: 1.1em; font-weight: 700; color: #0078d4; }
+        
+        .status-badge { 
+            display: inline-block; 
+            padding: 4px 10px; 
+            border-radius: 20px; 
+            font-size: 0.75em; 
+            font-weight: 600;
+        }
+        .status-paid { background: #e6fffa; color: #00875a; }
+        .status-unpaid { background: #fff1f0; color: #d93025; }
+        .status-pending { background: #fff7e6; color: #d48806; }
+        .status-draft { background: #f5f5f5; color: #8c8c8c; }
+        
+        .btn-view { 
+            background: #f0f2f5; 
+            color: #0078d4; 
+            text-decoration: none; 
+            padding: 8px 14px; 
+            border-radius: 10px; 
+            font-size: 0.85em; 
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            background: white;
+            border-radius: 16px;
+            color: #65676b;
+        }
+        .empty-state i { font-size: 3em; color: #ccd0d5; margin-bottom: 15px; }
+        .empty-state p { margin: 0; font-size: 1em; }
     </style>
 </head>
 <body>
-    <h2>ประวัติการชำระเงิน ห้อง {{ tenant.room.room_number }}</h2>
-    {% for inv in invoices %}
-    <div class="card">
-        <div class="row">
-            <strong>เดือน {{ inv.billing_month }}/{{ inv.billing_year }}</strong>
-            <span class="status {{ inv.status }}">
-                {{ 'ชำระแล้ว' if inv.status == 'Paid' else ('ค้างชำระ' if inv.status == 'Unpaid' else ('รอตรวจสอบ' if inv.status == 'Pending Verification' else ('ฉบับร่าง' if inv.status == 'Draft' else inv.status))) }}
-            </span>
+    <div class="container">
+        <div class="header">
+            <h2><i class="fa-solid fa-clock-rotate-left" style="color: #0078d4; margin-right: 10px;"></i>ประวัติห้อง {{ tenant.room.room_number }}</h2>
         </div>
-        <div class="row">
-            <span>ยอดรวม: {{ "{:,.2f}".format(inv.total_amount) }} บาท</span>
-            <a href="/bill/{{ inv.uuid }}" class="btn-view">ดูรายละเอียด</a>
+
+        {% for inv in invoices %}
+        <a href="/bill/{{ inv.uuid }}" style="text-decoration: none; color: inherit;">
+            <div class="card">
+                <div class="card-top">
+                    <div class="period">เดือน {{ inv.billing_month }}/{{ inv.billing_year }}</div>
+                    {% if inv.status == 'Paid' %}
+                        <span class="status-badge status-paid"><i class="fa-solid fa-check"></i> ชำระแล้ว</span>
+                    {% elif inv.status == 'Unpaid' %}
+                        <span class="status-badge status-unpaid">ค้างชำระ</span>
+                    {% elif inv.status == 'Pending Verification' %}
+                        <span class="status-badge status-pending">รอตรวจสอบ</span>
+                    {% elif inv.status == 'Draft' %}
+                        <span class="status-badge status-draft">ฉบับร่าง</span>
+                    {% else %}
+                        <span class="status-badge status-draft">{{ inv.status }}</span>
+                    {% endif %}
+                </div>
+                <div class="card-bottom">
+                    <div class="amount">฿{{ "{:,.2f}".format(inv.total_amount) }}</div>
+                    <div class="btn-view">
+                        ดูบิล <i class="fa-solid fa-chevron-right" style="font-size: 0.8em;"></i>
+                    </div>
+                </div>
+            </div>
+        </a>
+        {% else %}
+        <div class="empty-state">
+            <i class="fa-solid fa-receipt"></i>
+            <p>ยังไม่มีประวัติการชำระเงิน</p>
+            <p style="font-size: 0.85em; margin-top: 5px; color: #8a8d91;">เมื่อมีการออกใบแจ้งหนี้ รายการจะแสดงที่นี่</p>
         </div>
+        {% endfor %}
     </div>
-    {% endfor %}
 </body>
 </html>

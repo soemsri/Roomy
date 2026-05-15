@@ -2419,6 +2419,7 @@ def send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_oth
         except: pass
 
 def setup_personal_rich_menu(tenant, db: Session, force=False):
+    global LINE_TENANT_CHANNEL_ACCESS_TOKEN
     if not tenant or not tenant.line_user_id:
         return None
     
@@ -2430,13 +2431,14 @@ def setup_personal_rich_menu(tenant, db: Session, force=False):
     multi_room = len(active_tenants) > 1
 
     # Check if we already have a menu and if it's still appropriate
-    # (Simplified check: if they have a rich_menu_id, we assume it's correct 
-    # unless force=True or we want to get fancy with counting rooms in the menu name)
     if tenant.rich_menu_id and not force:
         return tenant.rich_menu_id
 
-    # Load Tenant Channel Access Token
-    token = os.getenv("LINE_TENANT_CHANNEL_ACCESS_TOKEN")
+    # Load Tenant Channel Access Token from global (which is loaded from DB)
+    token = LINE_TENANT_CHANNEL_ACCESS_TOKEN
+    if not token:
+        token = os.getenv("LINE_TENANT_CHANNEL_ACCESS_TOKEN")
+    
     if not token:
         return None
 
@@ -2487,14 +2489,16 @@ def setup_personal_rich_menu(tenant, db: Session, force=False):
         
         rich_menu_id = res.json()["richMenuId"]
 
-        # 2. Upload Image
-        image_path = os.path.join(os.path.dirname(__file__), "tenant_richmenu.png")
+        # 2. Upload Image (Prefer compressed JPG to avoid 1MB limit)
+        image_path = os.path.join(os.path.dirname(__file__), "tenant_richmenu.jpg")
+        if not os.path.exists(image_path):
+             image_path = os.path.join(os.path.dirname(__file__), "tenant_richmenu.png")
         if not os.path.exists(image_path):
              image_path = os.path.join(os.path.dirname(__file__), "image", "tenantrichmenu.jpg")
 
         if os.path.exists(image_path):
             with open(image_path, "rb") as f:
-                content_type = "image/png" if image_path.endswith(".png") else "image/jpeg"
+                content_type = "image/jpeg" if image_path.endswith(".jpg") else "image/png"
                 requests.post(
                     f"https://api-data.line.me/v2/bot/richmenu/{rich_menu_id}/content",
                     headers={
