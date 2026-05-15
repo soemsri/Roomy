@@ -2240,26 +2240,40 @@ def send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_oth
     import promptpay
     
     rooms_str = ", ".join(success_rooms)
-    apt_name = owner.display_name if owner and owner.display_name else "หอพักสุขอนันต์"
     
     # 1. Payment Method Logic
     qr_enabled = owner.qr_payment_enabled if owner else 1
     payment_instruction_contents = []
     
     if qr_enabled:
-        # Get PromptPay ID
+        # Get PromptPay ID and Name
         promptpay_id = "0812345678"
+        promptpay_name = ""
         try:
             config_list = json.loads(owner.promptpay_config)
             if config_list and isinstance(config_list, list) and len(config_list) > 0:
                 promptpay_id = config_list[0].get('id', promptpay_id)
+                promptpay_name = config_list[0].get('name', "")
         except: pass
         
         payload = promptpay.generate_promptpay_payload(promptpay_id, g_total)
-        qr_url = f"https://chart.googleapis.com/chart?cht=qr&chs=300x300&chl={payload}"
+        import urllib.parse
+        encoded_payload = urllib.parse.quote(payload)
+        qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={encoded_payload}"
         
-        payment_instruction_contents = [
-            {"type": "text", "text": "สแกน QR Code เพื่อชำระเงิน", "size": "sm", "color": "#555555", "align": "center", "margin": "lg"},
+        if promptpay_name:
+            payment_instruction_contents.append({
+                "type": "text", 
+                "text": f"ชื่อบัญชี: {promptpay_name}", 
+                "size": "sm", 
+                "color": "#0078d4", 
+                "weight": "bold", 
+                "align": "center", 
+                "margin": "lg"
+            })
+
+        payment_instruction_contents.extend([
+            {"type": "text", "text": "สแกน QR Code เพื่อชำระเงิน", "size": "sm", "color": "#555555", "align": "center", "margin": "md"},
             {
                 "type": "image",
                 "url": qr_url,
@@ -2267,22 +2281,32 @@ def send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_oth
                 "aspectMode": "fit",
                 "margin": "md"
             },
-            {"type": "text", "text": f"พร้อมเพย์: {promptpay_id}", "size": "xs", "color": "#888888", "align": "center", "margin": "sm"}
-        ]
-    else:
-        payment_instruction_contents = [
             {
-                "type": "box",
-                "layout": "vertical",
-                "backgroundColor": "#f8f9fa",
-                "paddingAll": "md",
-                "margin": "lg",
-                "contents": [
-                    {"type": "text", "text": "ชำระเป็นเงินสดได้ที่", "size": "sm", "color": "#555555", "align": "center"},
-                    {"type": "text", "text": "หน้าเคาน์เตอร์ออฟฟิศ", "weight": "bold", "size": "md", "color": "#111111", "align": "center", "margin": "xs"}
-                ]
-            }
+                "type": "button",
+                "style": "secondary",
+                "height": "sm",
+                "margin": "md",
+                "action": {
+                    "type": "uri",
+                    "label": "ดาวน์โหลด QR Code",
+                    "uri": qr_url
+                }
+            },
+            {"type": "text", "text": f"พร้อมเพย์: {promptpay_id}", "size": "xs", "color": "#888888", "align": "center", "margin": "sm"}
+        ])
+    
+    # Always add cash notice at the bottom of instructions
+    payment_instruction_contents.append({
+        "type": "box",
+        "layout": "vertical",
+        "backgroundColor": "#f8f9fa",
+        "paddingAll": "md",
+        "margin": "lg",
+        "contents": [
+            {"type": "text", "text": "หรือชำระเป็นเงินสดได้ที่", "size": "xs", "color": "#888888", "align": "center"},
+            {"type": "text", "text": "หน้าเคาน์เตอร์ออฟฟิศ", "weight": "bold", "size": "sm", "color": "#555555", "align": "center", "margin": "xs"}
         ]
+    })
 
     # 2. Build Flex JSON
     flex_json = {
@@ -2301,12 +2325,10 @@ def send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_oth
             "type": "box",
             "layout": "vertical",
             "contents": [
-                {"type": "text", "text": apt_name, "weight": "bold", "size": "md", "margin": "md"},
-                {"type": "separator", "margin": "lg"},
                 {
                     "type": "box",
                     "layout": "vertical",
-                    "margin": "lg",
+                    "margin": "md",
                     "spacing": "sm",
                     "contents": [
                         {
