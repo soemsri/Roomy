@@ -299,8 +299,21 @@
         /* Responsive */
         @media (max-width: 992px) {
             .sidebar { transform: translateX(-100%); }
-            .main-wrapper { margin-left: 0; width: 100%; }
+            .main-wrapper { margin-left: 0; width: 100%; padding: 15px; }
             .sidebar.active { transform: translateX(0); }
+            
+            /* Settings Mobile Optimization */
+            .settings-grid {
+                flex-direction: column !important;
+                gap: 20px !important;
+            }
+            .left-col, .right-col {
+                width: 100% !important;
+            }
+            .bank-pair {
+                grid-template-columns: 1fr !important;
+                gap: 15px !important;
+            }
         }
     </style>
     <!-- CKEditor 5 for Lease Template -->
