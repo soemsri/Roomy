@@ -712,16 +712,28 @@
                             </div>
                         </div>
                         <div>
-                            <label>พร้อมเพย์ที่ใช้</label>
-                            <select id="room_promptpay_id" name="promptpay_id">
-                                <option value="">(ค่าเริ่มต้น)</option>
-                                {% if owner and owner.promptpay_config %}
-                                    {% set pp_list = owner.promptpay_config | from_json %}
-                                    {% for pp in pp_list %}
-                                        <option value="{{ pp.id if pp is mapping else pp }}">{{ pp.name if pp is mapping else pp }}</option>
-                                    {% endfor %}
-                                {% endif %}
+                            <label>ช่องทางรับชำระเงินหลัก</label>
+                            <select id="room_primary_payment" name="primary_payment" onchange="updatePaymentHiddenFields(this, '')">
+                                <option value="">-- เลือกช่องทางชำระเงิน --</option>
+                                <optgroup label="PromptPay">
+                                    {% if owner and owner.promptpay_config %}
+                                        {% set pp_list = owner.promptpay_config | from_json %}
+                                        {% for pp in pp_list %}
+                                            <option value="PromptPay:{{ pp.id if pp is mapping else pp }}">{{ pp.name if pp is mapping else pp }} ({{ pp.id if pp is mapping else pp }})</option>
+                                        {% endfor %}
+                                    {% endif %}
+                                </optgroup>
+                                <optgroup label="บัญชีธนาคาร">
+                                    {% if owner and owner.bank_config %}
+                                        {% set bank_list = owner.bank_config | from_json %}
+                                        {% for b in bank_list %}
+                                            <option value="Bank:{{ b.id }}">{{ b.bank }} - {{ b.account }} ({{ b.name }})</option>
+                                        {% endfor %}
+                                    {% endif %}
+                                </optgroup>
                             </select>
+                            <input type="hidden" id="primary_payment_type" name="primary_payment_type">
+                            <input type="hidden" id="primary_payment_id" name="primary_payment_id">
                         </div>
                     </div>
                     
@@ -774,6 +786,8 @@
                                     data-elec="{{ room.electricity_rate }}"
                                     data-water="{{ room.water_rate }}"
                                     data-ppid="{{ room.promptpay_id or '' }}"
+                                    data-paytype="{{ room.primary_payment_type or 'PromptPay' }}"
+                                    data-payid="{{ room.primary_payment_id or '' }}"
                                     data-recurring='{{ room.recurring_charges or "[]" }}'
                                     data-building="{{ room.building_id or 'null' }}"
                                     onclick="openEditRoom(this)">
@@ -1022,8 +1036,21 @@
                     <div class="form-group" style="background: #f8f9fa; padding: 20px; border-radius: 12px; border: 1px solid var(--border);">
                         <label><i class="fa-solid fa-wallet"></i> บัญชีพร้อมเพย์</label>
                         <div id="pp_container"></div>
-                        <button type="button" class="btn btn-outline" style="margin-top: 15px; width: 100%; border-style: dashed;" onclick="addPPField('', '')">+ เพิ่มบัญชี</button>
+                        <div style="display: flex; gap: 10px; margin-top: 15px;">
+                            <button type="button" class="btn btn-outline" style="flex: 2; border-style: dashed;" onclick="addPPField('', '')">+ เพิ่มบัญชีพร้อมเพย์</button>
+                            <button type="button" class="btn" style="flex: 1; padding: 10px;" onclick="saveQuickSettings()"><i class="fa-solid fa-save"></i> บันทึกบัญชี</button>
+                        </div>
                         <input type="hidden" id="promptpay_config">
+                    </div>
+                    <div class="form-group" style="background: #fdf2f8; padding: 20px; border-radius: 12px; border: 1px solid #fbcfe8; margin-top: 20px;">
+                        <label style="color: #be185d;"><i class="fa-solid fa-building-columns"></i> บัญชีธนาคาร</label>
+                        <div id="bank_container"></div>
+                        <div style="display: flex; gap: 10px; margin-top: 15px;">
+                            <button type="button" class="btn btn-outline" style="flex: 2; border-style: dashed; color: #be185d; border-color: #f9a8d4;" onclick="addBankField('', '', '', '', '')">+ เพิ่มบัญชีธนาคาร</button>
+                            <button type="button" class="btn" style="flex: 1; padding: 10px; background: #be185d;" onclick="saveQuickSettings()"><i class="fa-solid fa-save"></i> บันทึกบัญชี</button>
+                        </div>
+                        <input type="hidden" id="bank_config">
+                    </div>
                     </div>
                 </div>
                 <div class="right-col">
@@ -1330,17 +1357,30 @@
                         <div class="form-group"><label>เรทน้ำ</label><input type="number" id="edit_water_rate" name="water_rate" required></div>
                     </div>
                     <div class="form-group">
-                        <label>พร้อมเพย์เฉพาะห้อง</label>
-                        <select id="edit_room_promptpay_id" name="promptpay_id">
-                            <option value="">(ค่าเริ่มต้น)</option>
-                            {% if owner and owner.promptpay_config %}
-                                {% set pp_list = owner.promptpay_config | from_json %}
-                                {% for pp in pp_list %}
-                                    <option value="{{ pp.id if pp is mapping else pp }}">{{ pp.name if pp is mapping else pp }}</option>
-                                {% endfor %}
-                            {% endif %}
+                        <label>ช่องทางการชำระเงินหลัก (เลือกได้อย่างเดียว)</label>
+                        <select id="edit_primary_payment" name="primary_payment" onchange="updatePaymentHiddenFields(this, 'edit_')">
+                            <option value="">-- เลือกช่องทางชำระเงิน --</option>
+                            <optgroup label="PromptPay">
+                                {% if owner and owner.promptpay_config %}
+                                    {% set pp_list = owner.promptpay_config | from_json %}
+                                    {% for pp in pp_list %}
+                                        <option value="PromptPay:{{ pp.id if pp is mapping else pp }}">{{ pp.name if pp is mapping else pp }} ({{ pp.id if pp is mapping else pp }})</option>
+                                    {% endfor %}
+                                {% endif %}
+                            </optgroup>
+                            <optgroup label="บัญชีธนาคาร">
+                                {% if owner and owner.bank_config %}
+                                    {% set bank_list = owner.bank_config | from_json %}
+                                    {% for b in bank_list %}
+                                        <option value="Bank:{{ b.id }}">{{ b.bank }} - {{ b.account }} ({{ b.name }})</option>
+                                    {% endfor %}
+                                {% endif %}
+                            </optgroup>
                         </select>
+                        <input type="hidden" id="edit_primary_payment_type" name="primary_payment_type">
+                        <input type="hidden" id="edit_primary_payment_id" name="primary_payment_id">
                     </div>
+
                     <div class="form-group">
                         <label style="display: flex; justify-content: space-between;">
                             <span>ค่าใช้จ่ายประจำเดือน</span>
@@ -1696,6 +1736,9 @@
 
     <script id="pp_data_raw" type="application/json">
         {{ (owner.promptpay_config if owner and owner.promptpay_config else "[]") | safe }}
+    </script>
+    <script id="bank_data_raw" type="application/json">
+        {{ (owner.bank_config if owner and owner.bank_config else "[]") | safe }}
     </script>
     <script id="move_in_fees_raw" type="application/json">
         {{ (owner.move_in_fees_config if owner and owner.move_in_fees_config else "[]") | safe }}
@@ -2230,6 +2273,20 @@
             } catch(e) { console.error("Error initPP:", e); addPPField('', ''); }
         }
 
+        // Init Bank
+        function initBank() {
+            try {
+                const rawConfig = document.getElementById('bank_data_raw').textContent.trim();
+                let list = JSON.parse(rawConfig);
+                const container = document.getElementById('bank_container');
+                if (!container) return;
+                container.innerHTML = '';
+                if (Array.isArray(list) && list.length > 0) {
+                    list.forEach(item => addBankField(item.bank || '', item.account || '', item.name || '', item.qr || '', item.id || ''));
+                } else { addBankField('', '', '', '', ''); }
+            } catch(e) { console.error("Error initBank:", e); addBankField('', '', '', '', ''); }
+        }
+
         // Init Fees
         function initFees() {
             try {
@@ -2250,6 +2307,7 @@
         // Initialize Section Visibility (Default Hash or Overview)
         window.addEventListener('DOMContentLoaded', () => {
             initPP();
+            initBank();
             initFees();
             const hash = window.location.hash.replace('#', '');
             if (hash) showSection(hash);
@@ -2552,6 +2610,68 @@
             container.appendChild(div);
         }
 
+        function addBankField(bank = '', account = '', name = '', qr = '', id = '') {
+            const container = document.getElementById('bank_container');
+            if (!container) return;
+            const bankId = id || 'bank_' + Date.now() + Math.random().toString(36).substr(2, 5);
+            const div = document.createElement('div');
+            div.className = 'bank-pair'; 
+            div.style.display = 'grid'; 
+            div.style.gridTemplateColumns = '1fr 1fr 1fr auto'; 
+            div.style.gap = '8px'; 
+            div.style.marginBottom = '15px';
+            div.style.padding = '10px';
+            div.style.background = 'white';
+            div.style.borderRadius = '8px';
+            div.style.border = '1px solid #f9a8d4';
+            
+            div.innerHTML = `
+                <input type="hidden" class="bank-id" value="${bankId}">
+                <div style="grid-column: span 1;"><label style="font-size:0.7em;">ธนาคาร</label><input type="text" placeholder="ธนาคาร" value="${bank}" class="bank-name-input"></div>
+                <div style="grid-column: span 1;"><label style="font-size:0.7em;">เลขบัญชี</label><input type="text" placeholder="เลขบัญชี" value="${account}" class="bank-acc-input"></div>
+                <div style="grid-column: span 1;"><label style="font-size:0.7em;">ชื่อบัญชี</label><input type="text" placeholder="ชื่อบัญชี" value="${name}" class="bank-owner-input"></div>
+                <div style="display:flex; align-items:flex-end; gap:5px;">
+                    <input type="hidden" class="bank-qr-path" value="${qr}">
+                    <button type="button" class="btn btn-outline" style="color:#be185d; border-color:#f9a8d4;" onclick="uploadBankQR(this)" title="อัปโหลด QR Code">
+                        <i class="fa-solid ${qr ? 'fa-image' : 'fa-upload'}"></i>
+                    </button>
+                    <button type="button" class="btn btn-danger" onclick="this.parentElement.parentElement.remove()"><i class="fa-solid fa-trash"></i></button>
+                </div>
+            `;
+            container.appendChild(div);
+        }
+
+        async function uploadBankQR(btn) {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.onchange = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                const formData = new FormData();
+                formData.append('image', file);
+                
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+                try {
+                    const res = await fetch('/admin/settings/upload-bank-qr', { method: 'POST', body: formData });
+                    const data = await res.json();
+                    if (res.ok) {
+                        btn.parentElement.querySelector('.bank-qr-path').value = data.url;
+                        btn.innerHTML = '<i class="fa-solid fa-image" style="color:var(--success);"></i>';
+                        alert('อัปโหลด QR Code เรียบร้อย');
+                    } else {
+                        alert('Error: ' + data.detail);
+                        btn.innerHTML = '<i class="fa-solid fa-upload"></i>';
+                    }
+                } catch (err) {
+                    alert('Upload failed: ' + err);
+                    btn.innerHTML = '<i class="fa-solid fa-upload"></i>';
+                }
+            };
+            input.click();
+        }
+
         async function previewPP(btn) {
             const ppId = btn.parentElement.querySelector('.pp-id').value.trim();
             if (!ppId) return;
@@ -2588,10 +2708,21 @@
                 if (id) pairs.push({ id, name });
             });
 
+            const banks = [];
+            document.querySelectorAll('.bank-pair').forEach(div => {
+                const id = div.querySelector('.bank-id').value;
+                const bank = div.querySelector('.bank-name-input').value.trim();
+                const account = div.querySelector('.bank-acc-input').value.trim();
+                const name = div.querySelector('.bank-owner-input').value.trim();
+                const qr = div.querySelector('.bank-qr-path').value;
+                if (bank && account) banks.push({ id, bank, account, name, qr });
+            });
+
             const formData = new FormData();
             formData.append('display_name', document.getElementById('display_name').value);
             formData.append('qr_enabled', document.getElementById('qr_enabled').value);
             formData.append('promptpay_config', JSON.stringify(pairs));
+            formData.append('bank_config', JSON.stringify(banks));
             formData.append('late_fee_enabled', document.getElementById('late_fee_enabled').checked ? "1" : "0");
             formData.append('due_day', document.getElementById('due_day').value);
             formData.append('late_fee_per_day', document.getElementById('late_fee_per_day').value);
@@ -2610,6 +2741,31 @@
                 alert('Error saving settings: ' + (err.detail || JSON.stringify(err)));
             }
         };
+
+        function saveQuickSettings() {
+            // Trigger the main form's submit event
+            const form = document.getElementById('settingsForm');
+            if (form) {
+                // We use requestSubmit() if available, otherwise dispatch event
+                if (typeof form.requestSubmit === 'function') {
+                    form.requestSubmit();
+                } else {
+                    form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+                }
+            }
+        }
+
+        function updatePaymentHiddenFields(select, prefix) {
+            const val = select.value;
+            if (val.includes(':')) {
+                const parts = val.split(':');
+                document.getElementById(prefix + 'primary_payment_type').value = parts[0];
+                document.getElementById(prefix + 'primary_payment_id').value = parts[1];
+            } else {
+                document.getElementById(prefix + 'primary_payment_type').value = '';
+                document.getElementById(prefix + 'primary_payment_id').value = '';
+            }
+        }
 
         function addRecurringRow(containerId, desc = '', amt = '') {
             const container = document.getElementById(containerId);
@@ -2663,7 +2819,12 @@
             document.getElementById('edit_base_rent').value = d.rent;
             document.getElementById('edit_elec_rate').value = d.elec;
             document.getElementById('edit_water_rate').value = d.water;
-            document.getElementById('edit_room_promptpay_id').value = d.ppid;
+            
+            const paySelector = document.getElementById('edit_primary_payment');
+            const payVal = d.paytype + ':' + d.payid;
+            paySelector.value = payVal;
+            updatePaymentHiddenFields(paySelector, 'edit_');
+
             document.getElementById('edit_building_id').value = d.building === 'null' ? '' : d.building;
             const container = document.getElementById('edit_room_recurring_container');
             container.innerHTML = '';

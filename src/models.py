@@ -18,6 +18,7 @@ class Owner(Base):
     magic_link_duration_min = Column(Integer, default=5) # Duration of magic link in minutes
     promptpay_config = Column(Text, default='[]')
     promptpay_name = Column(String)
+    bank_config = Column(Text, default='[]') # JSON: [{"id": "...", "bank": "...", "account": "...", "name": "...", "qr": "..."}]
     qr_payment_enabled = Column(Integer, default=1)
     late_fee_enabled = Column(Integer, default=0)
     due_day = Column(Integer, default=5)
@@ -69,7 +70,9 @@ class Room(Base):
     base_rent = Column(Float, default=0.0)
     electricity_rate = Column(Float, default=0.0)
     water_rate = Column(Float, default=0.0)
-    promptpay_id = Column(String) # The specific PromptPay ID for this room
+    promptpay_id = Column(String) # Legacy PromptPay ID
+    primary_payment_type = Column(String, default="PromptPay") # PromptPay, Bank
+    primary_payment_id = Column(String) # ID from the respective config
     recurring_charges = Column(Text) # JSON: [{"description": "...", "amount": 0}]
 
     building = relationship("Building", back_populates="rooms")

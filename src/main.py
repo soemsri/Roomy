@@ -728,37 +728,47 @@ async def view_bill(request: Request, invoice_uuid: str, db: Session = Depends(g
 
     promptpay_id = None
     promptpay_name = None
+    bank_info = None
     qr_enabled = 1
     
     if owner:
         qr_enabled = owner.qr_payment_enabled
-        # 1. Get room specific preference
-        target_id = invoice.room.promptpay_id if invoice.room else None
         
-        # 2. Parse config
-        config_list = []
+        p_type = invoice.room.primary_payment_type if invoice.room else "PromptPay"
+        p_id = invoice.room.primary_payment_id if invoice.room else None
+
+        if p_type == "Bank":
+            try:
+                bank_list = json.loads(owner.bank_config)
+                bank_info = next((b for b in bank_list if b.get('id') == p_id), None)
+            except: pass
+        else:
+            # PromptPay logic
+            target_id = p_id or (invoice.room.promptpay_id if invoice.room else None)
+            config_list = []
+            try:
+                config_list = json.loads(owner.promptpay_config)
+            except: pass
+            
+            if target_id and isinstance(config_list, list):
+                match = next((c for c in config_list if c.get('id') == target_id), None)
+                if match:
+                    promptpay_id = match.get('id')
+                    promptpay_name = match.get('name')
+            
+            if not promptpay_id and isinstance(config_list, list) and len(config_list) > 0:
+                promptpay_id = config_list[0].get('id')
+                promptpay_name = config_list[0].get('name')
+
+    if not promptpay_id and not bank_info:
+        promptpay_id = "0812345678"
+
+    payload = ""
+    if promptpay_id:
         try:
-            config_list = json.loads(owner.promptpay_config)
-        except: pass
-        
-        if target_id and isinstance(config_list, list):
-            match = next((c for c in config_list if c.get('id') == target_id), None)
-            if match:
-                promptpay_id = match.get('id')
-                promptpay_name = match.get('name')
-        
-        # 3. Fallback
-        if not promptpay_id and isinstance(config_list, list) and len(config_list) > 0:
-            promptpay_id = config_list[0].get('id')
-            promptpay_name = config_list[0].get('name')
-
-    if not promptpay_id: promptpay_id = "0812345678"
-
-    try:
-        payload = promptpay.generate_promptpay_payload(promptpay_id, invoice.total_amount)
-    except Exception as e:
-        print(f"PromptPay Generation Error: {e}")
-        payload = ""
+            payload = promptpay.generate_promptpay_payload(promptpay_id, invoice.total_amount)
+        except Exception as e:
+            print(f"PromptPay Generation Error: {e}")
 
     return templates.TemplateResponse("bill.html", {
         "request": request,
@@ -781,6 +791,7 @@ async def view_bill(request: Request, invoice_uuid: str, db: Session = Depends(g
         "promptpay_payload": payload,
         "qr_enabled": qr_enabled,
         "promptpay_name": promptpay_name,
+        "bank_info": bank_info,
         "room": invoice.room
     })
 
@@ -1505,7 +1516,8 @@ async def add_room(
     electricity_rate: float = Form(...),
     water_rate: float = Form(...),
     building_id: str = Form(None),
-    promptpay_id: str = Form(None),
+    primary_payment_type: str = Form(None),
+    primary_payment_id: str = Form(None),
     recurring_charges: str = Form("[]"),
     db: Session = Depends(get_db),
     admin: bool = Depends(get_admin)
@@ -1525,7 +1537,8 @@ async def add_room(
         electricity_rate=electricity_rate,
         water_rate=water_rate,
         building_id=bid,
-        promptpay_id=promptpay_id,
+        primary_payment_type=primary_payment_type,
+        primary_payment_id=primary_payment_id,
         recurring_charges=recurring_charges,
         status="Vacant"
     )
@@ -1542,7 +1555,8 @@ async def edit_room(
     electricity_rate: float = Form(...),
     water_rate: float = Form(...),
     building_id: str = Form(None),
-    promptpay_id: str = Form(None),
+    primary_payment_type: str = Form(None),
+    primary_payment_id: str = Form(None),
     recurring_charges: str = Form("[]"),
     db: Session = Depends(get_db),
     admin: bool = Depends(get_admin)
@@ -1567,7 +1581,8 @@ async def edit_room(
     room.electricity_rate = electricity_rate
     room.water_rate = water_rate
     room.building_id = bid
-    room.promptpay_id = promptpay_id
+    room.primary_payment_type = primary_payment_type
+    room.primary_payment_id = primary_payment_id
     room.recurring_charges = recurring_charges
     db.commit()
     return {"status": "Success"}
@@ -2051,6 +2066,7 @@ async def save_config(
 async def save_settings(
     display_name: str = Form(None),
     promptpay_config: str = Form("[]"),
+    bank_config: str = Form("[]"),
     qr_enabled: str = Form("1"),
     late_fee_enabled: str = Form("0"),
     due_day: str = Form("5"),
@@ -2066,13 +2082,15 @@ async def save_settings(
     if not owner:
         owner = models.Owner(line_user_id="SYSTEM")
         db.add(owner)
-    
+
     if display_name is not None:
         owner.display_name = display_name
-    
+
     owner.promptpay_config = promptpay_config
-    
+    owner.bank_config = bank_config
+
     # Safe conversions
+
     try: owner.qr_payment_enabled = int(qr_enabled)
     except: owner.qr_payment_enabled = 1
     
@@ -2096,6 +2114,23 @@ async def save_settings(
     
     db.commit()
     return {"status": "Success"}
+
+@app.post("/admin/settings/upload-bank-qr")
+async def upload_bank_qr(
+    image: UploadFile = File(...),
+    admin: bool = Depends(get_admin)
+):
+    # Ensure directory exists
+    if not os.path.exists(uploads_dir):
+        os.makedirs(uploads_dir)
+        
+    file_ext = os.path.splitext(image.filename)[1]
+    file_name = f"bank_qr_{uuid.uuid4().hex}{file_ext}"
+    file_path = os.path.join(uploads_dir, file_name)
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(image.file, buffer)
+    
+    return {"url": f"/uploads/{file_name}"}
 
 @app.get("/admin/magic-login")
 async def magic_login(request: Request, token: str, db: Session = Depends(get_db)):

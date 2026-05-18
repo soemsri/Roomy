@@ -3,6 +3,7 @@
 <head>
     <title>ใบแจ้งหนี้ - SukAnan Apartment</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * { box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 15px; background: #f0f2f5; color: #1c1e21; }
@@ -27,11 +28,17 @@
         }
         .btn:active { opacity: 0.8; }
         .btn-cash { background: #65676b; }
+        .btn-outline { background: white; color: #65676b; border: 1px solid #ccd0d5; }
         
         .qr-section { text-align: center; margin-top: 25px; display: none; animation: fadeIn 0.3s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         
         #qr-image { width: 100%; max-width: 250px; height: auto; border: 1px solid #ddd; padding: 10px; border-radius: 12px; margin: 15px 0; }
+        
+        .bank-card { background: #f8faff; border: 1px solid #d0e3ff; border-radius: 12px; padding: 15px; margin: 15px 0; text-align: left; }
+        .bank-name { font-weight: bold; color: #0078d4; font-size: 1.1em; }
+        .bank-acc { font-size: 1.4em; font-weight: 800; margin: 8px 0; color: #1c1e21; display: flex; align-items: center; gap: 10px; }
+        .copy-btn { color: #888; cursor: pointer; font-size: 0.7em; }
         
         #upload-form { text-align: left; padding: 20px; background: #f7f8fa; border: 2px dashed #ccd0d5; border-radius: 12px; margin-top: 20px; }
         #upload-form label { font-size: 0.9em; display: block; margin-bottom: 10px; font-weight: 700; color: #1c1e21; }
@@ -103,7 +110,7 @@
 
         {% if status == 'Unpaid' %}
             {% if qr_enabled == 1 %}
-            <button class="btn" id="pay-qr">ชำระด้วย QR PromptPay</button>
+            <button class="btn" id="pay-qr">ชำระเงินออนไลน์</button>
             {% endif %}
             <button class="btn btn-cash" id="pay-cash-btn" onclick="alert('กรุณาชำระเงินสดที่ออฟฟิศ และขอรับใบเสร็จตัวจริง')">ชำระด้วยเงินสด</button>
         {% elif status == 'Pending Verification' %}
@@ -118,11 +125,27 @@
         {% endif %}
 
         <div class="qr-section" id="qr-container">
-            <p style="margin: 0; font-weight: 700; color: #1c1e21;">สแกน QR Code เพื่อโอนเงิน</p>
-            {% if promptpay_name %}
-            <p style="margin: 5px 0; color: #0078d4; font-weight: 700; font-size: 1.1em;">ชื่อบัญชี: {{ promptpay_name }}</p>
+            <p style="margin: 0; font-weight: 700; color: #1c1e21;">ข้อมูลการชำระเงิน</p>
+            
+            {% if bank_info %}
+                <div class="bank-card">
+                    <div class="bank-name">{{ bank_info.bank }}</div>
+                    <div class="bank-acc">
+                        <span id="acc-num">{{ bank_info.account }}</span>
+                        <i class="fa-regular fa-copy copy-btn" onclick="copyAcc()"></i>
+                    </div>
+                    <div style="color: #65676b; font-size: 0.9em;">ชื่อบัญชี: {{ bank_info.name }}</div>
+                </div>
+                {% if bank_info.qr %}
+                    <img id="qr-image" src="{{ bank_info.qr }}" alt="Bank QR">
+                {% endif %}
+            {% else %}
+                {% if promptpay_name %}
+                <p style="margin: 5px 0; color: #0078d4; font-weight: 700; font-size: 1.1em;">ชื่อบัญชี: {{ promptpay_name }}</p>
+                {% endif %}
+                <img id="qr-image" src="" alt="PromptPay QR">
             {% endif %}
-            <img id="qr-image" src="" alt="PromptPay QR">
+
             <p style="font-size: 0.85em; color: #65676b; margin: 10px 0 20px; line-height: 1.4;">กรุณาตรวจสอบยอดเงินให้ตรงกับบิล<br>และแนบสลิปด้านล่างเพื่อแจ้งเจ้าหน้าที่</p>
             
             <form id="upload-form">
@@ -130,25 +153,33 @@
                 <input type="file" id="slip-file" accept="image/*" required>
                 <button type="submit" class="btn" style="background: #0078d4; margin-top: 0;">ส่งสลิปยืนยัน</button>
             </form>
-            <button class="btn btn-outline" style="background:none; border:1px solid #ccd0d5; color:#65676b; margin-top:15px; padding:10px;" onclick="location.reload()">ย้อนกลับ</button>
+            <button class="btn btn-outline" style="margin-top:15px;" onclick="location.reload()">ย้อนกลับ</button>
         </div>
     </div>
 
     <script>
+        function copyAcc() {
+            const acc = document.getElementById('acc-num').innerText;
+            navigator.clipboard.writeText(acc);
+            alert('คัดลอกเลขบัญชีแล้ว');
+        }
+
         const payQrBtn = document.getElementById('pay-qr');
         if (payQrBtn) {
             payQrBtn.addEventListener('click', function(e) {
+                const isBank = {{ 'true' if bank_info else 'false' }};
                 const payload = "{{ promptpay_payload }}";
-                if (payload) {
+                
+                if (!isBank && payload) {
                     const qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" + encodeURIComponent(payload);
                     document.getElementById('qr-image').src = qrUrl;
-                    document.getElementById('qr-container').style.display = 'block';
-                    this.style.display = 'none';
-                    const cashBtn = document.getElementById('pay-cash-btn');
-                    if (cashBtn) cashBtn.style.display = 'none';
-                    // Scroll to QR
-                    document.getElementById('qr-container').scrollIntoView({ behavior: 'smooth' });
                 }
+                
+                document.getElementById('qr-container').style.display = 'block';
+                this.style.display = 'none';
+                const cashBtn = document.getElementById('pay-cash-btn');
+                if (cashBtn) cashBtn.style.display = 'none';
+                document.getElementById('qr-container').scrollIntoView({ behavior: 'smooth' });
             });
         }
 
