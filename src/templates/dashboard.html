@@ -1038,7 +1038,7 @@
                         <div id="pp_container"></div>
                         <div style="display: flex; gap: 10px; margin-top: 15px;">
                             <button type="button" class="btn btn-outline" style="flex: 2; border-style: dashed;" onclick="addPPField('', '')">+ เพิ่มบัญชีพร้อมเพย์</button>
-                            <button type="button" class="btn" style="flex: 1; padding: 10px;" onclick="saveQuickSettings()"><i class="fa-solid fa-save"></i> บันทึกบัญชี</button>
+                            <button type="button" class="btn btn-primary" style="flex: 1; padding: 10px;" onclick="saveQuickSettings()"><i class="fa-solid fa-save"></i> บันทึกบัญชี</button>
                         </div>
                         <input type="hidden" id="promptpay_config">
                     </div>
@@ -1047,7 +1047,7 @@
                         <div id="bank_container"></div>
                         <div style="display: flex; gap: 10px; margin-top: 15px;">
                             <button type="button" class="btn btn-outline" style="flex: 2; border-style: dashed; color: #be185d; border-color: #f9a8d4;" onclick="addBankField('', '', '', '', '')">+ เพิ่มบัญชีธนาคาร</button>
-                            <button type="button" class="btn" style="flex: 1; padding: 10px; background: #be185d;" onclick="saveQuickSettings()"><i class="fa-solid fa-save"></i> บันทึกบัญชี</button>
+                            <button type="button" class="btn btn-primary" style="flex: 1; padding: 10px;" onclick="saveQuickSettings()"><i class="fa-solid fa-save"></i> บันทึกบัญชี</button>
                         </div>
                         <input type="hidden" id="bank_config">
                     </div>
@@ -1487,9 +1487,9 @@
         <div class="modal-content" style="max-width:320px; text-align:center;">
             <div class="modal-header"><h3 id="qrPreviewTitle">QR Preview</h3></div>
             <div class="modal-body">
-                <div id="qrPreviewContainer" style="padding:10px; border:1px solid var(--border); border-radius:10px;">
-                    <img id="qrPreviewImage" style="width:200px; height:200px; display:none;">
-                    <div id="qrPreviewLoading"><i class="fa-solid fa-spinner fa-spin"></i> กำลังสร้าง...</div>
+                <div id="qrPreviewContainer" style="padding:15px; background: white; border-radius:10px;">
+                    <img id="qrPreviewImage" style="width: 280px; max-width: 100%; height: auto; display:none; border-radius: 8px;">
+                    <div id="qrPreviewLoading" style="padding: 20px;"><i class="fa-solid fa-spinner fa-spin"></i> กำลังโหลด...</div>
                 </div>
             </div>
             <div class="modal-footer"><button class="btn btn-primary" onclick="document.getElementById('qrPreviewModal').style.display='none'">ปิด</button></div>
@@ -2632,6 +2632,9 @@
                 <div style="grid-column: span 1;"><label style="font-size:0.7em;">ชื่อบัญชี</label><input type="text" placeholder="ชื่อบัญชี" value="${name}" class="bank-owner-input"></div>
                 <div style="display:flex; align-items:flex-end; gap:5px;">
                     <input type="hidden" class="bank-qr-path" value="${qr}">
+                    <button type="button" class="btn btn-outline btn-bank-preview" style="color:#be185d; border-color:#f9a8d4; display: ${qr ? 'inline-block' : 'none'};" onclick="previewBankQR(this)" title="ดู QR Code">
+                        <i class="fa-solid fa-qrcode"></i>
+                    </button>
                     <button type="button" class="btn btn-outline" style="color:#be185d; border-color:#f9a8d4;" onclick="uploadBankQR(this)" title="อัปโหลด QR Code">
                         <i class="fa-solid ${qr ? 'fa-image' : 'fa-upload'}"></i>
                     </button>
@@ -2659,6 +2662,11 @@
                     if (res.ok) {
                         btn.parentElement.querySelector('.bank-qr-path').value = data.url;
                         btn.innerHTML = '<i class="fa-solid fa-image" style="color:var(--success);"></i>';
+                        
+                        // Show preview button
+                        const previewBtn = btn.parentElement.querySelector('.btn-bank-preview');
+                        if (previewBtn) previewBtn.style.display = 'inline-block';
+                        
                         alert('อัปโหลด QR Code เรียบร้อย');
                     } else {
                         alert('Error: ' + data.detail);
@@ -2682,6 +2690,31 @@
             const data = await res.json();
             img.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(data.payload)}`;
             img.onload = () => { img.style.display = 'inline-block'; document.getElementById('qrPreviewLoading').style.display='none'; };
+        }
+
+        function previewBankQR(btn) {
+            const qrPath = btn.parentElement.querySelector('.bank-qr-path').value;
+            if (!qrPath) {
+                alert('ยังไม่มีรูป QR Code');
+                return;
+            }
+            const modal = document.getElementById('qrPreviewModal');
+            const img = document.getElementById('qrPreviewImage');
+            const loading = document.getElementById('qrPreviewLoading');
+            
+            modal.style.display = 'block';
+            img.style.display = 'none';
+            loading.style.display = 'block';
+            
+            img.src = qrPath;
+            img.onload = () => {
+                img.style.display = 'inline-block';
+                loading.style.display = 'none';
+            };
+            img.onerror = () => {
+                alert('ไม่สามารถโหลดรูปภาพได้');
+                modal.style.display = 'none';
+            };
         }
 
         function exportReport() { 
