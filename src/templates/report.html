@@ -266,9 +266,9 @@
                 <span class="stat-trend trend-down"><i class="fa-solid fa-arrow-up"></i> 5.2%</span>
             </div>
             <div class="stat-card">
-                <span class="stat-label">Net Profit</span>
-                <span class="stat-value" id="totalProfitVal" style="color: var(--primary);">฿0.00</span>
-                <span class="stat-trend trend-up"><i class="fa-solid fa-arrow-up"></i> 8.1%</span>
+                <span class="stat-label">Occupancy Rate</span>
+                <span class="stat-value" id="occupancyRateVal" style="color: var(--primary);">0%</span>
+                <span class="stat-trend trend-up"><i class="fa-solid fa-users"></i> <span id="occupancyCount">0/0</span> Rooms</span>
             </div>
         </div>
 
@@ -277,21 +277,62 @@
             <div class="card span-8">
                 <div class="card-title">
                     <span>Revenue & Expenses Trends</span>
-                    <select style="width: auto; padding: 6px 12px; font-size: 0.8em; border-radius: 10px;">
-                        <option>Last 12 Months</option>
-                        <option>This Year</option>
-                    </select>
                 </div>
                 <div style="height: 350px;">
                     <canvas id="mainChart"></canvas>
                 </div>
             </div>
 
-            <!-- Distribution Chart -->
+            <!-- Monthly Expense Distribution Chart -->
             <div class="card span-4">
-                <div class="card-title">Expense Breakdown</div>
+                <div class="card-title">Monthly Expense Distribution</div>
                 <div style="height: 350px; display: flex; align-items: center; justify-content: center;">
                     <canvas id="donutChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Total Expense Breakdown -->
+            <div class="card span-4">
+                <div class="card-title">Total Expense Breakdown</div>
+                <div style="height: 350px; display: flex; align-items: center; justify-content: center;">
+                    <canvas id="totalExpenseDonutChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Aging Receivables Chart -->
+            <div class="card span-8">
+                <div class="card-title">
+                    <span>Aging Receivables (By Bucket)</span>
+                </div>
+                <div style="height: 350px;">
+                    <canvas id="agingChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Top Debtors Table -->
+            <div class="card span-4">
+                <div class="card-title">Top Outstanding Balances</div>
+                <div class="table-wrap" style="margin-top: 0;">
+                    <table style="border-spacing: 0;">
+                        <thead>
+                            <tr>
+                                <th>Room</th>
+                                <th>Name</th>
+                                <th style="text-align: right;">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody id="agingTableBody">
+                            <!-- JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Utility Profit/Loss Chart -->
+            <div class="card span-12">
+                <div class="card-title">Utility Profit/Loss (Collected vs Actual Paid)</div>
+                <div style="height: 350px;">
+                    <canvas id="utilityChart"></canvas>
                 </div>
             </div>
 
@@ -307,6 +348,7 @@
                                 <option value="Maintenance">Maintenance (ค่าซ่อมบำรุง)</option>
                                 <option value="Salary">Salary (เงินเดือน)</option>
                                 <option value="Utility">Utility (ค่าน้ำไฟหลวง)</option>
+                                <option value="Marketing">Marketing (ค่าการตลาด)</option>
                                 <option value="Other">Other (อื่นๆ)</option>
                             </select>
                         </div>
@@ -361,142 +403,299 @@
         {{ chart_data | safe }}
     </script>
 
+    <script id="occupancyStats" type="application/json">
+        {{ occupancy_stats | safe }}
+    </script>
+    <script id="occupancyTrend" type="application/json">
+        {{ occupancy_trend | safe }}
+    </script>
+
+    <script id="agingData" type="application/json">
+        {{ aging_data | safe }}
+    </script>
+
     <script>
-        const data = JSON.parse(document.getElementById('chartData').textContent);
+        // Data Retrieval
+        const dataStr = document.getElementById('chartData').textContent;
+        const occStatsStr = document.getElementById('occupancyStats').textContent;
+        const agingDataStr = document.getElementById('agingData').textContent;
+        
+        const data = JSON.parse(dataStr || '{}');
+        const occStats = JSON.parse(occStatsStr || '{"rate":0,"occupied":0,"total":0}');
+        const agingData = JSON.parse(agingDataStr || '{"buckets":{},"debtors":[]}');
 
-        // Update Stat Cards
-        const totalInc = data.income.total.reduce((a, b) => a + b, 0);
-        const totalExp = data.expense.total.reduce((a, b) => a + b, 0);
-        document.getElementById('totalIncomeVal').textContent = '฿' + totalInc.toLocaleString();
-        document.getElementById('totalExpenseVal').textContent = '฿' + totalExp.toLocaleString();
-        document.getElementById('totalProfitVal').textContent = '฿' + (totalInc - totalExp).toLocaleString();
+        // --- Update Stat Cards ---
+        try {
+            const totalInc = (data.income && data.income.total) ? data.income.total.reduce((a, b) => a + b, 0) : 0;
+            const totalExp = (data.expense && data.expense.total) ? data.expense.total.reduce((a, b) => a + b, 0) : 0;
+            
+            document.getElementById('totalIncomeVal').textContent = '฿' + totalInc.toLocaleString();
+            document.getElementById('totalExpenseVal').textContent = '฿' + totalExp.toLocaleString();
+            document.getElementById('occupancyRateVal').textContent = (occStats.rate || 0).toFixed(1) + '%';
+            document.getElementById('occupancyCount').textContent = (occStats.occupied || 0) + '/' + (occStats.total || 0);
+        } catch (e) { console.error("Stats Update Error:", e); }
 
-        // --- Main Line/Bar Chart ---
-        const ctxMain = document.getElementById('mainChart').getContext('2d');
-        const profitGradient = ctxMain.createLinearGradient(0, 0, 0, 400);
-        profitGradient.addColorStop(0, 'rgba(79, 70, 229, 0.2)');
-        profitGradient.addColorStop(1, 'rgba(79, 70, 229, 0)');
-
-        new Chart(ctxMain, {
-            type: 'line',
-            data: {
-                labels: data.labels,
-                datasets: [
-                    {
-                        label: 'Net Profit',
-                        data: data.profit,
-                        borderColor: '#4f46e5',
-                        backgroundColor: profitGradient,
-                        fill: true,
-                        tension: 0.4,
-                        pointRadius: 4,
-                        pointHoverRadius: 6,
-                        borderWidth: 3,
-                        type: 'line'
-                    },
-                    {
-                        label: 'Total Income',
-                        data: data.income.total,
-                        backgroundColor: '#10b981',
-                        borderRadius: 8,
-                        type: 'bar',
-                        barThickness: 20
-                    },
-                    {
-                        label: 'Total Expenses',
-                        data: data.expense.total,
-                        backgroundColor: '#ef4444',
-                        borderRadius: 8,
-                        type: 'bar',
-                        barThickness: 20
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: 'top', align: 'end', labels: { boxWidth: 8, usePointStyle: true, font: { weight: '600', size: 12 } } }
+        // --- Aging Receivables Chart ---
+        try {
+            const ctxAging = document.getElementById('agingChart').getContext('2d');
+            new Chart(ctxAging, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(agingData.buckets || {}),
+                    datasets: [{
+                        label: 'Total Amount',
+                        data: Object.values(agingData.buckets || {}),
+                        backgroundColor: ['#fbbf24', '#f97316', '#ef4444'],
+                        borderRadius: 10,
+                        barThickness: 40
+                    }]
                 },
-                scales: {
-                    y: { grid: { borderDash: [5, 5], drawBorder: false }, ticks: { font: { weight: '600' } } },
-                    x: { grid: { display: false }, ticks: { font: { weight: '600' } } }
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false } },
+                        y: { grid: { display: false } }
+                    }
                 }
+            });
+        } catch (e) { console.error("Aging Chart Error:", e); }
+
+        // --- Aging Debtors Table ---
+        try {
+            const agingBody = document.getElementById('agingTableBody');
+            if (agingBody) {
+                agingBody.innerHTML = (agingData.debtors || []).map(d => `
+                    <tr>
+                        <td style="background: transparent; border-radius: 0; padding: 12px 10px;"><strong>${d.room}</strong></td>
+                        <td style="background: transparent; border-radius: 0; padding: 12px 10px;">${d.name}</td>
+                        <td style="background: transparent; border-radius: 0; padding: 12px 10px; text-align: right; font-weight: 700; color: #ef4444;">฿${d.amount.toLocaleString()}</td>
+                    </tr>
+                `).join('') || '<tr><td colspan="3" style="text-align: center; padding: 20px; color: var(--text-muted);">No outstanding balances.</td></tr>';
             }
-        });
+        } catch (e) { console.error("Aging Table Error:", e); }
 
-        // --- Donut Chart ---
-        const lastMonthExp = {
-            common: data.expense.common.slice(-1)[0] || 0,
-            maintenance: data.expense.maintenance.slice(-1)[0] || 0,
-            salary: data.expense.salary.slice(-1)[0] || 0,
-            utility: data.expense.utility.slice(-1)[0] || 0,
-            other: data.expense.other.slice(-1)[0] || 0
-        };
+        // --- Main Revenue/Expense Chart ---
+        try {
+            const ctxMain = document.getElementById('mainChart').getContext('2d');
+            const profitGradient = ctxMain.createLinearGradient(0, 0, 0, 400);
+            profitGradient.addColorStop(0, 'rgba(79, 70, 229, 0.2)');
+            profitGradient.addColorStop(1, 'rgba(79, 70, 229, 0)');
 
-        const ctxDonut = document.getElementById('donutChart').getContext('2d');
-        new Chart(ctxDonut, {
-            type: 'doughnut',
-            data: {
-                labels: ['Common', 'Maint.', 'Salary', 'Util', 'Other'],
-                datasets: [{
-                    data: [lastMonthExp.common, lastMonthExp.maintenance, lastMonthExp.salary, lastMonthExp.utility, lastMonthExp.other],
-                    backgroundColor: ['#6366f1', '#f59e0b', '#ef4444', '#10b981', '#94a3b8'],
-                    borderWidth: 0,
-                    hoverOffset: 10
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                cutout: '75%',
-                plugins: {
-                    legend: { position: 'bottom', labels: { boxWidth: 10, padding: 20, font: { weight: '600' } } }
+            new Chart(ctxMain, {
+                type: 'line',
+                data: {
+                    labels: data.labels || [],
+                    datasets: [
+                        {
+                            label: 'Net Profit',
+                            data: data.profit || [],
+                            borderColor: '#4f46e5',
+                            backgroundColor: profitGradient,
+                            fill: true,
+                            tension: 0.4,
+                            type: 'line'
+                        },
+                        {
+                            label: 'Total Income',
+                            data: (data.income && data.income.total) || [],
+                            backgroundColor: '#10b981',
+                            borderRadius: 8,
+                            type: 'bar',
+                            barThickness: 20
+                        },
+                        {
+                            label: 'Total Expenses',
+                            data: (data.expense && data.expense.total) || [],
+                            backgroundColor: '#ef4444',
+                            borderRadius: 8,
+                            type: 'bar',
+                            barThickness: 20
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top', align: 'end', labels: { usePointStyle: true } }
+                    },
+                    scales: {
+                        y: { grid: { borderDash: [5, 5], drawBorder: false } },
+                        x: { grid: { display: false } }
+                    }
                 }
-            }
-        });
+            });
+        } catch (e) { console.error("Main Chart Error:", e); }
 
-        // --- UI Logic ---
+        // --- Expense Distribution (Last Month) ---
+        try {
+            const exp = data.expense || {};
+            const lastMonthExp = [
+                (exp.common || []).slice(-1)[0] || 0,
+                (exp.maintenance || []).slice(-1)[0] || 0,
+                (exp.salary || []).slice(-1)[0] || 0,
+                (exp.utility || []).slice(-1)[0] || 0,
+                (exp.marketing || []).slice(-1)[0] || 0,
+                (exp.other || []).slice(-1)[0] || 0
+            ];
+
+            const ctxDonut = document.getElementById('donutChart').getContext('2d');
+            new Chart(ctxDonut, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Common', 'Maint.', 'Salary', 'Util', 'Market', 'Other'],
+                    datasets: [{
+                        data: lastMonthExp,
+                        backgroundColor: ['#6366f1', '#f59e0b', '#ef4444', '#10b981', '#ec4899', '#94a3b8'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '75%',
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+        } catch (e) { console.error("Monthly Donut Error:", e); }
+
+        // --- Total Expense Breakdown ---
+        try {
+            const tb = data.total_breakdown || {};
+            const totalData = [
+                tb['Common Area'] || 0,
+                tb['Maintenance'] || 0,
+                tb['Salary'] || 0,
+                tb['Utility'] || 0,
+                tb['Marketing'] || 0,
+                tb['Other'] || 0
+            ];
+
+            const ctxTotalDonut = document.getElementById('totalExpenseDonutChart').getContext('2d');
+            new Chart(ctxTotalDonut, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Common', 'Maint.', 'Salary', 'Util', 'Market', 'Other'],
+                    datasets: [{
+                        data: totalData,
+                        backgroundColor: ['#6366f1', '#f59e0b', '#ef4444', '#10b981', '#ec4899', '#94a3b8'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '75%',
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+        } catch (e) { console.error("Total Donut Error:", e); }
+
+        // --- Utility Profit/Loss Chart ---
+        try {
+            const util = data.utility_compare || {};
+            const ctxUtil = document.getElementById('utilityChart').getContext('2d');
+            new Chart(ctxUtil, {
+                type: 'bar',
+                data: {
+                    labels: util.labels || [],
+                    datasets: [
+                        {
+                            label: 'Collected from Tenants',
+                            data: util.collected || [],
+                            backgroundColor: '#34d399',
+                            borderRadius: 6,
+                            barThickness: 30
+                        },
+                        {
+                            label: 'Actual Paid (MEA/MWA)',
+                            data: util.actual_paid || [],
+                            backgroundColor: '#f87171',
+                            borderRadius: 6,
+                            barThickness: 30
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { 
+                            beginAtZero: true,
+                            grid: { borderDash: [5, 5] },
+                            ticks: { callback: v => '฿' + v.toLocaleString() }
+                        }
+                    },
+                    plugins: {
+                        legend: { position: 'top' }
+                    }
+                }
+            });
+        } catch (e) { console.error("Utility Chart Error:", e); }
+
+        // --- UI Logic & API ---
         function toggleExpenseForm() {
             const el = document.getElementById('expenseFormCard');
-            el.style.display = (el.style.display === 'none') ? 'block' : 'none';
-            if(el.style.display === 'block') el.scrollIntoView({ behavior: 'smooth' });
+            if (el) {
+                el.style.display = (el.style.display === 'none') ? 'block' : 'none';
+                if(el.style.display === 'block') el.scrollIntoView({ behavior: 'smooth' });
+            }
         }
 
         async function loadExpenses() {
-            const res = await fetch('/admin/expenses');
-            const expenses = await res.json();
-            const body = document.getElementById('expenseTableBody');
-            
-            body.innerHTML = expenses.map(e => `
-                <tr>
-                    <td>${new Date(e.date).toLocaleDateString('th-TH')}</td>
-                    <td><span class="badge">${e.billing_month}/${e.billing_year}</span></td>
-                    <td><strong>${e.category}</strong></td>
-                    <td style="color: var(--text-muted); font-size: 0.9em;">${e.description || '-'}</td>
-                    <td style="text-align: right; font-weight: 700; color: #ef4444;">฿${e.amount.toLocaleString()}</td>
-                    <td style="text-align: center;">
-                        <button class="btn btn-secondary" style="padding: 6px; border-radius: 8px;" onclick="deleteExpense(${e.id})">
-                            <i class="fa-solid fa-trash-can" style="color: #ef4444;"></i>
-                        </button>
-                    </td>
-                </tr>
-            `).join('') || '<tr><td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted);">No expenses recorded yet.</td></tr>';
+            try {
+                const res = await fetch('/admin/expenses');
+                if (!res.ok) throw new Error('API Error');
+                const expenses = await res.json();
+                const body = document.getElementById('expenseTableBody');
+                if (!body) return;
+                
+                body.innerHTML = expenses.map(e => `
+                    <tr>
+                        <td style="background: transparent; border-radius: 0;">${new Date(e.date).toLocaleDateString('th-TH')}</td>
+                        <td style="background: transparent; border-radius: 0;"><span class="badge">${e.billing_month}/${e.billing_year}</span></td>
+                        <td style="background: transparent; border-radius: 0;"><strong>${e.category}</strong></td>
+                        <td style="background: transparent; border-radius: 0; color: var(--text-muted); font-size: 0.9em;">${e.description || '-'}</td>
+                        <td style="background: transparent; border-radius: 0; text-align: right; font-weight: 700; color: #ef4444;">฿${(e.amount || 0).toLocaleString()}</td>
+                        <td style="background: transparent; border-radius: 0; text-align: center;">
+                            <button class="btn btn-secondary" style="padding: 6px; border-radius: 8px;" onclick="deleteExpense(${e.id})">
+                                <i class="fa-solid fa-trash-can" style="color: #ef4444;"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `).join('') || '<tr><td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted);">No expenses recorded yet.</td></tr>';
+            } catch (err) {
+                console.error("Load Expenses Error:", err);
+                const body = document.getElementById('expenseTableBody');
+                if (body) body.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #ef4444; padding: 20px;">Unable to load expense data.</td></tr>';
+            }
         }
 
         async function deleteExpense(id) {
             if (!confirm('Confirm delete?')) return;
-            const res = await fetch(`/admin/expenses/${id}`, { method: 'DELETE' });
-            if (res.ok) window.location.reload();
+            try {
+                const res = await fetch(`/admin/expenses/${id}`, { method: 'DELETE' });
+                if (res.ok) window.location.reload();
+            } catch (e) { alert("Error deleting expense"); }
         }
 
-        document.getElementById('expenseForm').onsubmit = async (e) => {
-            e.preventDefault();
-            const formData = new FormData(e.target);
-            const res = await fetch('/admin/expenses', { method: 'POST', body: formData });
-            if (res.ok) window.location.reload();
-        };
+        const expForm = document.getElementById('expenseForm');
+        if (expForm) {
+            expForm.onsubmit = async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                try {
+                    const res = await fetch('/admin/expenses', { method: 'POST', body: formData });
+                    if (res.ok) window.location.reload();
+                    else alert("Error saving expense");
+                } catch (e) { alert("Network error"); }
+            };
+        }
 
+        // Initialize
         loadExpenses();
     </script>
 </body>

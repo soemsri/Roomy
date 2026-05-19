@@ -1054,11 +1054,11 @@ async def admin_report(request: Request, db: Session = Depends(get_db), admin: b
     income_rows = db.query(
         models.Invoice.billing_month,
         models.Invoice.billing_year,
-        func.sum(models.Invoice.rent_amount).label('rent'),
-        func.sum(models.Invoice.electricity_amount).label('elec'),
-        func.sum(models.Invoice.water_amount).label('water'),
-        func.sum(models.Invoice.total_amount - models.Invoice.rent_amount - models.Invoice.electricity_amount - models.Invoice.water_amount).label('other'),
-        func.sum(models.Invoice.total_amount).label('total')
+        func.coalesce(func.sum(models.Invoice.rent_amount), 0).label('rent'),
+        func.coalesce(func.sum(models.Invoice.electricity_amount), 0).label('elec'),
+        func.coalesce(func.sum(models.Invoice.water_amount), 0).label('water'),
+        func.coalesce(func.sum(models.Invoice.total_amount - models.Invoice.rent_amount - models.Invoice.electricity_amount - models.Invoice.water_amount), 0).label('other'),
+        func.coalesce(func.sum(models.Invoice.total_amount), 0).label('total')
     ).filter(models.Invoice.status == "Paid")\
      .group_by(models.Invoice.billing_year, models.Invoice.billing_month)\
      .order_by(models.Invoice.billing_year.asc(), models.Invoice.billing_month.asc())\
@@ -1069,20 +1069,21 @@ async def admin_report(request: Request, db: Session = Depends(get_db), admin: b
         models.Expense.billing_month,
         models.Expense.billing_year,
         models.Expense.category,
-        func.sum(models.Expense.amount).label('amount')
+        func.coalesce(func.sum(models.Expense.amount), 0).label('amount')
     ).group_by(models.Expense.billing_year, models.Expense.billing_month, models.Expense.category)\
      .order_by(models.Expense.billing_year.asc(), models.Expense.billing_month.asc())\
      .all()
      
     # Combine data for JSON
     report_data = {}
+    total_breakdown = {"Common Area": 0, "Maintenance": 0, "Salary": 0, "Utility": 0, "Marketing": 0, "Other": 0}
     
     for row in income_rows:
         key = f"{row.billing_year}-{row.billing_month:02d}"
         if key not in report_data:
             report_data[key] = {
                 "income": {"rent": 0, "elec": 0, "water": 0, "other": 0, "total": 0}, 
-                "expense": {"Common Area": 0, "Maintenance": 0, "Salary": 0, "Utility": 0, "Other": 0, "total": 0}
+                "expense": {"Common Area": 0, "Maintenance": 0, "Salary": 0, "Utility": 0, "Marketing": 0, "Other": 0, "total": 0}
             }
         report_data[key]["income"] = {
             "rent": row.rent or 0,
@@ -1097,13 +1098,18 @@ async def admin_report(request: Request, db: Session = Depends(get_db), admin: b
         if key not in report_data:
             report_data[key] = {
                 "income": {"rent": 0, "elec": 0, "water": 0, "other": 0, "total": 0}, 
-                "expense": {"Common Area": 0, "Maintenance": 0, "Salary": 0, "Utility": 0, "Other": 0, "total": 0}
+                "expense": {"Common Area": 0, "Maintenance": 0, "Salary": 0, "Utility": 0, "Marketing": 0, "Other": 0, "total": 0}
             }
         cat = row.category
         if cat not in report_data[key]["expense"]:
             report_data[key]["expense"][cat] = 0
         report_data[key]["expense"][cat] += row.amount
         report_data[key]["expense"]["total"] += row.amount
+        
+        if cat in total_breakdown:
+            total_breakdown[cat] += row.amount
+        else:
+            total_breakdown["Other"] += row.amount
 
     # Convert to sorted list for frontend
     sorted_keys = sorted(report_data.keys())
@@ -1124,17 +1130,81 @@ async def admin_report(request: Request, db: Session = Depends(get_db), admin: b
             "maintenance": [report_data[k]["expense"].get("Maintenance", 0) for k in recent_keys],
             "salary": [report_data[k]["expense"].get("Salary", 0) for k in recent_keys],
             "utility": [report_data[k]["expense"].get("Utility", 0) for k in recent_keys],
+            "marketing": [report_data[k]["expense"].get("Marketing", 0) for k in recent_keys],
             "other": [report_data[k]["expense"].get("Other", 0) for k in recent_keys],
             "total": [report_data[k]["expense"]["total"] for k in recent_keys],
         },
-        "profit": [report_data[k]["income"]["total"] - report_data[k]["expense"]["total"] for k in recent_keys]
+        "profit": [report_data[k]["income"]["total"] - report_data[k]["expense"]["total"] for k in recent_keys],
+        "total_breakdown": total_breakdown,
+        "utility_compare": {
+            "labels": recent_keys,
+            "collected": [report_data[k]["income"]["elec"] + report_data[k]["income"]["water"] for k in recent_keys],
+            "actual_paid": [report_data[k]["expense"]["Utility"] for k in recent_keys]
+        }
     }
 
     all_buildings = db.query(models.Building).all()
     owner = db.query(models.Owner).first()
+    
+    # Occupancy Stats
+    total_rooms = db.query(models.Room).count()
+    occupied_rooms = db.query(models.Room).filter(models.Room.status == "Occupied").count()
+    occupancy_stats = {
+        "total": total_rooms,
+        "occupied": occupied_rooms,
+        "vacant": total_rooms - occupied_rooms,
+        "rate": (occupied_rooms / total_rooms * 100) if total_rooms > 0 else 0
+    }
+    
+    # Historical Occupancy Trend (based on monthly invoices)
+    occupancy_trend = []
+    for k in recent_keys:
+        y, m = map(int, k.split('-'))
+        inv_count = db.query(models.Invoice).filter(
+            models.Invoice.billing_month == m,
+            models.Invoice.billing_year == y
+        ).count()
+        rate = (inv_count / total_rooms * 100) if total_rooms > 0 else 0
+        occupancy_trend.append(round(rate, 1))
+
+    # Aging Receivables
+    unpaid_invoices = db.query(models.Invoice).filter(models.Invoice.status != "Paid").all()
+    now = datetime.now()
+    aging_data = {
+        "buckets": {"1-15 days": 0, "16-30 days": 0, "30+ days": 0},
+        "debtors": [] # List of {name, room, amount, days}
+    }
+    
+    for inv in unpaid_invoices:
+        # Assuming due date is the 5th of the billing month
+        # If today is after the 5th, count days from the 5th
+        due_date = datetime(inv.billing_year, inv.billing_month, 5)
+        diff = now - due_date
+        days = max(0, diff.days)
+        
+        if days > 0:
+            if days <= 15: aging_data["buckets"]["1-15 days"] += inv.total_amount
+            elif days <= 30: aging_data["buckets"]["16-30 days"] += inv.total_amount
+            else: aging_data["buckets"]["30+ days"] += inv.total_amount
+            
+            aging_data["debtors"].append({
+                "name": inv.tenant.full_name if inv.tenant else "N/A",
+                "room": inv.room.room_number if inv.room else "N/A",
+                "amount": inv.total_amount,
+                "days": days
+            })
+    
+    # Sort debtors by amount descending
+    aging_data["debtors"].sort(key=lambda x: x["amount"], reverse=True)
+    # Take top 10 for the table/chart
+    aging_data["debtors"] = aging_data["debtors"][:10]
+
     return templates.TemplateResponse("report.html", {
         "request": request,
         "chart_data": json.dumps(chart_data),
+        "occupancy_stats": json.dumps(occupancy_stats),
+        "occupancy_trend": json.dumps(occupancy_trend),
+        "aging_data": json.dumps(aging_data),
         "all_buildings": all_buildings,
         "owner": owner
     })
