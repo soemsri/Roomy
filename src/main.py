@@ -1015,6 +1015,130 @@ async def admin_dashboard(
         "building_id": building_id
     })
 
+@app.get("/admin/expenses")
+async def list_expenses(db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+    return db.query(models.Expense).order_by(models.Expense.id.desc()).all()
+
+@app.post("/admin/expenses")
+async def add_expense(
+    category: str = Form(...),
+    amount: float = Form(...),
+    description: str = Form(None),
+    month: int = Form(...),
+    year: int = Form(...),
+    db: Session = Depends(get_db),
+    admin: bool = Depends(get_admin)
+):
+    expense = models.Expense(
+        category=category,
+        amount=amount,
+        description=description,
+        billing_month=month,
+        billing_year=year
+    )
+    db.add(expense)
+    db.commit()
+    return {"status": "Success"}
+
+@app.delete("/admin/expenses/{expense_id}")
+async def delete_expense(expense_id: int, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+    expense = db.query(models.Expense).filter(models.Expense.id == expense_id).first()
+    if expense:
+        db.delete(expense)
+        db.commit()
+    return {"status": "Success"}
+
+@app.get("/admin/report", response_class=HTMLResponse)
+async def admin_report(request: Request, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+    # Income aggregation
+    income_rows = db.query(
+        models.Invoice.billing_month,
+        models.Invoice.billing_year,
+        func.sum(models.Invoice.rent_amount).label('rent'),
+        func.sum(models.Invoice.electricity_amount).label('elec'),
+        func.sum(models.Invoice.water_amount).label('water'),
+        func.sum(models.Invoice.total_amount - models.Invoice.rent_amount - models.Invoice.electricity_amount - models.Invoice.water_amount).label('other'),
+        func.sum(models.Invoice.total_amount).label('total')
+    ).filter(models.Invoice.status == "Paid")\
+     .group_by(models.Invoice.billing_year, models.Invoice.billing_month)\
+     .order_by(models.Invoice.billing_year.asc(), models.Invoice.billing_month.asc())\
+     .all()
+
+    # Expense aggregation
+    expense_rows = db.query(
+        models.Expense.billing_month,
+        models.Expense.billing_year,
+        models.Expense.category,
+        func.sum(models.Expense.amount).label('amount')
+    ).group_by(models.Expense.billing_year, models.Expense.billing_month, models.Expense.category)\
+     .order_by(models.Expense.billing_year.asc(), models.Expense.billing_month.asc())\
+     .all()
+     
+    # Combine data for JSON
+    report_data = {}
+    
+    for row in income_rows:
+        key = f"{row.billing_year}-{row.billing_month:02d}"
+        if key not in report_data:
+            report_data[key] = {
+                "income": {"rent": 0, "elec": 0, "water": 0, "other": 0, "total": 0}, 
+                "expense": {"Common Area": 0, "Maintenance": 0, "Salary": 0, "Utility": 0, "Other": 0, "total": 0}
+            }
+        report_data[key]["income"] = {
+            "rent": row.rent or 0,
+            "elec": row.elec or 0,
+            "water": row.water or 0,
+            "other": row.other or 0,
+            "total": row.total or 0
+        }
+
+    for row in expense_rows:
+        key = f"{row.billing_year}-{row.billing_month:02d}"
+        if key not in report_data:
+            report_data[key] = {
+                "income": {"rent": 0, "elec": 0, "water": 0, "other": 0, "total": 0}, 
+                "expense": {"Common Area": 0, "Maintenance": 0, "Salary": 0, "Utility": 0, "Other": 0, "total": 0}
+            }
+        cat = row.category
+        if cat not in report_data[key]["expense"]:
+            report_data[key]["expense"][cat] = 0
+        report_data[key]["expense"][cat] += row.amount
+        report_data[key]["expense"]["total"] += row.amount
+
+    # Convert to sorted list for frontend
+    sorted_keys = sorted(report_data.keys())
+    # Limit to last 12 months for the chart
+    recent_keys = sorted_keys[-12:] if len(sorted_keys) > 12 else sorted_keys
+    
+    chart_data = {
+        "labels": recent_keys,
+        "income": {
+            "rent": [report_data[k]["income"]["rent"] for k in recent_keys],
+            "elec": [report_data[k]["income"]["elec"] for k in recent_keys],
+            "water": [report_data[k]["income"]["water"] for k in recent_keys],
+            "other": [report_data[k]["income"]["other"] for k in recent_keys],
+            "total": [report_data[k]["income"]["total"] for k in recent_keys],
+        },
+        "expense": {
+            "common": [report_data[k]["expense"].get("Common Area", 0) for k in recent_keys],
+            "maintenance": [report_data[k]["expense"].get("Maintenance", 0) for k in recent_keys],
+            "salary": [report_data[k]["expense"].get("Salary", 0) for k in recent_keys],
+            "utility": [report_data[k]["expense"].get("Utility", 0) for k in recent_keys],
+            "other": [report_data[k]["expense"].get("Other", 0) for k in recent_keys],
+            "total": [report_data[k]["expense"]["total"] for k in recent_keys],
+        },
+        "profit": [report_data[k]["income"]["total"] - report_data[k]["expense"]["total"] for k in recent_keys]
+    }
+
+    all_buildings = db.query(models.Building).all()
+    owner = db.query(models.Owner).first()
+    return templates.TemplateResponse("report.html", {
+        "request": request,
+        "chart_data": json.dumps(chart_data),
+        "all_buildings": all_buildings,
+        "owner": owner
+    })
+
 @app.post("/admin/registration/{tenant_id}/approve")
 async def approve_registration(tenant_id: int, room_ids: str = Form(...), db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
     tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()

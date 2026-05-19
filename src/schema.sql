@@ -153,9 +153,21 @@ CREATE TABLE maintenance_requests (
     description TEXT,
     image_url TEXT,
     status TEXT DEFAULT 'Pending', -- Pending, In Progress, Fixed
+    cost REAL DEFAULT 0.0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (tenant_id) REFERENCES tenants(id),
     FOREIGN KEY (room_id) REFERENCES rooms(id)
+);
+
+-- 7.1 Expenses
+CREATE TABLE expenses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category TEXT NOT NULL, -- Common Area, Maintenance, Salary, Utility, Other
+    amount REAL NOT NULL,
+    description TEXT,
+    date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    billing_month INTEGER,
+    billing_year INTEGER
 );
 
 -- 8. Room Assets

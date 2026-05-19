@@ -257,6 +257,16 @@ class Invoice(Base):
     room = relationship("Room")
     tenant = relationship("Tenant")
 
+class Expense(Base):
+    __tablename__ = "expenses"
+    id = Column(Integer, primary_key=True, index=True)
+    category = Column(String, nullable=False) # Common Area, Maintenance, Salary, Utility, Other
+    amount = Column(Float, nullable=False)
+    description = Column(Text)
+    date = Column(DateTime, server_default=func.now())
+    billing_month = Column(Integer)
+    billing_year = Column(Integer)
+
 class MaintenanceRequest(Base):
     __tablename__ = "maintenance_requests"
     id = Column(Integer, primary_key=True, index=True)
@@ -266,6 +276,7 @@ class MaintenanceRequest(Base):
     description = Column(Text)
     image_url = Column(String)
     status = Column(String, default="Pending")
+    cost = Column(Float, default=0.0)
     created_at = Column(DateTime, server_default=func.now())
     
     room = relationship("Room")

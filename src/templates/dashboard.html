@@ -333,6 +333,7 @@
         </div>
         <nav class="sidebar-menu">
             <a href="#overview" class="menu-item active"><i class="fa-solid fa-chart-line"></i> ภาพรวมระบบ</a>
+            <a href="/admin/report" class="menu-item"><i class="fa-solid fa-file-invoice-dollar"></i> รายงานการเงิน</a>
             <a href="#meterSection" class="menu-item"><i class="fa-solid fa-gauge-high"></i> จดมิเตอร์น้ำไฟ</a>
             <a href="#pendingSection" class="menu-item">
                 <i class="fa-solid fa-user-clock"></i> รอการอนุมัติ
@@ -1534,15 +1535,18 @@
                 <!-- Content loaded via JS -->
             </div>
             <div class="modal-footer">
-                <div style="display:flex; gap:10px; width:100%; align-items:center;">
+                <div style="display:flex; flex-direction: column; gap: 10px; width: 100%;">
                     <input type="hidden" id="current_repair_id">
-                    <select id="update_repair_status" class="form-control" style="flex:1; padding: 10px; border-radius: 8px; border: 1px solid var(--border);">
-                        <option value="Pending">Pending (รอรับเรื่อง)</option>
-                        <option value="In Progress">In Progress (กำลังดำเนินการ)</option>
-                        <option value="Fixed">Fixed (ซ่อมเสร็จสิ้น)</option>
-                        <option value="Cancelled">Cancelled (ยกเลิก)</option>
-                    </select>
-                    <button class="btn btn-primary" onclick="saveRepairStatus()">บันทึกสถานะ</button>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <input type="number" id="update_repair_cost" class="form-control" placeholder="ค่าซ่อม (บาท)" style="flex:1; padding: 10px; border-radius: 8px; border: 1px solid var(--border);">
+                        <select id="update_repair_status" class="form-control" style="flex:1; padding: 10px; border-radius: 8px; border: 1px solid var(--border);">
+                            <option value="Pending">Pending (รอรับเรื่อง)</option>
+                            <option value="In Progress">In Progress (กำลังดำเนินการ)</option>
+                            <option value="Fixed">Fixed (ซ่อมเสร็จสิ้น)</option>
+                            <option value="Cancelled">Cancelled (ยกเลิก)</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary" style="width: 100%; justify-content: center;" onclick="saveRepairStatus()">บันทึกข้อมูล</button>
                 </div>
             </div>
         </div>
