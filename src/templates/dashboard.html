@@ -29,19 +29,23 @@
             font-weight: bold;
         }
         :root {
-            --primary: #0078d4;
-            --primary-dark: #005a9e;
-            --secondary: #607d8b;
-            --success: #27ae60;
+            --primary: #4f46e5;
+            --primary-dark: #3730a3;
+            --sidebar-active: #1e1b4b;
+            --secondary: #64748b;
+            --success: #10b981;
             --warning: #f39c12;
-            --danger: #e74c3c;
-            --bg-body: #f4f7f9;
+            --danger: #ef4444;
+            --bg-body: #f8fafd;
             --bg-sidebar: #ffffff;
-            --text-main: #2c3e50;
-            --text-muted: #7f8c8d;
-            --border: #edf2f7;
-            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            --sidebar-width: 260px;
+            --bg-card: #ffffff;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --border: #f1f5f9;
+            --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
+            --radius-lg: 24px;
+            --radius-md: 16px;
+            --sidebar-width: 280px;
         }
 
         .building-tabs {
@@ -86,57 +90,73 @@
             min-height: 100vh;
         }
 
-        /* Sidebar Layout */
+        /* Sidebar Layout - Sync with Report */
         .sidebar {
             width: var(--sidebar-width);
-            background: var(--bg-sidebar);
-            border-right: 1px solid var(--border);
+            background: #ffffff;
             position: fixed;
             height: 100vh;
             display: flex;
             flex-direction: column;
+            padding: 30px 20px;
             z-index: 100;
-            transition: all 0.3s;
+            border-right: 1px solid var(--border);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        .sidebar-header {
-            padding: 25px;
-            font-weight: 700;
-            font-size: 1.2em;
-            color: var(--primary);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            border-bottom: 1px solid var(--border);
-        }
-        .sidebar-menu {
-            padding: 20px 0;
-            flex: 1;
-            overflow-y: auto;
-        }
-        .menu-item {
-            padding: 12px 25px;
+        .sidebar-brand {
+            font-weight: 800;
+            font-size: 1.5em;
+            color: #ef4444;
+            margin-bottom: 50px;
             display: flex;
             align-items: center;
             gap: 12px;
-            color: var(--secondary);
+            padding-left: 10px;
+        }
+        .sidebar-brand span { color: var(--text-main); }
+        
+        .menu-section {
+            margin-bottom: 30px;
+        }
+        .menu-label {
+            font-size: 0.75em;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 15px;
+            padding-left: 10px;
+            font-weight: 600;
+        }
+        .menu-item {
+            padding: 14px 18px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            color: var(--text-muted);
             text-decoration: none;
             font-weight: 500;
-            transition: all 0.2s;
-            cursor: pointer;
+            border-radius: var(--radius-md);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            margin-bottom: 5px;
         }
-        .menu-item:hover, .menu-item.active {
+        .menu-item:hover {
             color: var(--primary);
-            background: #f0f7ff;
-            border-right: 4px solid var(--primary);
+            background: #f1f5f9;
         }
-        .menu-item i { width: 20px; text-align: center; }
+        .menu-item.active {
+            background: var(--sidebar-active);
+            color: #ffffff;
+            box-shadow: 0 10px 15px -3px rgba(30, 27, 75, 0.2);
+        }
+        .menu-item i { font-size: 1.1em; width: 24px; text-align: center; }
 
-        /* Main Content */
+        /* Main Content Wrapper */
         .main-wrapper {
             margin-left: var(--sidebar-width);
             flex: 1;
-            padding: 30px;
-            width: calc(100% - var(--sidebar-width));
+            padding: 40px;
+            max-width: 1600px;
+            transition: all 0.3s;
         }
         header {
             display: flex;
@@ -327,49 +347,62 @@
 <body>
     <!-- Sidebar -->
     <aside class="sidebar">
-        <div class="sidebar-header">
-            <i class="fa-solid fa-city"></i>
-            <span>SukAnan Admin</span>
+        <div class="sidebar-brand">
+            <i class="fa-solid fa-house-chimney-window" style="color: #ef4444;"></i>
+            <span>Roomy.</span>
         </div>
-        <div class="language-selector" style="padding: 10px 15px; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 10px;">
-            <div style="font-size: 0.7em; color: rgba(255,255,255,0.5); text-transform: uppercase; margin-bottom: 8px; letter-spacing: 1px;">Language / ภาษา</div>
-            <div style="display: flex; gap: 5px;">
-                <button onclick="setLanguage('th')" class="btn" style="flex: 1; padding: 4px; font-size: 0.7em; background: {{ 'var(--primary)' if lang == 'th' else 'rgba(255,255,255,0.1)' }}; color: white; border: none; border-radius: 4px; cursor: pointer;">TH</button>
-                <button onclick="setLanguage('en')" class="btn" style="flex: 1; padding: 4px; font-size: 0.7em; background: {{ 'var(--primary)' if lang == 'en' else 'rgba(255,255,255,0.1)' }}; color: white; border: none; border-radius: 4px; cursor: pointer;">EN</button>
-                <button onclick="setLanguage('jp')" class="btn" style="flex: 1; padding: 4px; font-size: 0.7em; background: {{ 'var(--primary)' if lang == 'jp' else 'rgba(255,255,255,0.1)' }}; color: white; border: none; border-radius: 4px; cursor: pointer;">JP</button>
+
+        <div class="menu-section">
+            <div class="menu-label">Language / ภาษา</div>
+            <div style="display: flex; gap: 8px; padding-left: 10px;">
+                <button onclick="setLanguage('th')" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.7em; cursor: pointer; {{ 'background: var(--primary); color: white;' if lang == 'th' else '' }}">TH</button>
+                <button onclick="setLanguage('en')" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.7em; cursor: pointer; {{ 'background: var(--primary); color: white;' if lang == 'en' else '' }}">EN</button>
+                <button onclick="setLanguage('jp')" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.7em; cursor: pointer; {{ 'background: var(--primary); color: white;' if lang == 'jp' else '' }}">JP</button>
             </div>
         </div>
-        <nav class="sidebar-menu">
-            <a href="#overview" class="menu-item active"><i class="fa-solid fa-chart-line"></i> ภาพรวมระบบ</a>
-            <a href="/admin/report" class="menu-item"><i class="fa-solid fa-file-invoice-dollar"></i> รายงานการเงิน</a>
-            <a href="#meterSection" class="menu-item"><i class="fa-solid fa-gauge-high"></i> จดมิเตอร์น้ำไฟ</a>
+        
+        <div class="menu-section">
+            <div class="menu-label">Menu</div>
+            <a href="#overview" class="menu-item active"><i class="fa-solid fa-chart-line"></i> <span>ภาพรวมระบบ</span></a>
+            <a href="/admin/report" class="menu-item"><i class="fa-solid fa-file-invoice-dollar"></i> <span>รายงานการเงิน</span></a>
+            <a href="#meterSection" class="menu-item"><i class="fa-solid fa-gauge-high"></i> <span>จดมิเตอร์น้ำไฟ</span></a>
+        </div>
+
+        <div class="menu-section">
+            <div class="menu-label">Records</div>
             <a href="#pendingSection" class="menu-item">
-                <i class="fa-solid fa-user-clock"></i> รอการอนุมัติ
+                <i class="fa-solid fa-user-clock"></i> <span>รอการอนุมัติ</span>
                 {% if pending_registrations|length > 0 %}
                 <span class="nav-badge pulse">NEW</span>
                 {% endif %}
             </a>
-            <a href="#roomSection" class="menu-item"><i class="fa-solid fa-door-open"></i> จัดการห้องพัก</a>
-            <a href="#leaseSection" class="menu-item"><i class="fa-solid fa-file-contract"></i> จัดการสัญญา</a>
+            <a href="#roomSection" class="menu-item"><i class="fa-solid fa-door-open"></i> <span>จัดการห้องพัก</span></a>
+            <a href="#leaseSection" class="menu-item"><i class="fa-solid fa-file-contract"></i> <span>จัดการสัญญา</span></a>
             <a href="#billSection" class="menu-item">
-                <i class="fa-solid fa-file-invoice-dollar"></i> บิลล่าสุด
+                <i class="fa-solid fa-file-invoice-dollar"></i> <span>บิลล่าสุด</span>
                 {% if stats.pending_verification > 0 %}
                 <span class="nav-badge pulse">NEW</span>
                 {% endif %}
             </a>
-            <a href="#historySection" class="menu-item">
-                <i class="fa-solid fa-clock-rotate-left"></i> ประวัติ
-            </a>
+            <a href="#historySection" class="menu-item"><i class="fa-solid fa-clock-rotate-left"></i> <span>ประวัติ</span></a>
             <a href="#repairSection" class="menu-item">
-                <i class="fa-solid fa-screwdriver-wrench"></i> แจ้งซ่อม
+                <i class="fa-solid fa-screwdriver-wrench"></i> <span>แจ้งซ่อม</span>
                 {% if stats.pending_repairs > 0 %}
                 <span class="nav-badge pulse">NEW</span>
                 {% endif %}
             </a>
-            <a href="#tenantSection" class="menu-item"><i class="fa-solid fa-users"></i> ผู้เช่า</a>
-            <a href="#settingsSection" class="menu-item"><i class="fa-solid fa-gears"></i> ตั้งค่าระบบ</a>
-            <a href="/admin/logout" class="menu-item" style="margin-top: auto; color: var(--danger);"><i class="fa-solid fa-right-from-bracket"></i> ออกจากระบบ</a>
-        </nav>
+        </div>
+
+        <div class="menu-section">
+            <div class="menu-label">Management</div>
+            <a href="#tenantSection" class="menu-item"><i class="fa-solid fa-users"></i> <span>ผู้เช่า</span></a>
+        </div>
+
+        <div class="menu-section" style="margin-top: auto;">
+            <div class="menu-label">System</div>
+            <a href="#settingsSection" class="menu-item"><i class="fa-solid fa-gears"></i> <span>ตั้งค่าระบบ</span></a>
+            <a href="/admin/logout" class="menu-item" style="color: #ef4444;"><i class="fa-solid fa-right-from-bracket"></i> <span>ออกจากระบบ</span></a>
+        </div>
     </aside>
 
     <!-- Main Content -->

@@ -97,7 +97,7 @@
 	ไอเดียการทำกราฟ: กราฟแท่งเปรียบเทียบ (Clustered Bar Chart): วางแท่ง "ยอดเก็บได้" คู่กับ "ยอดจ่ายจริง" เคียงข้างกันในแต่ละเดือน ถ้าแท่งยอดจ่ายจริงสูงกว่า แปลว่ามีจุดรั่วไหลแน่นอน
 
 
-6. ค่า API Key ของ LINE Developer จะอยู่ในไฟล์ D:\\Gemini\\Project\\Roomy\\src\\LINE_API_INFO.txt
+6. ค่า API Key ของ LINE Developer จะอยู่ในไฟล์ D:\\Gemini\\Project\\Roomy\\src\\LINE_API_INFO.txt 
 
 7. สร้างรูป Richmenu เพื่อให้ฉันเอาไป upload เข้าในระบบ LINE OA
 
