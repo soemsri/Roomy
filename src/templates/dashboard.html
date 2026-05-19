@@ -331,6 +331,14 @@
             <i class="fa-solid fa-city"></i>
             <span>SukAnan Admin</span>
         </div>
+        <div class="language-selector" style="padding: 10px 15px; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 10px;">
+            <div style="font-size: 0.7em; color: rgba(255,255,255,0.5); text-transform: uppercase; margin-bottom: 8px; letter-spacing: 1px;">Language / ภาษา</div>
+            <div style="display: flex; gap: 5px;">
+                <button onclick="setLanguage('th')" class="btn" style="flex: 1; padding: 4px; font-size: 0.7em; background: {{ 'var(--primary)' if lang == 'th' else 'rgba(255,255,255,0.1)' }}; color: white; border: none; border-radius: 4px; cursor: pointer;">TH</button>
+                <button onclick="setLanguage('en')" class="btn" style="flex: 1; padding: 4px; font-size: 0.7em; background: {{ 'var(--primary)' if lang == 'en' else 'rgba(255,255,255,0.1)' }}; color: white; border: none; border-radius: 4px; cursor: pointer;">EN</button>
+                <button onclick="setLanguage('jp')" class="btn" style="flex: 1; padding: 4px; font-size: 0.7em; background: {{ 'var(--primary)' if lang == 'jp' else 'rgba(255,255,255,0.1)' }}; color: white; border: none; border-radius: 4px; cursor: pointer;">JP</button>
+            </div>
+        </div>
         <nav class="sidebar-menu">
             <a href="#overview" class="menu-item active"><i class="fa-solid fa-chart-line"></i> ภาพรวมระบบ</a>
             <a href="/admin/report" class="menu-item"><i class="fa-solid fa-file-invoice-dollar"></i> รายงานการเงิน</a>
@@ -1770,6 +1778,11 @@
     </script>
 
     <script>
+        function setLanguage(lang) {
+            document.cookie = `lang=${lang}; path=/; max-age=31536000`;
+            window.location.reload();
+        }
+
         function filterRoomsForReg(tenantId, buildingId) {
             const container = document.getElementById(`reg_rooms_container_${tenantId}`);
             const vacantRoomsDataEl = document.getElementById('vacant_rooms_data');

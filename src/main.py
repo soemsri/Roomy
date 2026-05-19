@@ -35,6 +35,21 @@ app = FastAPI()
 # Important: directory is relative to where you run uvicorn
 templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "templates"))
 
+# Multi-language support
+translations = {}
+for lang in ["en", "th", "jp"]:
+    try:
+        with open(os.path.join(os.path.dirname(__file__), f"i18n/{lang}.json"), "r", encoding="utf-8") as f:
+            translations[lang] = json.load(f)
+    except Exception as e:
+        print(f"Error loading {lang} translation: {e}")
+        translations[lang] = {}
+
+def get_text(key, lang="th"):
+    return translations.get(lang, translations.get("th", {})).get(key, key)
+
+templates.env.globals['get_text'] = get_text
+
 def from_json(value):
     try:
         return json.loads(value)
@@ -973,6 +988,7 @@ async def admin_dashboard(
     db: Session = Depends(get_db), 
     admin: bool = Depends(get_admin)
 ):
+    lang = request.cookies.get("lang", "th")
     from sqlalchemy.orm import joinedload
     stats = {
         "total_rooms": db.query(models.Room).count(),
@@ -1012,14 +1028,69 @@ async def admin_dashboard(
         "owner": owner,
         "current_month": cur_m,
         "current_year": cur_y,
-        "building_id": building_id
+        "building_id": building_id,
+        "lang": lang
     })
 
 @app.get("/admin/expenses")
 async def list_expenses(db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
     return db.query(models.Expense).order_by(models.Expense.id.desc()).all()
 
-@app.post("/admin/expenses")
+@app.get("/admin/revenue-details")
+async def list_revenue_detail(month: int, year: int, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+    invoices = db.query(models.Invoice).filter(
+        models.Invoice.billing_month == month,
+        models.Invoice.billing_year == year,
+        models.Invoice.status == "Paid"
+    ).all()
+    
+    results = []
+    for inv in invoices:
+        try:
+            results.append({
+                "id": inv.id,
+                "room": inv.room.room_number if inv.room else "N/A",
+                "tenant": inv.tenant.full_name if inv.tenant else "N/A",
+                "rent": float(inv.rent_amount or 0),
+                "elec": float(inv.electricity_amount or 0),
+                "water": float(inv.water_amount or 0),
+                "other": float((inv.total_amount or 0) - (inv.rent_amount or 0) - (inv.electricity_amount or 0) - (inv.water_amount or 0)),
+                "total": float(inv.total_amount or 0),
+                "date": inv.paid_at.strftime("%Y-%m-%d %H:%M") if inv.paid_at else "-"
+            })
+        except Exception as e:
+            print(f"Error processing invoice {inv.id}: {e}")
+            continue
+            
+    return results
+
+@app.get("/admin/revenue")
+async def list_revenue(db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+    # Aggregate income by month/year
+    income_rows = db.query(
+        models.Invoice.billing_month,
+        models.Invoice.billing_year,
+        func.coalesce(func.sum(models.Invoice.rent_amount), 0).label('rent'),
+        func.coalesce(func.sum(models.Invoice.electricity_amount), 0).label('elec'),
+        func.coalesce(func.sum(models.Invoice.water_amount), 0).label('water'),
+        func.coalesce(func.sum(models.Invoice.total_amount - models.Invoice.rent_amount - models.Invoice.electricity_amount - models.Invoice.water_amount), 0).label('other'),
+        func.coalesce(func.sum(models.Invoice.total_amount), 0).label('total')
+    ).filter(models.Invoice.status == "Paid")\
+     .group_by(models.Invoice.billing_year, models.Invoice.billing_month)\
+     .order_by(models.Invoice.billing_year.desc(), models.Invoice.billing_month.desc())\
+     .all()
+    
+    return [
+        {
+            "month": r.billing_month,
+            "year": r.billing_year,
+            "rent": r.rent,
+            "elec": r.elec,
+            "water": r.water,
+            "other": r.other,
+            "total": r.total
+        } for r in income_rows
+    ]
 async def add_expense(
     category: str = Form(...),
     amount: float = Form(...),
@@ -1050,6 +1121,7 @@ async def delete_expense(expense_id: int, db: Session = Depends(get_db), admin: 
 
 @app.get("/admin/report", response_class=HTMLResponse)
 async def admin_report(request: Request, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+    lang = request.cookies.get("lang", "th")
     # Income aggregation
     income_rows = db.query(
         models.Invoice.billing_month,
@@ -1206,7 +1278,8 @@ async def admin_report(request: Request, db: Session = Depends(get_db), admin: b
         "occupancy_trend": json.dumps(occupancy_trend),
         "aging_data": json.dumps(aging_data),
         "all_buildings": all_buildings,
-        "owner": owner
+        "owner": owner,
+        "lang": lang
     })
 
 @app.post("/admin/registration/{tenant_id}/approve")

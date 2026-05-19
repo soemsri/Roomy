@@ -223,52 +223,61 @@
     <aside class="sidebar">
         <div class="sidebar-brand">
             <i class="fa-solid fa-house-chimney-window"></i>
-            <span>Roomy.</span>
+            <span>{{ get_text('app_name', lang) }}.</span>
+        </div>
+
+        <div class="menu-section">
+            <div class="menu-label">Language / ภาษา</div>
+            <div style="display: flex; gap: 8px; padding-left: 10px;">
+                <button onclick="setLanguage('th')" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.7em; {{ 'background: var(--primary); color: white;' if lang == 'th' else '' }}">TH</button>
+                <button onclick="setLanguage('en')" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.7em; {{ 'background: var(--primary); color: white;' if lang == 'en' else '' }}">EN</button>
+                <button onclick="setLanguage('jp')" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.7em; {{ 'background: var(--primary); color: white;' if lang == 'jp' else '' }}">JP</button>
+            </div>
         </div>
         
         <div class="menu-section">
             <div class="menu-label">Menu</div>
-            <a href="/admin/dashboard#overview" class="menu-item"><i class="fa-solid fa-grid-2"></i> Dashboard</a>
-            <a href="/admin/report" class="menu-item active"><i class="fa-solid fa-chart-pie"></i> Analytics</a>
-            <a href="/admin/dashboard#roomSection" class="menu-item"><i class="fa-solid fa-door-open"></i> Rooms</a>
-            <a href="/admin/dashboard#tenantSection" class="menu-item"><i class="fa-solid fa-users"></i> Tenants</a>
+            <a href="/admin/dashboard#overview" class="menu-item"><i class="fa-solid fa-grid-2"></i> {{ get_text('dashboard', lang) }}</a>
+            <a href="/admin/report" class="menu-item active"><i class="fa-solid fa-chart-pie"></i> {{ get_text('analytics', lang) }}</a>
+            <a href="/admin/dashboard#roomSection" class="menu-item"><i class="fa-solid fa-door-open"></i> {{ get_text('rooms', lang) }}</a>
+            <a href="/admin/dashboard#tenantSection" class="menu-item"><i class="fa-solid fa-users"></i> {{ get_text('tenants', lang) }}</a>
         </div>
 
         <div class="menu-section">
             <div class="menu-label">Settings</div>
-            <a href="/admin/dashboard#settingsSection" class="menu-item"><i class="fa-solid fa-sliders"></i> Configuration</a>
-            <a href="/admin/logout" class="menu-item" style="color: #ef4444;"><i class="fa-solid fa-arrow-right-from-bracket"></i> Logout</a>
+            <a href="/admin/dashboard#settingsSection" class="menu-item"><i class="fa-solid fa-sliders"></i> {{ get_text('configuration', lang) }}</a>
+            <a href="/admin/logout" class="menu-item" style="color: #ef4444;"><i class="fa-solid fa-arrow-right-from-bracket"></i> {{ get_text('logout', lang) }}</a>
         </div>
     </aside>
 
     <main class="main-content">
         <div class="header-top">
             <div class="greeting">
-                <h1>Hello, {{ owner.display_name if owner else 'Admin' }}!</h1>
-                <p>Here is your financial overview for SukAnan Apartment.</p>
+                <h1>{{ get_text('hello', lang) }}, {{ owner.display_name if owner else 'Admin' }}!</h1>
+                <p>{{ get_text('financial_overview', lang) }}</p>
             </div>
             <div style="display: flex; gap: 12px;">
-                <button class="btn btn-secondary" onclick="window.print()"><i class="fa-solid fa-print"></i> Export</button>
-                <button class="btn btn-primary" onclick="toggleExpenseForm()"><i class="fa-solid fa-plus"></i> Add Expense</button>
+                <button class="btn btn-secondary" onclick="window.print()"><i class="fa-solid fa-print"></i> {{ get_text('export', lang) }}</button>
+                <button class="btn btn-primary" onclick="toggleExpenseForm()"><i class="fa-solid fa-plus"></i> {{ get_text('add_expense', lang) }}</button>
             </div>
         </div>
 
         <!-- Quick Stats -->
         <div class="stat-group">
             <div class="stat-card">
-                <span class="stat-label">Total Revenue</span>
+                <span class="stat-label">{{ get_text('total_revenue', lang) }}</span>
                 <span class="stat-value" id="totalIncomeVal">฿0.00</span>
                 <span class="stat-trend trend-up"><i class="fa-solid fa-arrow-up"></i> 12.5%</span>
             </div>
             <div class="stat-card">
-                <span class="stat-label">Total Expenses</span>
+                <span class="stat-label">{{ get_text('total_expenses', lang) }}</span>
                 <span class="stat-value" id="totalExpenseVal" style="color: #ef4444;">฿0.00</span>
                 <span class="stat-trend trend-down"><i class="fa-solid fa-arrow-up"></i> 5.2%</span>
             </div>
             <div class="stat-card">
-                <span class="stat-label">Occupancy Rate</span>
+                <span class="stat-label">{{ get_text('occupancy_rate', lang) }}</span>
                 <span class="stat-value" id="occupancyRateVal" style="color: var(--primary);">0%</span>
-                <span class="stat-trend trend-up"><i class="fa-solid fa-users"></i> <span id="occupancyCount">0/0</span> Rooms</span>
+                <span class="stat-trend trend-up"><i class="fa-solid fa-users"></i> <span id="occupancyCount">0/0</span> {{ get_text('rooms', lang) }}</span>
             </div>
         </div>
 
@@ -276,7 +285,7 @@
             <!-- Main Chart -->
             <div class="card span-8">
                 <div class="card-title">
-                    <span>Revenue & Expenses Trends</span>
+                    <span>{{ get_text('revenue_expense_trends', lang) }}</span>
                 </div>
                 <div style="height: 350px;">
                     <canvas id="mainChart"></canvas>
@@ -285,7 +294,7 @@
 
             <!-- Monthly Expense Distribution Chart -->
             <div class="card span-4">
-                <div class="card-title">Monthly Expense Distribution</div>
+                <div class="card-title">{{ get_text('monthly_expense_distribution', lang) }}</div>
                 <div style="height: 350px; display: flex; align-items: center; justify-content: center;">
                     <canvas id="donutChart"></canvas>
                 </div>
@@ -293,7 +302,7 @@
 
             <!-- Total Expense Breakdown -->
             <div class="card span-4">
-                <div class="card-title">Total Expense Breakdown</div>
+                <div class="card-title">{{ get_text('total_expense_breakdown', lang) }}</div>
                 <div style="height: 350px; display: flex; align-items: center; justify-content: center;">
                     <canvas id="totalExpenseDonutChart"></canvas>
                 </div>
@@ -302,7 +311,7 @@
             <!-- Aging Receivables Chart -->
             <div class="card span-8">
                 <div class="card-title">
-                    <span>Aging Receivables (By Bucket)</span>
+                    <span>{{ get_text('aging_receivables', lang) }}</span>
                 </div>
                 <div style="height: 350px;">
                     <canvas id="agingChart"></canvas>
@@ -311,12 +320,12 @@
 
             <!-- Top Debtors Table -->
             <div class="card span-4">
-                <div class="card-title">Top Outstanding Balances</div>
+                <div class="card-title">{{ get_text('top_outstanding', lang) }}</div>
                 <div class="table-wrap" style="margin-top: 0;">
                     <table style="border-spacing: 0;">
                         <thead>
                             <tr>
-                                <th>Room</th>
+                                <th>{{ get_text('rooms', lang) }}</th>
                                 <th>Name</th>
                                 <th style="text-align: right;">Amount</th>
                             </tr>
@@ -330,7 +339,7 @@
 
             <!-- Utility Profit/Loss Chart -->
             <div class="card span-12">
-                <div class="card-title">Utility Profit/Loss (Collected vs Actual Paid)</div>
+                <div class="card-title">{{ get_text('utility_profit_loss', lang) }}</div>
                 <div style="height: 350px;">
                     <canvas id="utilityChart"></canvas>
                 </div>
@@ -342,7 +351,7 @@
                 <form id="expenseForm">
                     <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
                         <div class="input-group">
-                            <label>Category</label>
+                            <label>{{ get_text('category', lang) }}</label>
                             <select name="category" required>
                                 <option value="Common Area">Common Area (ค่าส่วนกลาง)</option>
                                 <option value="Maintenance">Maintenance (ค่าซ่อมบำรุง)</option>
@@ -365,7 +374,7 @@
                         </div>
                     </div>
                     <div class="input-group">
-                        <label>Description</label>
+                        <label>{{ get_text('description', lang) }}</label>
                         <input type="text" name="description" placeholder="Notes for this expense...">
                     </div>
                     <div style="display: flex; gap: 12px; justify-content: flex-end;">
@@ -375,19 +384,42 @@
                 </form>
             </div>
 
-            <!-- Recent Expenses Table -->
+            <!-- Recent Revenue Table -->
             <div class="card span-12">
-                <div class="card-title">Expense History</div>
+                <div class="card-title">{{ get_text('revenue_history', lang) }}</div>
                 <div class="table-wrap">
                     <table>
                         <thead>
                             <tr>
-                                <th>Date</th>
-                                <th>Period</th>
-                                <th>Category</th>
-                                <th>Description</th>
+                                <th>{{ get_text('period', lang) }}</th>
+                                <th style="text-align: right;">{{ get_text('rent', lang) }}</th>
+                                <th style="text-align: right;">{{ get_text('elec', lang) }}</th>
+                                <th style="text-align: right;">{{ get_text('water', lang) }}</th>
+                                <th style="text-align: right;">{{ get_text('other', lang) }}</th>
+                                <th style="text-align: right;">{{ get_text('total', lang) }}</th>
+                                <th style="text-align: center;">{{ get_text('details', lang) }}</th>
+                            </tr>
+                        </thead>
+                        <tbody id="revenueTableBody">
+                            <!-- JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Recent Expenses Table -->
+            <div class="card span-12">
+                <div class="card-title">{{ get_text('expense_history', lang) }}</div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>{{ get_text('date', lang) }}</th>
+                                <th>{{ get_text('period', lang) }}</th>
+                                <th>{{ get_text('category', lang) }}</th>
+                                <th>{{ get_text('description', lang) }}</th>
                                 <th style="text-align: right;">Amount</th>
-                                <th style="text-align: center;">Actions</th>
+                                <th style="text-align: center;">{{ get_text('actions', lang) }}</th>
                             </tr>
                         </thead>
                         <tbody id="expenseTableBody">
@@ -398,6 +430,37 @@
             </div>
         </div>
     </main>
+
+    <!-- Revenue Detail Modal -->
+    <div id="revenueDetailModal" class="modal" style="display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center;">
+        <div class="card" style="width: 90%; max-width: 1000px; max-height: 80vh; overflow-y: auto; position: relative; padding: 40px;">
+            <div class="card-title">
+                <span id="revenueDetailTitle">{{ get_text('details', lang) }}</span>
+                <button onclick="closeRevenueDetail()" style="background: none; border: none; font-size: 1.5em; cursor: pointer; color: var(--text-muted);">&times;</button>
+            </div>
+            <div class="table-wrap">
+                <table style="border-spacing: 0;">
+                    <thead>
+                        <tr>
+                            <th>{{ get_text('rooms', lang) }}</th>
+                            <th>{{ get_text('tenants', lang) }}</th>
+                            <th style="text-align: right;">{{ get_text('rent', lang) }}</th>
+                            <th style="text-align: right;">{{ get_text('elec', lang) }}</th>
+                            <th style="text-align: right;">{{ get_text('water', lang) }}</th>
+                            <th style="text-align: right;">{{ get_text('other', lang) }}</th>
+                            <th style="text-align: right;">{{ get_text('total', lang) }}</th>
+                        </tr>
+                    </thead>
+                    <tbody id="revenueDetailBody">
+                        <!-- JS -->
+                    </tbody>
+                </table>
+            </div>
+            <div style="margin-top: 30px; text-align: right;">
+                <button class="btn btn-primary" onclick="closeRevenueDetail()">Close</button>
+            </div>
+        </div>
+    </div>
 
     <script id="chartData" type="application/json">
         {{ chart_data | safe }}
@@ -415,6 +478,11 @@
     </script>
 
     <script>
+        function setLanguage(lang) {
+            document.cookie = `lang=${lang}; path=/; max-age=31536000`;
+            window.location.reload();
+        }
+
         // Data Retrieval
         const dataStr = document.getElementById('chartData').textContent;
         const occStatsStr = document.getElementById('occupancyStats').textContent;
@@ -423,6 +491,12 @@
         const data = JSON.parse(dataStr || '{}');
         const occStats = JSON.parse(occStatsStr || '{"rate":0,"occupied":0,"total":0}');
         const agingData = JSON.parse(agingDataStr || '{"buckets":{},"debtors":[]}');
+
+        // Translations for dynamic JS parts
+        const langStrings = {
+            total_sum: "{{ get_text('total_sum', lang) }}",
+            detail: "{{ get_text('details', lang) }}"
+        };
 
         // --- Update Stat Cards ---
         try {
@@ -645,6 +719,93 @@
             }
         }
 
+        async function loadRevenue() {
+            try {
+                const res = await fetch('/admin/revenue');
+                if (!res.ok) throw new Error('API Error');
+                const revenue = await res.json();
+                const body = document.getElementById('revenueTableBody');
+                if (!body) return;
+                
+                body.innerHTML = revenue.map(r => `
+                    <tr>
+                        <td style="background: transparent; border-radius: 0;"><strong>${r.month}/${r.year}</strong></td>
+                        <td style="background: transparent; border-radius: 0; text-align: right;">฿${(r.rent || 0).toLocaleString()}</td>
+                        <td style="background: transparent; border-radius: 0; text-align: right;">฿${(r.elec || 0).toLocaleString()}</td>
+                        <td style="background: transparent; border-radius: 0; text-align: right;">฿${(r.water || 0).toLocaleString()}</td>
+                        <td style="background: transparent; border-radius: 0; text-align: right;">฿${(r.other || 0).toLocaleString()}</td>
+                        <td style="background: transparent; border-radius: 0; text-align: right; font-weight: 700; color: #10b981;">฿${(r.total || 0).toLocaleString()}</td>
+                        <td style="background: transparent; border-radius: 0; text-align: center;">
+                            <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.8em;" onclick="viewRevenueDetail(${r.month}, ${r.year})">
+                                <i class="fa-solid fa-circle-info"></i> ${langStrings.detail}
+                            </button>
+                        </td>
+                    </tr>
+                `).join('') || '<tr><td colspan="7" style="text-align: center; padding: 40px; color: var(--text-muted);">No revenue recorded yet.</td></tr>';
+            } catch (err) {
+                console.error("Load Revenue Error:", err);
+                const body = document.getElementById('revenueTableBody');
+                if (body) body.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #ef4444; padding: 20px;">Unable to load revenue data.</td></tr>';
+            }
+        }
+
+        async function viewRevenueDetail(month, year) {
+            const modal = document.getElementById('revenueDetailModal');
+            const title = document.getElementById('revenueDetailTitle');
+            const body = document.getElementById('revenueDetailBody');
+            
+            title.textContent = `${langStrings.detail} for ${month}/${year}`;
+            body.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 20px;"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</td></tr>';
+            modal.style.display = 'flex';
+
+            try {
+                const res = await fetch(`/admin/revenue-details?month=${month}&year=${year}`);
+                const data = await res.json();
+                
+                let rowsHtml = data.map(inv => `
+                    <tr>
+                        <td style="padding: 12px 10px;"><strong>${inv.room}</strong></td>
+                        <td style="padding: 12px 10px;">${inv.tenant}</td>
+                        <td style="padding: 12px 10px; text-align: right;">฿${inv.rent.toLocaleString()}</td>
+                        <td style="padding: 12px 10px; text-align: right;">฿${inv.elec.toLocaleString()}</td>
+                        <td style="padding: 12px 10px; text-align: right;">฿${inv.water.toLocaleString()}</td>
+                        <td style="padding: 12px 10px; text-align: right;">฿${inv.other.toLocaleString()}</td>
+                        <td style="padding: 12px 10px; text-align: right; font-weight: 700; color: #10b981;">฿${inv.total.toLocaleString()}</td>
+                    </tr>
+                `).join('');
+
+                if (data.length > 0) {
+                    const totals = data.reduce((acc, inv) => {
+                        acc.rent += inv.rent;
+                        acc.elec += inv.elec;
+                        acc.water += inv.water;
+                        acc.other += inv.other;
+                        acc.total += inv.total;
+                        return acc;
+                    }, { rent: 0, elec: 0, water: 0, other: 0, total: 0 });
+
+                    rowsHtml += `
+                        <tr style="background: #f1f5f9; font-weight: 700;">
+                            <td colspan="2" style="padding: 12px 10px; text-align: center;">${langStrings.total_sum}</td>
+                            <td style="padding: 12px 10px; text-align: right;">฿${totals.rent.toLocaleString()}</td>
+                            <td style="padding: 12px 10px; text-align: right;">฿${totals.elec.toLocaleString()}</td>
+                            <td style="padding: 12px 10px; text-align: right;">฿${totals.water.toLocaleString()}</td>
+                            <td style="padding: 12px 10px; text-align: right;">฿${totals.other.toLocaleString()}</td>
+                            <td style="padding: 12px 10px; text-align: right; color: #10b981;">฿${totals.total.toLocaleString()}</td>
+                        </tr>
+                    `;
+                }
+
+                body.innerHTML = rowsHtml || '<tr><td colspan="7" style="text-align:center; padding: 20px;">No detailed records found.</td></tr>';
+            } catch (e) {
+                body.innerHTML = '<tr><td colspan="7" style="text-align:center; color: #ef4444; padding: 20px;">Error loading data.</td></tr>';
+            }
+        }
+
+        function closeRevenueDetail() {
+            document.getElementById('revenueDetailModal').style.display = 'none';
+        }
+
         async function loadExpenses() {
             try {
                 const res = await fetch('/admin/expenses');
@@ -697,6 +858,7 @@
 
         // Initialize
         loadExpenses();
+        loadRevenue();
     </script>
 </body>
 </html>

@@ -1,6 +1,7 @@
 import os
 import sys
 import uuid
+import json
 from datetime import datetime
 
 # Ensure src is in path
@@ -47,7 +48,7 @@ class MockEvent:
         self.message = MockMessage(text)
         self.reply_token = reply_token
 
-def run_registration_tests():
+def test_registration_flow():
     # Use localized overrides and mocks
     app.dependency_overrides[get_db] = override_get_db
     client = TestClient(app)
@@ -57,8 +58,6 @@ def run_registration_tests():
     main.tenant_bot_api = MagicMock()
     main.line_bot_api = MagicMock()
 
-    print("Starting Multi-step Registration Validation...")
-    
     # Init DB
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
@@ -67,67 +66,65 @@ def run_registration_tests():
     
     # Setup Data
     owner_id = "OWNER_LINE"
-    db.add(models.Owner(line_user_id=owner_id, display_name="Owner"))
+    owner = models.Owner(
+        line_user_id=owner_id, 
+        display_name="Owner",
+        lease_template="Contract for {tenant_name} room {room_number}",
+        move_in_fees_config=json.dumps([
+            {"name": "เงินประกัน", "value": 1, "is_multiplier": True},
+            {"name": "ค่าเช่าล่วงหน้า", "value": 1, "is_multiplier": True}
+        ])
+    )
+    db.add(owner)
     db.add(models.Room(room_number="R101", floor=1, base_rent=3000, status="Vacant"))
     db.commit()
     
     tenant_line_id = "TENANT_LINE"
     
-    # 0. Initial Message (Triggers status -> AwaitingRoom)
-    print("Step 0: Initial Greeting...")
+    # 0. Initial Message (Triggers status -> AwaitingRegistration)
     handle_tenant_message(MockEvent(tenant_line_id, "สวัสดี"), db=db)
     tenant = db.query(models.Tenant).filter(models.Tenant.line_user_id == tenant_line_id).first()
-    assert tenant.status == "AwaitingRoom"
+    assert tenant.status == "AwaitingRegistration"
 
-    # 1. Step 1: Enter Room Number
-    print("Step 1: Tenant enters Room Number 'R101'...")
-    handle_tenant_message(MockEvent(tenant_line_id, "R101"), db=db)
-    
-    db.refresh(tenant)
-    assert tenant is not None
-    assert tenant.status == "AwaitingName"
-    assert tenant.current_room_id is not None
-    print("  SUCCESS: Status is AwaitingName")
-
-    # 2. Step 2: Enter Name
-    print("Step 2: Tenant enters Name 'John Doe'...")
-    handle_tenant_message(MockEvent(tenant_line_id, "John Doe"), db=db)
-    db.refresh(tenant)
-    assert tenant.full_name == "John Doe"
-    assert tenant.status == "AwaitingPhone"
-    print("  SUCCESS: Status is AwaitingPhone")
-
-    # 3. Step 3: Enter Phone
-    print("Step 3: Tenant enters Phone '0812345678'...")
-    handle_tenant_message(MockEvent(tenant_line_id, "0812345678"), db=db)
-    db.refresh(tenant)
-    assert tenant.phone_number == "0812345678"
-    assert tenant.status == "Pending"
-    print("  SUCCESS: Status is Pending")
-
-    # 4. Step 4: Owner Approves
-    print("Step 4: Owner approves via Dashboard...")
-    cookies = {"admin_session": ADMIN_PASSWORD}
-    res = client.post(f"/admin/registration/{tenant.id}/approve", cookies=cookies)
+    # 1. Step 1: Submit Registration via API
+    registration_data = {
+        "full_name": "John Doe",
+        "phone_number": "0812345678",
+        "citizen_id": "1234567890123",
+        "requested_move_in_date": "2026-06-01"
+    }
+    res = client.post(f"/register/{tenant.uuid}", json=registration_data)
     assert res.status_code == 200
     
     db.refresh(tenant)
+    assert tenant.full_name == "John Doe"
+    assert tenant.status == "Pending"
+
+    # 2. Step 2: Owner Approves
+    # We need to simulate the login or bypass security if needed
+    owner = db.query(models.Owner).first()
+    owner.password_hash = "fake_hash"
+    db.commit()
+    
     room = db.query(models.Room).filter(models.Room.room_number == "R101").first()
+    
+    cookies = {"admin_session": "fake_hash"}
+    res = client.post(f"/admin/registration/{tenant.id}/approve", data={"room_ids": str(room.id)}, cookies=cookies)
+    assert res.status_code == 200
+    
+    db.refresh(tenant)
+    db.refresh(room)
     assert tenant.status == "Active"
     assert room.status == "Occupied"
+    assert tenant.current_room_id == room.id
     
     lease = db.query(models.Lease).filter(models.Lease.tenant_id == tenant.id).first()
     assert lease is not None
-    print("  SUCCESS: Tenant is Active, Room is Occupied, Lease created.")
-
-    print("\nALL REGISTRATION FLOW TESTS PASSED!")
     db.close()
 
 if __name__ == "__main__":
-    try:
-        run_registration_tests()
-    finally:
-        if os.path.exists("./test_registration.db"):
-            try:
-                os.remove("./test_registration.db")
-            except: pass
+    test_registration_flow()
+    if os.path.exists("./test_registration.db"):
+        try:
+            os.remove("./test_registration.db")
+        except: pass
