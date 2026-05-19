@@ -1,6 +1,6 @@
 {
     "project": "Roomy",
-    "last_updated": "2026-05-19T11:05:00Z",
+    "last_updated": "2026-05-19T16:20:00Z",
     "features": {
         "multi_language": {
             "supported_languages": ["th", "en", "jp"],
@@ -10,11 +10,21 @@
         "revenue_history": {
             "summary_row": "implemented",
             "data_fix": "fixed (using paid_at instead of created_at)"
+        },
+        "ui_standardization": {
+            "status": "completed",
+            "changes": [
+                "Unified card and table styles in global.css",
+                "Fixed structural HTML errors (stray divs) in dashboard.html",
+                "Implemented responsive sidebar with mobile toggle in admin_base.html",
+                "Synchronized Dashboard and Report look and feel",
+                "Added scrollable and compact sidebar for better accessibility"
+            ]
         }
     },
     "configuration": {
         "default_language": "th",
         "i18n_path": "i18n/"
     },
-    "session_notes": "Implemented multi-language support (TH, EN, JP) for Analytics and Dashboard. Fixed Revenue History detail modal (empty display due to missing created_at attribute) and added a summary row calculating totals. Corrected Thai translations in i18n/th.json."
+    "session_notes": "Resolved critical UI layout issues across admin pages. Standardized global styles for cards, tables, and stats overview. Fixed structural imbalances in dashboard.html (stray divs) and admin_base.html. Unified language selector styling and sidebar aesthetics to match the Report page. Implemented a scrollable, compact sidebar to resolve overflow issues at 100% zoom. Seeded 100 new rooms (Floors 2-6, 20 rooms per floor) for testing and development."
 }

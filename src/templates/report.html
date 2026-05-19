@@ -45,14 +45,24 @@
             height: 100vh;
             display: flex;
             flex-direction: column;
-            padding: 30px 20px;
+            padding: 20px 15px;
             z-index: 100;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: var(--border) transparent;
+        }
+        .sidebar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .sidebar::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 10px;
         }
         .sidebar-brand {
             font-weight: 800;
             font-size: 1.5em;
             color: #ef4444; /* Red logo like prototype */
-            margin-bottom: 50px;
+            margin-bottom: 30px;
             display: flex;
             align-items: center;
             gap: 12px;
@@ -61,19 +71,19 @@
         .sidebar-brand span { color: var(--text-main); }
         
         .menu-section {
-            margin-bottom: 30px;
+            margin-bottom: 20px;
         }
         .menu-label {
             font-size: 0.75em;
             text-transform: uppercase;
             letter-spacing: 0.05em;
             color: var(--text-muted);
-            margin-bottom: 15px;
+            margin-bottom: 10px;
             padding-left: 10px;
             font-weight: 600;
         }
         .menu-item {
-            padding: 14px 18px;
+            padding: 10px 15px;
             display: flex;
             align-items: center;
             gap: 15px;
@@ -82,7 +92,7 @@
             font-weight: 500;
             border-radius: var(--radius-md);
             transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            margin-bottom: 5px;
+            margin-bottom: 2px;
         }
         .menu-item:hover {
             color: var(--primary);

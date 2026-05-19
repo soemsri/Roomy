@@ -98,16 +98,26 @@
             height: 100vh;
             display: flex;
             flex-direction: column;
-            padding: 30px 20px;
+            padding: 20px 15px;
             z-index: 100;
             border-right: 1px solid var(--border);
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: var(--border) transparent;
+        }
+        .sidebar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .sidebar::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 10px;
         }
         .sidebar-brand {
             font-weight: 800;
             font-size: 1.5em;
             color: #ef4444;
-            margin-bottom: 50px;
+            margin-bottom: 30px;
             display: flex;
             align-items: center;
             gap: 12px;
@@ -116,19 +126,19 @@
         .sidebar-brand span { color: var(--text-main); }
         
         .menu-section {
-            margin-bottom: 30px;
+            margin-bottom: 20px;
         }
         .menu-label {
             font-size: 0.75em;
             text-transform: uppercase;
             letter-spacing: 0.05em;
             color: var(--text-muted);
-            margin-bottom: 15px;
+            margin-bottom: 10px;
             padding-left: 10px;
             font-weight: 600;
         }
         .menu-item {
-            padding: 14px 18px;
+            padding: 10px 15px;
             display: flex;
             align-items: center;
             gap: 15px;
@@ -137,7 +147,7 @@
             font-weight: 500;
             border-radius: var(--radius-md);
             transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            margin-bottom: 5px;
+            margin-bottom: 2px;
         }
         .menu-item:hover {
             color: var(--primary);
@@ -363,30 +373,30 @@
         
         <div class="menu-section">
             <div class="menu-label">Menu</div>
-            <a href="#overview" class="menu-item active"><i class="fa-solid fa-chart-line"></i> <span>ภาพรวมระบบ</span></a>
-            <a href="/admin/report" class="menu-item"><i class="fa-solid fa-file-invoice-dollar"></i> <span>รายงานการเงิน</span></a>
-            <a href="#meterSection" class="menu-item"><i class="fa-solid fa-gauge-high"></i> <span>จดมิเตอร์น้ำไฟ</span></a>
+            <a href="#overview" class="menu-item active"><i class="fa-solid fa-chart-line"></i> <span>{{ get_text('system_overview', lang) }}</span></a>
+            <a href="/admin/report" class="menu-item"><i class="fa-solid fa-file-invoice-dollar"></i> <span>{{ get_text('analytics', lang) }}</span></a>
+            <a href="#meterSection" class="menu-item"><i class="fa-solid fa-gauge-high"></i> <span>{{ get_text('meter_reading', lang) }}</span></a>
         </div>
 
         <div class="menu-section">
             <div class="menu-label">Records</div>
             <a href="#pendingSection" class="menu-item">
-                <i class="fa-solid fa-user-clock"></i> <span>รอการอนุมัติ</span>
+                <i class="fa-solid fa-user-clock"></i> <span>{{ get_text('pending_registrations', lang) }}</span>
                 {% if pending_registrations|length > 0 %}
                 <span class="nav-badge pulse">NEW</span>
                 {% endif %}
             </a>
-            <a href="#roomSection" class="menu-item"><i class="fa-solid fa-door-open"></i> <span>จัดการห้องพัก</span></a>
-            <a href="#leaseSection" class="menu-item"><i class="fa-solid fa-file-contract"></i> <span>จัดการสัญญา</span></a>
+            <a href="#roomSection" class="menu-item"><i class="fa-solid fa-door-open"></i> <span>{{ get_text('manage_rooms', lang) }}</span></a>
+            <a href="#leaseSection" class="menu-item"><i class="fa-solid fa-file-contract"></i> <span>{{ get_text('manage_leases', lang) }}</span></a>
             <a href="#billSection" class="menu-item">
-                <i class="fa-solid fa-file-invoice-dollar"></i> <span>บิลล่าสุด</span>
+                <i class="fa-solid fa-file-invoice-dollar"></i> <span>{{ get_text('latest_bills', lang) }}</span>
                 {% if stats.pending_verification > 0 %}
                 <span class="nav-badge pulse">NEW</span>
                 {% endif %}
             </a>
-            <a href="#historySection" class="menu-item"><i class="fa-solid fa-clock-rotate-left"></i> <span>ประวัติ</span></a>
+            <a href="#historySection" class="menu-item"><i class="fa-solid fa-clock-rotate-left"></i> <span>{{ get_text('history', lang) }}</span></a>
             <a href="#repairSection" class="menu-item">
-                <i class="fa-solid fa-screwdriver-wrench"></i> <span>แจ้งซ่อม</span>
+                <i class="fa-solid fa-screwdriver-wrench"></i> <span>{{ get_text('repairs', lang) }}</span>
                 {% if stats.pending_repairs > 0 %}
                 <span class="nav-badge pulse">NEW</span>
                 {% endif %}
@@ -395,23 +405,23 @@
 
         <div class="menu-section">
             <div class="menu-label">Management</div>
-            <a href="#tenantSection" class="menu-item"><i class="fa-solid fa-users"></i> <span>ผู้เช่า</span></a>
+            <a href="#tenantSection" class="menu-item"><i class="fa-solid fa-users"></i> <span>{{ get_text('tenants', lang) }}</span></a>
         </div>
 
         <div class="menu-section" style="margin-top: auto;">
             <div class="menu-label">System</div>
-            <a href="#settingsSection" class="menu-item"><i class="fa-solid fa-gears"></i> <span>ตั้งค่าระบบ</span></a>
-            <a href="/admin/logout" class="menu-item" style="color: #ef4444;"><i class="fa-solid fa-right-from-bracket"></i> <span>ออกจากระบบ</span></a>
+            <a href="#settingsSection" class="menu-item"><i class="fa-solid fa-gears"></i> <span>{{ get_text('settings', lang) }}</span></a>
+            <a href="/admin/logout" class="menu-item" style="color: #ef4444;"><i class="fa-solid fa-right-from-bracket"></i> <span>{{ get_text('logout', lang) }}</span></a>
         </div>
     </aside>
 
     <!-- Main Content -->
     <div class="main-wrapper">
         <header>
-            <h1 style="font-size: 1.5em; font-weight: 700;">ยินดีต้อนรับ, {{ owner.display_name if owner else 'เจ้าของหอพัก' }}</h1>
+            <h1 style="font-size: 1.5em; font-weight: 700;">{{ get_text('welcome', lang) }}, {{ owner.display_name if owner else 'Admin' }}</h1>
             <div class="user-profile">
                 <i class="fa-solid fa-circle-user" style="color: var(--primary); font-size: 1.2em;"></i>
-                <span>แอดมินระบบ</span>
+                <span>{{ get_text('admin_profile', lang) }}</span>
             </div>
         </header>
 
@@ -420,28 +430,28 @@
             <div class="stat-card">
                 <div class="stat-icon icon-blue"><i class="fa-solid fa-building"></i></div>
                 <div class="stat-info">
-                    <h3>ห้องทั้งหมด</h3>
+                    <h3>{{ get_text('all_rooms', lang) }}</h3>
                     <p>{{ stats.total_rooms }}</p>
                 </div>
             </div>
             <div class="stat-card">
                 <div class="stat-icon icon-green"><i class="fa-solid fa-check-circle"></i></div>
                 <div class="stat-info">
-                    <h3>ห้องว่าง</h3>
+                    <h3>{{ get_text('vacant_rooms', lang) }}</h3>
                     <p>{{ stats.vacant_rooms }}</p>
                 </div>
             </div>
             <div class="stat-card">
                 <div class="stat-icon icon-red"><i class="fa-solid fa-clock-rotate-left"></i></div>
                 <div class="stat-info">
-                    <h3>บิลค้างชำระ</h3>
+                    <h3>{{ get_text('unpaid_bills', lang) }}</h3>
                     <p>{{ stats.unpaid_invoices }}</p>
                 </div>
             </div>
             <div class="stat-card">
                 <div class="stat-icon icon-orange"><i class="fa-solid fa-wrench"></i></div>
                 <div class="stat-info">
-                    <h3>แจ้งซ่อมค้าง</h3>
+                    <h3>{{ get_text('pending_repairs', lang) }}</h3>
                     <p>{{ stats.pending_repairs }}</p>
                 </div>
             </div>
@@ -511,13 +521,13 @@
                 <table>
                     <thead>
                         <tr>
-                            <th>ชื่อ-นามสกุล</th>
-                            <th>เลขบัตรประชาชน</th>
-                            <th>เบอร์โทร</th>
-                            <th>วันที่ต้องการเข้า</th>
-                            <th>ตึก</th>
-                            <th>ห้อง</th>
-                            <th>จัดการ</th>
+                            <th>{{ get_text('full_name', lang) }}</th>
+                            <th>{{ get_text('id_number', lang) }}</th>
+                            <th>{{ get_text('phone', lang) }}</th>
+                            <th>{{ get_text('move_in_date', lang) }}</th>
+                            <th>{{ get_text('building', lang) }}</th>
+                            <th>{{ get_text('room', lang) }}</th>
+                            <th>{{ get_text('actions', lang) }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -539,7 +549,7 @@
                             </td>
                             <td>
                                 <select id="reg_building_{{ p.id }}" class="form-control" style="width: auto;" onchange="filterRoomsForReg({{ p.id }}, this.value)">
-                                    <option value="">-- เลือกตึก --</option>
+                                    <option value="">-- {{ get_text('building', lang) }} --</option>
                                     {% for b in all_buildings %}
                                     <option value="{{ b.id }}">{{ b.name }}</option>
                                     {% endfor %}
@@ -547,12 +557,12 @@
                             </td>
                             <td>
                                 <div id="reg_rooms_container_{{ p.id }}" style="max-height: 120px; overflow-y: auto; border: 1px solid #ddd; padding: 5px; border-radius: 4px; min-width: 160px; background: #fff;">
-                                    <span style="color: #888; font-size: 0.85rem;">-- เลือกตึกก่อน --</span>
+                                    <span style="color: #888; font-size: 0.85rem;">-- {{ get_text('building', lang) }} --</span>
                                 </div>
                             </td>
                             <td>
-                                <button id="btn_approve_{{ p.id }}" class="btn btn-primary" style="background: var(--success);" onclick="approveReg({{ p.id }})">อนุมัติ</button>
-                                <button class="btn btn-danger" onclick="rejectReg({{ p.id }})">ปฏิเสธ</button>
+                                <button id="btn_approve_{{ p.id }}" class="btn btn-primary" style="background: var(--success);" onclick="approveReg({{ p.id }})">{{ get_text('approve', lang) }}</button>
+                                <button class="btn btn-danger" onclick="rejectReg({{ p.id }})">{{ get_text('reject', lang) }}</button>
                             </td>
                         </tr>
                         {% endfor %}
@@ -563,17 +573,17 @@
 
             {% if move_out_requests|length > 0 %}
             <div class="section-header">
-                <h2><i class="fa-solid fa-door-open" style="color: var(--danger);"></i> รายการแจ้งย้ายออก</h2>
+                <h2><i class="fa-solid fa-door-open" style="color: var(--danger);"></i> {{ get_text('move_out_list', lang) }}</h2>
             </div>
             <div class="table-container">
                 <table>
                     <thead>
                         <tr>
-                            <th>ห้อง</th>
-                            <th>ชื่อผู้เช่า</th>
-                            <th>วันที่แจ้งย้าย</th>
-                            <th>เหตุผล</th>
-                            <th>จัดการ</th>
+                            <th>{{ get_text('room', lang) }}</th>
+                            <th>{{ get_text('full_name', lang) }}</th>
+                            <th>{{ get_text('move_out_date', lang) }}</th>
+                            <th>{{ get_text('reason', lang) }}</th>
+                            <th>{{ get_text('actions', lang) }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -584,8 +594,8 @@
                             <td style="color: var(--danger); font-weight: 600;">{{ r.requested_date.strftime('%d/%m/%Y') }}</td>
                             <td style="font-size: 0.85em; color: var(--text-muted);">{{ r.reason or '-' }}</td>
                             <td>
-                                <button class="btn btn-danger" onclick="unmapTenant({{ r.tenant.id }})">ย้ายออก (ยืนยัน)</button>
-                                <button class="btn btn-outline" style="color: var(--text-muted); border-color: var(--border);" onclick="cancelMoveOut({{ r.tenant.id }})">ยกเลิก</button>
+                                <button class="btn btn-danger" onclick="unmapTenant({{ r.tenant.id }})">{{ get_text('confirm_move_out', lang) }}</button>
+                                <button class="btn btn-outline" style="color: var(--text-muted); border-color: var(--border);" onclick="cancelMoveOut({{ r.tenant.id }})">{{ get_text('cancel', lang) }}</button>
                             </td>
                         </tr>
                         {% endfor %}
@@ -596,16 +606,16 @@
         </div>
 
         <!-- Meter Recording -->
-        <div class="section-card" id="meterSection">
+        <div class="card section-card" id="meterSection">
             <div class="section-header">
-                <h2><i class="fa-solid fa-gauge-high"></i> บันทึกมิเตอร์ & ออกบิล</h2>
+                <h2><i class="fa-solid fa-gauge-high"></i> {{ get_text('meter_billing', lang) }}</h2>
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <div id="edit_indicator" style="display:none; color: var(--warning); font-size: 0.9em; font-weight: 600;">
                         <i class="fa-solid fa-edit"></i> กำลังแก้ไขข้อมูลเดิม
                     </div>
                     <div class="tabs" style="margin-bottom: 0; padding: 3px;">
-                        <div class="tab active" id="tab_single_meter" onclick="switchMeterMode('single')" style="padding: 5px 15px; font-size: 0.8em;">จดทีละห้อง</div>
-                        <div class="tab" id="tab_bulk_meter" onclick="switchMeterMode('bulk')" style="padding: 5px 15px; font-size: 0.8em;">จดแบบรายอาคาร</div>
+                        <div class="tab active" id="tab_single_meter" onclick="switchMeterMode('single')" style="padding: 5px 15px; font-size: 0.8em;">{{ get_text('single_reading', lang) }}</div>
+                        <div class="tab" id="tab_bulk_meter" onclick="switchMeterMode('bulk')" style="padding: 5px 15px; font-size: 0.8em;">{{ get_text('bulk_reading', lang) }}</div>
                     </div>
                 </div>
             </div>
@@ -614,14 +624,14 @@
             <form id="meterForm">
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px;">
                     <div>
-                        <label>เดือน/ปี</label>
+                        <label>{{ get_text('month', lang) }}/{{ get_text('year', lang) }}</label>
                         <div style="display: flex; gap: 5px;">
                             <input type="number" id="month" name="month" value="{{ current_month }}" min="1" max="12" required onchange="loadCurrentRoomMeter()">
                             <input type="number" id="year" name="year" value="{{ current_year }}" required onchange="loadCurrentRoomMeter()">
                         </div>
                     </div>
                     <div>
-                        <label>เลือกตึก</label>
+                        <label>{{ get_text('building', lang) }}</label>
                         <select id="meter_building_id" onchange="filterMeterRooms(this.value)">
                             <option value="all">ทั้งหมด</option>
                             {% for b in all_buildings %}
@@ -630,9 +640,9 @@
                         </select>
                     </div>
                     <div>
-                        <label>ห้อง</label>
+                        <label>{{ get_text('room', lang) }}</label>
                         <select id="room_id" name="room_id" required onchange="loadCurrentRoomMeter()">
-                            <option value="">-- เลือกห้อง --</option>
+                            <option value="">-- {{ get_text('room', lang) }} --</option>
                             {% for room in all_rooms %}
                             <option value="{{ room.id }}" class="meter-room-opt" data-building-id="{{ room.building_id }}">{{ room.room_number }}</option>
                             {% endfor %}
@@ -1816,6 +1826,49 @@
             window.location.reload();
         }
 
+        function renderBeautifulPagination(containerId, totalPages, currentPage, onPageClick) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            
+            container.innerHTML = '';
+            if (totalPages <= 1) {
+                container.style.display = 'none';
+                return;
+            }
+            container.style.display = 'flex';
+
+            // Prev Button
+            const prevBtn = document.createElement('button');
+            prevBtn.className = `page-btn ${currentPage === 1 ? 'disabled' : ''}`;
+            prevBtn.innerHTML = '<i class="fa-solid fa-chevron-left"></i>';
+            prevBtn.onclick = () => { if(currentPage > 1) onPageClick(currentPage - 1); };
+            container.appendChild(prevBtn);
+
+            // Page Numbers with Ellipsis
+            for (let i = 1; i <= totalPages; i++) {
+                if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
+                    const btn = document.createElement('button');
+                    btn.className = `page-btn ${i === currentPage ? 'active' : ''}`;
+                    btn.innerText = i;
+                    btn.onclick = () => onPageClick(i);
+                    container.appendChild(btn);
+                } else if (i === currentPage - 3 || i === currentPage + 3) {
+                    const span = document.createElement('span');
+                    span.innerText = '...';
+                    span.style.padding = '0 5px';
+                    span.style.color = 'var(--text-muted)';
+                    container.appendChild(span);
+                }
+            }
+
+            // Next Button
+            const nextBtn = document.createElement('button');
+            nextBtn.className = `page-btn ${currentPage === totalPages ? 'disabled' : ''}`;
+            nextBtn.innerHTML = '<i class="fa-solid fa-chevron-right"></i>';
+            nextBtn.onclick = () => { if(currentPage < totalPages) onPageClick(currentPage + 1); };
+            container.appendChild(nextBtn);
+        }
+
         function filterRoomsForReg(tenantId, buildingId) {
             const container = document.getElementById(`reg_rooms_container_${tenantId}`);
             const vacantRoomsDataEl = document.getElementById('vacant_rooms_data');
@@ -1930,18 +1983,7 @@
                 `).join('');
 
                 // Pagination Controls
-                const pagination = document.getElementById('historyPagination');
-                if (pagination) {
-                    let html = '';
-                    if (data.total_pages > 1) {
-                        html = `
-                            <button class="btn btn-outline" ${data.current_page === 1 ? 'disabled' : ''} onclick="loadTenantHistory(${data.current_page - 1})">ก่อนหน้า</button>
-                            <span style="margin: 0 15px; align-self: center;">หน้า ${data.current_page} จาก ${data.total_pages}</span>
-                            <button class="btn btn-outline" ${data.current_page === data.total_pages ? 'disabled' : ''} onclick="loadTenantHistory(${data.current_page + 1})">ถัดไป</button>
-                        `;
-                    }
-                    pagination.innerHTML = html;
-                }
+                renderBeautifulPagination('historyPagination', data.total_pages, data.current_page, (p) => loadTenantHistory(p));
             } catch (e) {
                 list.innerHTML = '<tr><td colspan="5" style="color:var(--danger); text-align:center;">ไม่สามารถโหลดข้อมูลได้: ' + e + '</td></tr>';
             }
@@ -2146,44 +2188,11 @@
                 `).join('');
 
                 // Render Pagination Controls
-                renderMeterHistoryPagination(data.total_pages, data.current_page);
+                renderBeautifulPagination('meterHistoryPagination', data.total_pages, data.current_page, (p) => loadMeterHistory(p));
 
             } catch (e) {
                 newList.innerHTML = '<tr><td colspan="5" style="color:var(--danger); text-align:center;">ไม่สามารถโหลดข้อมูลได้: ' + e + '</td></tr>';
             }
-        }
-
-        function renderMeterHistoryPagination(totalPages, currentPage) {
-            let pager = document.getElementById('meterHistoryPagination');
-            if (!pager) {
-                pager = document.createElement('div');
-                pager.id = 'meterHistoryPagination';
-                pager.style.cssText = 'display:flex; justify-content:center; gap:5px; margin-top:20px; padding:10px;';
-                document.getElementById('historySection').appendChild(pager);
-            }
-
-            if (totalPages <= 1) {
-                pager.innerHTML = '';
-                return;
-            }
-
-            let html = '';
-            // Prev
-            html += `<button class="btn btn-outline" style="padding:5px 10px;" ${currentPage === 1 ? 'disabled' : ''} onclick="loadMeterHistory(${currentPage - 1})"><i class="fa-solid fa-chevron-left"></i></button>`;
-            
-            // Pages
-            for (let i = 1; i <= totalPages; i++) {
-                if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
-                    html += `<button class="btn ${i === currentPage ? 'btn-primary' : 'btn-outline'}" style="padding:5px 12px;" onclick="loadMeterHistory(${i})">${i}</button>`;
-                } else if (i === currentPage - 3 || i === currentPage + 3) {
-                    html += '<span style="padding:5px; color:var(--text-muted);">...</span>';
-                }
-            }
-
-            // Next
-            html += `<button class="btn btn-outline" style="padding:5px 10px;" ${currentPage === totalPages ? 'disabled' : ''} onclick="loadMeterHistory(${currentPage + 1})"><i class="fa-solid fa-chevron-right"></i></button>`;
-            
-            pager.innerHTML = html;
         }
 
         function viewRepairDetails(repair) {
@@ -2479,18 +2488,7 @@
                 `).join('') || '<tr><td colspan="5" style="text-align:center; padding: 40px; color: var(--text-muted);"><i class="fa-solid fa-file-circle-exclamation" style="font-size: 3em; margin-bottom: 15px; display: block; color: #d1d5db;"></i>ยังไม่มีข้อมูลสัญญาเช่าที่บันทึกในระบบ</td></tr>';
                 
                 // Pagination Controls
-                const pagination = document.getElementById('leasePagination');
-                if (pagination) {
-                    let html = '';
-                    if (data.total_pages > 1) {
-                        html = `
-                            <button class="btn btn-outline" ${data.current_page === 1 ? 'disabled' : ''} onclick="loadLeases(${data.current_page - 1})">ก่อนหน้า</button>
-                            <span style="margin: 0 15px; align-self: center;">หน้า ${data.current_page} จาก ${data.total_pages}</span>
-                            <button class="btn btn-outline" ${data.current_page === data.total_pages ? 'disabled' : ''} onclick="loadLeases(${data.current_page + 1})">ถัดไป</button>
-                        `;
-                    }
-                    pagination.innerHTML = html;
-                }
+                renderBeautifulPagination('leasePagination', data.total_pages, data.current_page, (p) => loadLeases(p));
             }
         }
 
