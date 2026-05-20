@@ -1870,7 +1870,37 @@ async def get_room_details(room_id: int, db: Session = Depends(get_db), admin: b
 
     tenant = db.query(models.Tenant).filter(models.Tenant.current_room_id == room_id, models.Tenant.status == "Active").first()
     meter_history = db.query(models.MeterReading).filter(models.MeterReading.room_id == room_id).order_by(models.MeterReading.id.desc()).limit(12).all()
+    
+    # Combined Payment History (Invoices + Initial Payments from Leases)
     payment_history = db.query(models.Invoice).filter(models.Invoice.room_id == room_id).order_by(models.Invoice.id.desc()).limit(12).all()
+    leases = db.query(models.Lease).filter(models.Lease.room_id == room_id).order_by(models.Lease.id.desc()).limit(5).all()
+    
+    payments = []
+    for p in payment_history:
+        payments.append({
+            "type": "Monthly Bill",
+            "month": p.billing_month,
+            "year": p.billing_year,
+            "total": p.total_amount,
+            "status": p.status,
+            "date": p.paid_at.strftime("%d/%m/%Y") if p.paid_at else "-"
+        })
+    
+    for l in leases:
+        # Only show if there was an actual initial fee set
+        if l.security_deposit_amount > 0 or l.advance_rent_amount > 0:
+            payments.append({
+                "type": "Initial Payment",
+                "month": l.start_date.month,
+                "year": l.start_date.year,
+                "total": (l.security_deposit_amount + l.advance_rent_amount),
+                "status": l.initial_payment_status,
+                "date": l.initial_payment_date.strftime("%d/%m/%Y") if l.initial_payment_date else "-"
+            })
+    
+    # Sort by Year, Month descending
+    payments.sort(key=lambda x: (x['year'], x['month']), reverse=True)
+
     assets = db.query(models.RoomAsset).filter(models.RoomAsset.room_id == room_id).all()
 
     owner = db.query(models.Owner).first()
@@ -1898,7 +1928,7 @@ async def get_room_details(room_id: int, db: Session = Depends(get_db), admin: b
             "residents": [{"nickname": r.nickname, "full_name": f"{r.first_name} {r.last_name}"} for r in tenant.residents] if tenant else []
         },
         "meters": [{"month": m.billing_month, "year": m.billing_year, "elec": m.electricity_reading, "water": m.water_reading, "date": m.recorded_at.strftime("%d/%m/%Y")} for m in meter_history],
-        "payments": [{"month": p.billing_month, "year": p.billing_year, "total": p.total_amount, "status": p.status, "date": p.paid_at.strftime("%d/%m/%Y") if p.paid_at else "-"} for p in payment_history],
+        "payments": payments,
         "assets": [{"id": a.id, "name": a.name, "quantity": a.quantity} for a in assets]
     }
 @app.post("/admin/rooms/{room_id}/assets/add")

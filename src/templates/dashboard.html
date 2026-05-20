@@ -466,7 +466,7 @@
                 <div style="display: flex; gap: 15px; align-items: flex-end;">
                     <div style="flex: 1;">
                         <label>อาคาร</label>
-                        <select id="report_building_id">
+                        <select id="report_building_id" style="width: 180px;">
                             <option value="all">ทั้งหมด</option>
                             {% for b in all_buildings %}
                             <option value="{{ b.id }}">{{ b.name }}</option>
@@ -667,24 +667,31 @@
                     </div>
                 </div>
 
-                <div style="margin-bottom: 20px;">
-                    <label style="display: flex; justify-content: space-between; align-items: center;">
-                        <span>ค่าใช้จ่ายอื่นๆ (เพิ่มเติมเฉพาะบิลนี้)</span>
-                        <button type="button" class="btn btn-outline" style="padding: 2px 10px; font-size: 0.8em;" onclick="addOtherChargeRow()">+ เพิ่มรายการ</button>
-                    </label>
-                    <div id="other_charges_container" style="margin-top: 10px;">
+                <div style="margin-bottom: 25px; padding: 20px; background: var(--primary-soft); border-radius: var(--radius-md); border: 1px dashed var(--primary);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h4 style="margin: 0; color: var(--primary); font-size: 0.95rem; font-weight: 700;">
+                            <i class="fa-solid fa-plus-circle"></i> {{ get_text('other_charges_one_time', lang) }}
+                        </h4>
+                        <button type="button" class="btn btn-primary" style="padding: 5px 15px; font-size: 0.85rem; background: var(--primary);" onclick="addOtherChargeRow()">
+                            <i class="fa-solid fa-plus"></i> {{ get_text('add_item', lang) }}
+                        </button>
+                    </div>
+                    <div id="other_charges_container">
                         <!-- Rows added here -->
                     </div>
+                    <p style="font-size: 0.75rem; color: var(--secondary); margin-top: 10px; margin-bottom: 0;">
+                        {{ get_text('other_charges_note', lang) }}
+                    </p>
                 </div>
                 <div class="meter-actions" style="display: flex; gap: 10px; margin-top: 10px;">
                     <button type="button" class="btn btn-outline" onclick="previewMeterBill()" style="flex: 1; justify-content: center; height: 45px; border-color: var(--primary); color: var(--primary);">
                         <i class="fa-solid fa-magnifying-glass-dollar"></i> Preview บิล
                     </button>
                     <button type="button" class="btn btn-outline" onclick="submitMeter(false)" style="flex: 1; justify-content: center; height: 45px;">
-                        <i class="fa-solid fa-save"></i> บันทึกร่าง
+                        <i class="fa-solid fa-save"></i> {{ get_text('save_draft', lang) }}
                     </button>
                     <button type="button" class="btn btn-primary" onclick="submitMeter(true)" style="flex: 2; justify-content: center; height: 45px; font-size: 1em;">
-                        <i class="fa-solid fa-paper-plane"></i> บันทึกและออกบิลจริง
+                        <i class="fa-solid fa-paper-plane"></i> {{ get_text('issue_bill', lang) }}
                     </button>
                     <button type="button" id="cancelEditBtn" class="btn btn-outline" style="display:none; flex: 1;" onclick="resetMeterForm()">
                         ยกเลิก
@@ -713,10 +720,10 @@
                     </div>
                     <div style="display: flex; gap: 10px; flex-shrink: 0;">
                         <button class="btn btn-outline" onclick="saveBulkMeters(false)" style="padding: 12px 15px;">
-                            <i class="fa-solid fa-save"></i> บันทึกร่าง
+                            <i class="fa-solid fa-save"></i> {{ get_text('save_draft', lang) }}
                         </button>
                         <button class="btn btn-primary" onclick="saveBulkMeters(true)" style="padding: 12px 15px;">
-                            <i class="fa-solid fa-paper-plane"></i> ออกบิล
+                            <i class="fa-solid fa-paper-plane"></i> {{ get_text('issue_bill', lang) }}
                         </button>
                     </div>
                 </div>
@@ -749,12 +756,18 @@
                 </div>
             </div>
 
-            <!-- Building Tabs -->
-            <div class="building-tabs">
-                <div class="building-tab active" onclick="filterRoomsByBuilding('all', this)">{{ get_text('all_rooms', lang) }}</div>
-                {% for b in all_buildings %}
-                <div class="building-tab" onclick="filterRoomsByBuilding({{ b.id }}, this)">{{ b.name }}</div>
-                {% endfor %}
+            <!-- Building Tabs & Search -->
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; flex-wrap: wrap; margin-bottom: 20px;">
+                <div class="building-tabs" style="margin-bottom: 0;">
+                    <div class="building-tab active" onclick="filterRoomsByBuilding('all', this)">{{ get_text('all_rooms', lang) }}</div>
+                    {% for b in all_buildings %}
+                    <div class="building-tab" onclick="filterRoomsByBuilding({{ b.id }}, this)">{{ b.name }}</div>
+                    {% endfor %}
+                </div>
+                <div style="position: relative; width: 300px;">
+                    <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
+                    <input type="text" id="roomSearchInput" onkeyup="paginateRooms(1)" placeholder="ค้นหาเลขห้อง หรือ ชื่อผู้เช่า..." style="padding-left: 45px; height: 45px; border-radius: 12px; box-shadow: var(--shadow-sm); width: 100%;">
+                </div>
             </div>
             
             <div id="roomFormContainer" style="display:none; background: #f8f9fa; padding: 20px; border-radius: 12px; margin-bottom: 25px;">
@@ -822,26 +835,35 @@
                 <table id="roomTable">
                     <thead>
                         <tr>
-                            <th>เลขห้อง</th>
-                            <th>ชั้น</th>
-                            <th>สถานะ</th>
-                            <th>ค่าเช่า</th>
-                            <th>พร้อมเพย์</th>
-                            <th>จัดการ</th>
+                            <th>{{ get_text('room', lang) }}</th>
+                            <th>{{ get_text('tenants', lang) }}</th>
+                            <th>{{ get_text('floor', lang) if get_text('floor', lang) != 'floor' else 'Floor' }}</th>
+                            <th>{{ get_text('status', lang) }}</th>
+                            <th>{{ get_text('rent', lang) }}</th>
+                            <th>{{ get_text('promptpay', lang) }}</th>
+                            <th>{{ get_text('actions', lang) }}</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for room in all_rooms %}
-                        <tr class="room-row" data-building-id="{{ room.building_id }}">
+                        <tr class="room-row" data-building-id="{{ room.building_id }}" data-tenant-name="{{ room.tenant.full_name if room.tenant else '' }}">
                             <td style="font-weight: 700;">{{ room.room_number }}</td>
+                            <td>
+                                {% if room.tenant %}
+                                    <div style="font-weight: 600;">{{ room.tenant.full_name }}</div>
+                                    <small style="color: var(--text-muted);">{{ room.tenant.phone_number }}</small>
+                                {% else %}
+                                    <span style="color: #ddd;">-</span>
+                                {% endif %}
+                            </td>
                             <td>{{ room.floor }}</td>
                             <td>
                                 <span class="badge {% if room.status == 'Vacant' %}badge-success{% elif room.status == 'Occupied' %}badge-warning{% else %}badge-danger{% endif %}">
-                                    {{ 'ว่าง' if room.status == 'Vacant' else ('มีผู้เช่า' if room.status == 'Occupied' else room.status) }}
+                                    {{ get_text('vacant', lang) if room.status == 'Vacant' else (get_text('occupied', lang) if room.status == 'Occupied' else room.status) }}
                                 </span>
                             </td>
                             <td style="font-weight: 600;">{{ "{:,.2f}".format(room.base_rent) }}</td>
-                            <td style="font-size: 0.85em; color: var(--text-muted);">{{ room.promptpay_id or 'ค่าเริ่มต้น' }}</td>
+                            <td style="font-size: 0.85em; color: var(--text-muted);">{{ room.promptpay_id or get_text('default_pp', lang) }}</td>
                             <td>
                                 <button class="btn btn-outline edit-room-btn" 
                                     data-id="{{ room.id }}"
@@ -859,7 +881,7 @@
                                     <i class="fa-solid fa-edit"></i>
                                 </button>
                                 <button class="btn btn-primary" style="padding: 5px 10px; background: #2980b9;" onclick="viewRoomDetails({{ room.id }}, '{{ room.room_number }}')">
-                                    <i class="fa-solid fa-circle-info"></i> รายละเอียด
+                                    <i class="fa-solid fa-circle-info"></i> {{ get_text('details', lang) }}
                                 </button>
                             </td>
                         </tr>
@@ -939,13 +961,12 @@
                 <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                     <h3 style="margin:0; font-size: 1em; color: var(--secondary);">{{ get_text('meter_reading', lang) }}</h3>
                     <div style="display:flex; gap:5px;">
-                        <select id="history_room_filter" onchange="loadMeterHistory()" style="width: 100px; padding: 5px;">
+                        <select id="history_room_filter" onchange="loadMeterHistory()" style="width: 200px; padding: 5px;">
                             <option value="">{{ get_text('all_rooms', lang) }}</option>
                             {% for room in all_rooms %}
                             <option value="{{ room.id }}">{{ room.room_number }}</option>
                             {% endfor %}
                         </select>
-                        <button class="btn btn-outline" onclick="loadMeterHistory()" style="padding: 5px 10px;">{{ get_text('details', lang) }}</button>
                     </div>
                 </div>
                 <div class="table-container">
@@ -985,7 +1006,7 @@
             <div class="section-header">
                 <h2><i class="fa-solid fa-screwdriver-wrench"></i> แจ้งซ่อม</h2>
                 <div style="display:flex; gap:5px;">
-                    <select id="repair_room_filter" onchange="loadRepairHistory()" style="width: 100px; padding: 5px;">
+                    <select id="repair_room_filter" onchange="loadRepairHistory()" style="width: 200px; padding: 5px;">
                         <option value="">ทั้งหมด</option>
                         {% for room in all_rooms %}
                         <option value="{{ room.id }}">{{ room.room_number }}</option>
@@ -1365,7 +1386,7 @@
                 <div id="tab-payments" class="tab-content">
                     <div class="table-container">
                         <table>
-                            <thead><tr><th>เดือน/ปี</th><th>ยอดรวม</th><th>สถานะ</th><th>วันที่จ่าย</th></tr></thead>
+                            <thead><tr><th>{{ get_text('period', lang) }}</th><th>{{ get_text('category', lang) }}</th><th>{{ get_text('total', lang) }}</th><th>{{ get_text('status', lang) }}</th></tr></thead>
                             <tbody id="dt-payments-list"></tbody>
                         </table>
                     </div>
@@ -2151,15 +2172,16 @@
             table.innerHTML = `
                 <thead>
                     <tr>
-                        <th>ห้อง</th>
-                        <th>รอบบิล</th>
-                        <th>มิเตอร์ไฟ</th>
-                        <th>มิเตอร์น้ำ</th>
-                        <th>สถานะบิล</th>
+                        <th>{{ get_text('room', lang) }}</th>
+                        <th>{{ get_text('period', lang) }}</th>
+                        <th>{{ get_text('elec', lang) }}</th>
+                        <th>{{ get_text('water', lang) }}</th>
+                        <th>{{ get_text('status', lang) }}</th>
+                        <th>{{ get_text('actions', lang) }}</th>
                     </tr>
                 </thead>
                 <tbody id="meterHistoryList">
-                    <tr><td colspan="5" style="text-align:center; padding:20px;">กำลังโหลดข้อมูล...</td></tr>
+                    <tr><td colspan="6" style="text-align:center; padding:20px;">{{ get_text('loading', lang) }}</td></tr>
                 </tbody>
             `;
             const newList = document.getElementById('meterHistoryList');
@@ -2169,7 +2191,7 @@
                 const data = await res.json();
                 
                 if (!data.items || data.items.length === 0) {
-                    newList.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">ไม่พบข้อมูลมิเตอร์</td></tr>';
+                    newList.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--text-muted);">{{ get_text("no_pending", lang) }}</td></tr>';
                     // Remove existing pagination if any
                     const existingPager = document.getElementById('meterHistoryPagination');
                     if (existingPager) existingPager.remove();
@@ -2183,6 +2205,11 @@
                         <td>${m.electricity}</td>
                         <td>${m.water}</td>
                         <td><span class="badge ${m.invoice_status === 'Paid' ? 'badge-success' : 'badge-warning'}">${m.invoice_status}</span></td>
+                        <td>
+                            <button class="btn btn-outline" style="padding: 5px 10px;" onclick="viewInvoiceDetails(${m.invoice_id})">
+                                <i class="fa-solid fa-eye"></i> {{ get_text('details', lang) }}
+                            </button>
+                        </td>
                     </tr>
                 `).join('');
 
@@ -2314,20 +2341,48 @@
             }
         }
 
+        let currentRoomPage = 1;
+        let activeRoomBuildingId = 'all';
+        const roomPageSize = 10;
+
+        function paginateRooms(page = 1) {
+            currentRoomPage = page;
+            const searchInput = document.getElementById('roomSearchInput');
+            const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+
+            const rows = document.querySelectorAll('.room-row');
+
+            // Filter by building AND Search query
+            const filteredRows = Array.from(rows).filter(row => {
+                const bId = row.getAttribute('data-building-id');
+                const roomNum = row.cells[0].innerText.toLowerCase();
+                const tenantName = row.getAttribute('data-tenant-name').toLowerCase();
+
+                const matchesBuilding = activeRoomBuildingId === 'all' || bId == activeRoomBuildingId;
+                const matchesQuery = query === '' || roomNum.includes(query) || tenantName.includes(query);
+
+                return matchesBuilding && matchesQuery;
+            });
+
+            // Hide all and show filtered page
+            rows.forEach(row => row.style.display = 'none');
+
+            const start = (page - 1) * roomPageSize;
+            const end = start + roomPageSize;
+
+            filteredRows.slice(start, end).forEach(row => {
+                row.style.display = '';
+            });
+
+            renderBeautifulPagination('roomPagination', Math.ceil(filteredRows.length / roomPageSize), currentRoomPage, (p) => paginateRooms(p));
+        }
+
         function filterRoomsByBuilding(buildingId, tab) {
             document.querySelectorAll('.building-tab').forEach(t => t.classList.remove('active'));
             tab.classList.add('active');
-            
-            const rows = document.querySelectorAll('.room-row');
-            rows.forEach(row => {
-                if (buildingId === 'all' || row.getAttribute('data-building-id') == buildingId) {
-                    row.style.display = '';
-                } else {
-                    row.style.display = 'none';
-                }
-            });
+            activeRoomBuildingId = buildingId;
+            paginateRooms(1);
         }
-
         // Init PromptPay
         function initPP() {
             try {
@@ -2639,7 +2694,16 @@
             document.getElementById('dt-global-recurring-list').innerHTML = data.room.global_recurring.map(c => `<tr><td>${c.description}</td><td style="text-align:right;">${parseFloat(c.amount).toLocaleString()} บาท</td></tr>`).join('') || '<tr><td colspan="2">ไม่มีรายการ</td></tr>';
             document.getElementById('dt-room-recurring-list').innerHTML = data.room.room_recurring.map(c => `<tr><td>${c.description}</td><td style="text-align:right;">${parseFloat(c.amount).toLocaleString()} บาท</td></tr>`).join('') || '<tr><td colspan="2">ไม่มีรายการ</td></tr>';
             document.getElementById('dt-meters-list').innerHTML = data.meters.map(m => `<tr><td>${m.month}/${m.year}</td><td>${m.elec}</td><td>${m.water}</td><td>${m.date}</td></tr>`).join('');
-            document.getElementById('dt-payments-list').innerHTML = data.payments.map(p => `<tr><td>${p.month}/${p.year}</td><td>${p.total}</td><td><span class="badge ${p.status==='Paid'?'badge-success':'badge-warning'}">${p.status}</span></td><td>${p.date}</td></tr>`).join('');
+            document.getElementById('dt-payments-list').innerHTML = data.payments.map(p => {
+                const typeLabel = p.type === 'Monthly Bill' ? "{{ get_text('monthly_bill', lang) }}" : "{{ get_text('initial_payment_type', lang) }}";
+                const typeClass = p.type === 'Monthly Bill' ? 'badge-info' : 'badge-primary';
+                return `<tr>
+                    <td>${p.month}/${p.year}</td>
+                    <td><span class="badge ${typeClass}">${typeLabel}</span></td>
+                    <td style="font-weight:600; color:var(--primary);">฿${parseFloat(p.total).toLocaleString()}</td>
+                    <td><span class="badge ${p.status==='Paid'?'badge-success':'badge-warning'}">${p.status}</span></td>
+                </tr>`;
+            }).join('') || '<tr><td colspan="4" style="text-align:center;">ไม่มีข้อมูลการชำระเงิน</td></tr>';
             document.getElementById('dt-assets-list').innerHTML = data.assets.map(a => `<tr><td>${a.name}</td><td>${a.quantity}</td><td><button class="btn btn-danger" style="padding:2px 8px;" onclick="deleteAsset(${a.id})"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('');
         }
 
@@ -2675,13 +2739,14 @@
             const div = document.createElement('div');
             div.className = 'bank-pair'; 
             div.style.display = 'grid'; 
-            div.style.gridTemplateColumns = '1fr 1fr 1fr auto'; 
+            div.style.gridTemplateColumns = '1fr 1.8fr 1.2fr auto'; 
             div.style.gap = '8px'; 
             div.style.marginBottom = '15px';
-            div.style.padding = '10px';
+            div.style.padding = '12px';
             div.style.background = 'white';
-            div.style.borderRadius = '8px';
-            div.style.border = '1px solid #f9a8d4';
+            div.style.borderRadius = '12px';
+            div.style.border = '1px solid var(--border)';
+            div.style.boxShadow = 'var(--shadow-sm)';
             
             div.innerHTML = `
                 <input type="hidden" class="bank-id" value="${bankId}">
@@ -2985,8 +3050,21 @@
         function addOtherChargeRow(containerId='other_charges_container', desc='', amt='') {
             const container = document.getElementById(containerId);
             const div = document.createElement('div');
-            div.className = 'other-charge-row'; div.style.display='flex'; div.style.gap='10px'; div.style.marginBottom='8px';
-            div.innerHTML = `<input type="text" value="${desc}" class="oc-desc" style="flex:2;"><input type="number" value="${amt}" class="oc-amt" style="flex:1;"><button type="button" class="btn btn-danger" onclick="this.parentElement.remove()"><i class="fa-solid fa-xmark"></i></button>`;
+            div.className = 'other-charge-row'; 
+            div.style.display='flex'; 
+            div.style.gap='10px'; 
+            div.style.marginBottom='10px';
+            div.style.background = 'white';
+            div.style.padding = '10px';
+            div.style.borderRadius = '8px';
+            div.style.boxShadow = 'var(--shadow-sm)';
+            
+            div.innerHTML = `
+                <input type="text" value="${desc}" class="oc-desc" placeholder="เช่น ค่าล้างแอร์" style="flex:2; border-color: var(--border);">
+                <input type="number" value="${amt}" class="oc-amt" placeholder="จำนวนเงิน" style="flex:1; border-color: var(--border); font-weight: 700;">
+                <button type="button" class="btn btn-danger" style="padding: 8px 12px;" onclick="this.parentElement.remove()">
+                    <i class="fa-solid fa-trash-can"></i>
+                </button>`;
             container.appendChild(div);
         }
 
@@ -3139,7 +3217,7 @@
                 const res = await fetch('/admin/meters/record', { method: 'POST', body: formData });
                 const data = await res.json();
                 if (res.ok) {
-                    alert(isIssue ? 'ออกบิลและแจ้งเตือนเรียบร้อย' : 'บันทึกร่างเรียบร้อย');
+                    alert(isIssue ? "{{ get_text('issue_success', lang) }}" : "{{ get_text('save_success', lang) }}");
                     const bid = document.getElementById('meter_building_id').value;
                     // Force refresh by redirecting to the exact current context
                     window.location.href = `/admin/dashboard?mode=single&month=${month}&year=${year}&building_id=${bid}#meterSection`;
@@ -3202,7 +3280,7 @@
             formData.append('issue_bill', isIssue);
             const res = await fetch('/admin/meters/bulk-record', { method: 'POST', body: formData });
             if (res.ok) {
-                alert(isIssue ? 'ออกบิลและแจ้งเตือนเรียบร้อย' : 'บันทึกร่างเรียบร้อย');
+                alert(isIssue ? "{{ get_text('issue_success', lang) }}" : "{{ get_text('save_success', lang) }}");
                 window.location.href = `/admin/dashboard?mode=bulk&month=${month}&year=${year}&building_id=${bid}#meterSection`;
                 window.location.reload();
             }

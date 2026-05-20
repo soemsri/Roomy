@@ -140,9 +140,12 @@
                     <img id="qr-image" src="{{ bank_info.qr }}" alt="Bank QR">
                 {% endif %}
             {% else %}
-                {% if promptpay_name %}
-                <p style="margin: 5px 0; color: #0078d4; font-weight: 700; font-size: 1.1em;">ชื่อบัญชี: {{ promptpay_name }}</p>
-                {% endif %}
+                <div style="margin: 15px 0;">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/c/c5/PromptPay-logo.png" alt="PromptPay Logo" style="height: 40px; margin-bottom: 10px;">
+                    {% if promptpay_name %}
+                    <p style="margin: 5px 0; color: #0078d4; font-weight: 700; font-size: 1.1em;">ชื่อบัญชี: {{ promptpay_name }}</p>
+                    {% endif %}
+                </div>
                 <img id="qr-image" src="" alt="PromptPay QR">
             {% endif %}
 
