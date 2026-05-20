@@ -869,21 +869,21 @@
             </div>
         </div>
 
-        <!-- Invoices & Billing -->
-        <div class="section-card" id="billSection">
+        <!-- Latest Bills -->
+        <div class="card section-card" id="billSection">
             <div class="section-header">
-                <h2><i class="fa-solid fa-file-invoice"></i> บิลล่าสุด (เดือน {{ current_month }}/{{ current_year }})</h2>
+                <h2><i class="fa-solid fa-file-invoice"></i> {{ get_text('latest_bills', lang) }} ({{ current_month }}/{{ current_year }})</h2>
             </div>
             <div class="table-container">
-                <table>
+                <table id="billTable">
                     <thead>
                         <tr>
-                            <th>ห้อง</th>
-                            <th>ผู้เช่า</th>
-                            <th>เดือน</th>
-                            <th>ยอดรวม</th>
-                            <th>สถานะ</th>
-                            <th>จัดการ</th>
+                            <th>{{ get_text('room', lang) }}</th>
+                            <th>{{ get_text('full_name', lang) }}</th>
+                            <th>{{ get_text('month', lang) }}</th>
+                            <th>{{ get_text('total', lang) }}</th>
+                            <th>{{ get_text('status', lang) }}</th>
+                            <th>{{ get_text('actions', lang) }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -895,7 +895,7 @@
                             <td style="font-weight: 700; color: var(--primary);">{{ "{:,.2f}".format(inv.total_amount) }}</td>
                             <td>
                                 <span class="badge {% if inv.status == 'Paid' %}badge-success{% elif inv.status == 'Pending Verification' %}badge-danger{% else %}badge-warning{% endif %}">
-                                    {{ inv.status }}
+                                    {{ get_text('paid', lang) if inv.status == 'Paid' else (get_text('unpaid', lang) if inv.status == 'Unpaid' else inv.status) }}
                                 </span>
                             </td>
                             <td>
@@ -908,12 +908,12 @@
                                 </button>
                                 {% endif %}
                                 {% if inv.status == 'Unpaid' %}
-                                <button class="btn btn-outline" onclick="confirmCash({{ inv.id }})"><i class="fa-solid fa-money-bill"></i> เงินสด</button>
+                                <button class="btn btn-outline" onclick="confirmCash({{ inv.id }})"><i class="fa-solid fa-money-bill"></i> {{ get_text('cash', lang) }}</button>
                                 <button class="btn btn-primary" style="background: #27ae60;" onclick="sendLine({{ inv.id }})"><i class="fa-brands fa-line"></i> ส่ง LINE</button>
                                 {% elif inv.status == 'Pending Verification' %}
-                                <a href="{{ inv.payment_receipt_img }}" target="_blank" class="btn btn-outline" style="color: var(--primary);"><i class="fa-solid fa-image"></i> ดูสลิป</a>
-                                <button class="btn btn-primary" style="background: var(--success);" onclick="approveInvoice({{ inv.id }})">อนุมัติ</button>
-                                <button class="btn btn-danger" onclick="rejectInvoice({{ inv.id }})">ปฏิเสธ</button>
+                                <a href="{{ inv.payment_receipt_img }}" target="_blank" class="btn btn-outline" style="color: var(--primary);"><i class="fa-solid fa-image"></i> {{ get_text('details', lang) }}</a>
+                                <button class="btn btn-primary" style="background: var(--success);" onclick="approveInvoice({{ inv.id }})">{{ get_text('approve', lang) }}</button>
+                                <button class="btn btn-danger" onclick="rejectInvoice({{ inv.id }})">{{ get_text('reject', lang) }}</button>
                                 {% endif %}
                             </td>
                         </tr>
@@ -924,60 +924,59 @@
         </div>
 
         <!-- History Section -->
-        <div class="section-card" id="historySection" style="margin-top: 30px; display: none;">
+        <div class="card section-card" id="historySection" style="display: none;">
             <div class="section-header">
-                <h2><i class="fa-solid fa-clock-rotate-left"></i> ประวัติ</h2>
+                <h2><i class="fa-solid fa-clock-rotate-left"></i> {{ get_text('history', lang) }}</h2>
             </div>
             
             <div class="tabs" style="margin-bottom: 20px;">
-                <div class="tab active" id="tab_history_meter" onclick="switchHistoryTab('meter')">ประวัติมิเตอร์</div>
-                <div class="tab" id="tab_history_tenant" onclick="switchHistoryTab('tenant')">ประวัติการเข้าพัก</div>
+                <div class="tab active" id="tab_history_meter" onclick="switchHistoryTab('meter')">{{ get_text('meter_reading', lang) }}</div>
+                <div class="tab" id="tab_history_tenant" onclick="switchHistoryTab('tenant')">{{ get_text('tenants', lang) }} {{ get_text('history', lang) }}</div>
             </div>
 
-            <!-- Meter History Content -->
+            <!-- Meter History -->
             <div id="meterHistoryContent">
                 <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                    <h3 style="margin:0; font-size: 1em; color: var(--secondary);">ประวัติมิเตอร์ (แยกตามห้อง)</h3>
+                    <h3 style="margin:0; font-size: 1em; color: var(--secondary);">{{ get_text('meter_reading', lang) }}</h3>
                     <div style="display:flex; gap:5px;">
                         <select id="history_room_filter" onchange="loadMeterHistory()" style="width: 100px; padding: 5px;">
-                            <option value="">ทั้งหมด</option>
+                            <option value="">{{ get_text('all_rooms', lang) }}</option>
                             {% for room in all_rooms %}
                             <option value="{{ room.id }}">{{ room.room_number }}</option>
                             {% endfor %}
                         </select>
-                        <button class="btn btn-outline" onclick="loadMeterHistory()" style="padding: 5px 10px;">ดู</button>
+                        <button class="btn btn-outline" onclick="loadMeterHistory()" style="padding: 5px 10px;">{{ get_text('details', lang) }}</button>
                     </div>
                 </div>
-                <div class="table-container" style="max-height: 400px;">
+                <div class="table-container">
                     <table id="meterHistoryTable">
                         <tbody id="meterHistoryList">
-                            <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">เลือกห้องเพื่อดูประวัติ</td></tr>
+                            <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">{{ get_text('loading', lang) }}</td></tr>
                         </tbody>
                     </table>
                 </div>
-                <div id="meterHistoryPagination" style="display:flex; justify-content:center; gap:5px; margin-top:20px; padding:10px;"></div>
+                <div id="meterHistoryPagination" class="pagination-container"></div>
             </div>
 
-            <!-- Tenant History Content -->
+            <!-- Tenant History -->
             <div id="tenantHistoryContent" style="display: none;">
-                <h3 style="margin-bottom:15px; font-size: 1em; color: var(--secondary);">ประวัติการเข้าพัก (อดีตผู้เช่า)</h3>
                 <div class="table-container">
                     <table>
                         <thead>
                             <tr>
-                                <th>ห้อง</th>
-                                <th>ชื่อ-นามสกุล</th>
-                                <th>วันที่เข้า/ออก</th>
-                                <th>ยอดปิดบัญชี</th>
-                                <th>รายละเอียด</th>
+                                <th>{{ get_text('room', lang) }}</th>
+                                <th>{{ get_text('full_name', lang) }}</th>
+                                <th>{{ get_text('date', lang) }}</th>
+                                <th>{{ get_text('total', lang) }}</th>
+                                <th>{{ get_text('details', lang) }}</th>
                             </tr>
                         </thead>
                         <tbody id="tenantHistoryList">
-                            <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">กำลังโหลดข้อมูล...</td></tr>
+                            <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">{{ get_text('loading', lang) }}</td></tr>
                         </tbody>
                     </table>
                 </div>
-                <div id="historyPagination" style="display:flex; justify-content:center; gap:5px; margin-top:20px; padding:10px;"></div>
+                <div id="historyPagination" class="pagination-container"></div>
             </div>
         </div>
 
@@ -2815,6 +2814,17 @@
             formData.append('qr_enabled', document.getElementById('qr_enabled').value);
             formData.append('promptpay_config', JSON.stringify(pairs));
             formData.append('bank_config', JSON.stringify(banks));
+            
+            // Include move-in fees config to prevent wiping
+            const fees = [];
+            document.querySelectorAll('.fee-row').forEach(row => {
+                const name = row.querySelector('.fee-name').value.trim();
+                const value = parseFloat(row.querySelector('.fee-value').value) || 0;
+                const type = row.querySelector('.fee-type').value;
+                if (name) fees.push({ name, value, is_multiplier: type === 'multiplier' });
+            });
+            formData.append('move_in_fees_config', JSON.stringify(fees));
+
             formData.append('late_fee_enabled', document.getElementById('late_fee_enabled').checked ? "1" : "0");
             formData.append('due_day', document.getElementById('due_day').value);
             formData.append('late_fee_per_day', document.getElementById('late_fee_per_day').value);

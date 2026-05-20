@@ -2477,28 +2477,37 @@ def perform_approval(db: Session, tenant, room_ids: list, owner, start_date=None
         target_tenant.current_room_id = room.id
         room.status = "Occupied"
         
-        # Calculate Initial Fees - ONLY from config
+        # Calculate Initial Fees
         security_deposit = 0.0
         advance_rent = 0.0
         applied_fees = []
         room_total = 0.0
         fees_text = ""
         
-        if owner and owner.move_in_fees_config:
-            try:
-                config = json.loads(owner.move_in_fees_config)
-                for f in config:
-                    amt = f['value'] * room.base_rent if f.get('is_multiplier') else f['value']
-                    applied_fees.append({"name": f['name'], "amount": amt})
-                    room_total += amt
-                    fees_text += f"<li>{f['name']}: {amt:,.2f} บาท</li>"
-                    
-                    if "ประกัน" in f['name']:
-                        security_deposit += amt
-                    elif "ล่วงหน้า" in f['name']:
-                        advance_rent += amt
-            except:
-                pass
+        # Load config or use defaults
+        config_str = owner.move_in_fees_config if owner and owner.move_in_fees_config else "[]"
+        try:
+            config = json.loads(config_str)
+        except:
+            config = []
+
+        if not config:
+            # Server-side Fallback Defaults
+            config = [
+                {"name": "ค่าเช่าล่วงหน้า 1 เดือน", "value": 1, "is_multiplier": True},
+                {"name": "ค่าประกันทรัพย์สิน", "value": 5000, "is_multiplier": False}
+            ]
+        
+        for f in config:
+            amt = f['value'] * room.base_rent if f.get('is_multiplier') else f['value']
+            applied_fees.append({"name": f['name'], "amount": amt})
+            room_total += amt
+            fees_text += f"<li>{f['name']}: {amt:,.2f} บาท</li>"
+            
+            if "ประกัน" in f['name']:
+                security_deposit += amt
+            elif "ล่วงหน้า" in f['name']:
+                advance_rent += amt
         
         if fees_text:
             fees_text = f"<ul>{fees_text}</ul><p><strong>รวมเงินมัดจำและค่าแรกเข้าห้อง {room.room_number}: {room_total:,.2f} บาท</strong></p>"
