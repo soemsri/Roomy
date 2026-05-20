@@ -1,21 +1,20 @@
 
 <!DOCTYPE html>
-<html lang="th">
+<html lang="{{ lang or 'th' }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>แจ้งย้ายออก - SukAnan Apartment</title>
+    <title>{{ get_text('move_out_title', lang) }} - SukAnan Apartment</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
             --primary: #ef4444;
-            --primary-dark: #b91c1c;
+            --primary-dark: #dc2626;
             --bg: #f8fafc;
             --card: #ffffff;
             --text: #1e293b;
             --text-muted: #64748b;
             --border: #e2e8f0;
-            --success: #22c55e;
         }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -62,6 +61,10 @@
             box-sizing: border-box;
             transition: border-color 0.2s;
         }
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
         .btn {
             width: 100%;
             padding: 14px;
@@ -82,58 +85,65 @@
         }
         .success-view i {
             font-size: 4rem;
-            color: var(--success);
+            color: #22c55e;
             margin-bottom: 20px;
         }
         .info-box {
-            background: #fef2f2;
-            border-left: 4px solid var(--primary);
+            background: #fff1f2;
+            border: 1px solid #fecdd3;
             padding: 15px;
-            margin-bottom: 20px;
-            font-size: 0.9rem;
+            border-radius: 8px;
+            margin-bottom: 25px;
             color: #991b1b;
+            font-size: 0.9rem;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h2><i class="fa-solid fa-door-open"></i> แจ้งย้ายออก</h2>
-            <p>ห้อง {{ tenant.room.room_number }} - {{ tenant.full_name }}</p>
+            <h2><i class="fa-solid fa-door-open"></i> {{ get_text('move_out_title', lang) }}</h2>
+            <p>{{ get_text('move_out_subtitle', lang) }}</p>
         </div>
         <div class="form-content" id="formContent">
             <div class="info-box">
-                <i class="fa-solid fa-circle-info"></i> การแจ้งย้ายออกต้องแจ้งล่วงหน้าตามเงื่อนไขในสัญญาเช่า กรุณาตรวจสอบวันที่ย้ายออกให้ถูกต้อง
+                <i class="fa-solid fa-circle-info"></i> {{ get_text('move_out_info', lang) }}
             </div>
             <form id="moveOutForm">
                 <div class="form-group">
-                    <label>วันที่ต้องการย้ายออก</label>
+                    <label>{{ get_text('room_number_label', lang) }}</label>
+                    <input type="text" value="{{ tenant.room.room_number if tenant.room else 'N/A' }}" disabled>
+                </div>
+                <div class="form-group">
+                    <label>{{ get_text('tenant_name_label', lang) }}</label>
+                    <input type="text" value="{{ tenant.full_name }}" disabled>
+                </div>
+                <div class="form-group">
+                    <label>{{ get_text('move_out_date_label', lang) }}</label>
                     <input type="date" id="requested_date" required>
                 </div>
                 <div class="form-group">
-                    <label>เหตุผลที่ย้ายออก (ระบุหรือไม่ก็ได้)</label>
-                    <textarea id="reason" rows="3" placeholder="ระบุเหตุผล..."></textarea>
+                    <label>{{ get_text('move_out_reason_label', lang) }}</label>
+                    <textarea id="reason" rows="3" placeholder="{{ get_text('move_out_reason_placeholder', lang) }}"></textarea>
                 </div>
-                <button type="submit" class="btn">ส่งคำขอแจ้งย้ายออก</button>
+                <button type="submit" class="btn">{{ get_text('submit_move_out', lang) }}</button>
             </form>
         </div>
         <div class="success-view" id="successView">
             <i class="fa-solid fa-circle-check"></i>
-            <h3>ส่งคำขอเรียบร้อยแล้ว</h3>
-            <p>เจ้าของหอพักได้รับคำขอแจ้งย้ายออกของคุณแล้ว จะดำเนินการตรวจสอบและติดต่อกลับโดยเร็วที่สุด</p>
+            <h3>{{ get_text('move_out_success_title', lang) }}</h3>
+            <p>{{ get_text('move_out_success_desc', lang) }}</p>
         </div>
     </div>
 
     <script>
         const tenant_uuid = "{{ tenant.uuid }}";
-        
+
         document.getElementById('moveOutForm').onsubmit = async (e) => {
             e.preventDefault();
-            if (!confirm('ยืนยันการส่งคำขอแจ้งย้ายออก?')) return;
-
             const btn = e.target.querySelector('button');
             btn.disabled = true;
-            btn.innerText = 'กำลังส่งข้อมูล...';
+            btn.innerText = '{{ get_text("sending_data", lang) }}';
 
             const data = {
                 requested_date: document.getElementById('requested_date').value,
@@ -152,14 +162,14 @@
                     document.getElementById('successView').style.display = 'block';
                 } else {
                     const err = await res.json();
-                    alert(err.detail || 'เกิดข้อผิดพลาด');
+                    alert(err.detail || '{{ get_text("error_occurred", lang) }}');
                     btn.disabled = false;
-                    btn.innerText = 'ส่งคำขอแจ้งย้ายออก';
+                    btn.innerText = '{{ get_text("submit_move_out", lang) }}';
                 }
             } catch (err) {
-                alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+                alert('{{ get_text("connection_error", lang) }}');
                 btn.disabled = false;
-                btn.innerText = 'ส่งคำขอแจ้งย้ายออก';
+                btn.innerText = '{{ get_text("submit_move_out", lang) }}';
             }
         };
     </script>

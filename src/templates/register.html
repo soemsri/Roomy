@@ -1,10 +1,10 @@
 
 <!DOCTYPE html>
-<html lang="th">
+<html lang="{{ lang or 'th' }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ลงทะเบียนเข้าพัก - SukAnan Apartment</title>
+    <title>{{ get_text('register_title', lang) }} - SukAnan Apartment</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
@@ -94,34 +94,42 @@
 <body>
     <div class="container" id="mainContainer">
         <div class="header">
-            <h2><i class="fa-solid fa-file-contract"></i> ลงทะเบียนเข้าพัก</h2>
-            <p>กรุณากรอกข้อมูลเพื่อทำสัญญาเช่า</p>
+            <h2><i class="fa-solid fa-file-contract"></i> {{ get_text('register_title', lang) }}</h2>
+            <p>{{ get_text('register_subtitle', lang) }}</p>
         </div>
         <div class="form-content" id="formContent">
             <form id="regForm">
                 <div class="form-group">
-                    <label>ชื่อ-นามสกุล</label>
-                    <input type="text" id="full_name" placeholder="ชื่อจริง - นามสกุล" value="{{ default_data.full_name if default_data else '' }}" required>
+                    <label>{{ get_text('full_name', lang) }}</label>
+                    <input type="text" id="full_name" placeholder="{{ get_text('full_name_placeholder', lang) }}" value="{{ default_data.full_name if default_data else '' }}" required>
                 </div>
                 <div class="form-group">
-                    <label>เลขบัตรประชาชน</label>
-                    <input type="text" id="citizen_id" placeholder="เลขบัตรประชาชน 13 หลัก" maxlength="13" pattern="\d{13}" title="กรุณากรอกตัวเลข 13 หลัก" value="{{ default_data.citizen_id if default_data else '' }}" required>
+                    <label>{{ get_text('citizen_id_label', lang) }}</label>
+                    <input type="text" id="citizen_id" placeholder="{{ get_text('citizen_id_placeholder', lang) }}" maxlength="13" pattern="\d{13}" title="{{ get_text('citizen_id_error', lang) }}" value="{{ default_data.citizen_id if default_data else '' }}" required>
                 </div>
                 <div class="form-group">
-                    <label>เบอร์โทรศัพท์</label>
+                    <label>{{ get_text('phone', lang) }}</label>
                     <input type="tel" id="phone_number" placeholder="08x-xxx-xxxx" value="{{ default_data.phone_number if default_data else '' }}" required>
                 </div>
                 <div class="form-group">
-                    <label>วันที่ต้องการเข้าพัก</label>
+                    <label>{{ get_text('move_in_date', lang) }}</label>
                     <input type="date" id="requested_move_in_date" required>
                 </div>
-                <button type="submit" class="btn">ส่งข้อมูลเพื่อลงทะเบียน</button>
+                <div class="form-group">
+                    <label>{{ get_text('language_label', lang) }}</label>
+                    <select id="language">
+                        <option value="th" {{ 'selected' if (lang or 'th') == 'th' else '' }}>ภาษาไทย (Thai)</option>
+                        <option value="en" {{ 'selected' if lang == 'en' else '' }}>English</option>
+                        <option value="jp" {{ 'selected' if lang == 'jp' else '' }}>日本語 (Japanese)</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn">{{ get_text('submit_registration', lang) }}</button>
             </form>
         </div>
         <div class="success-view" id="successView">
             <i class="fa-solid fa-circle-check"></i>
-            <h3>ส่งข้อมูลเรียบร้อยแล้ว!</h3>
-            <p>กรุณารอเจ้าของหอพักตรวจสอบและอนุมัติการเข้าพัก ระบบจะแจ้งเตือนคุณผ่าน LINE เมื่อมีการอัปเดต</p>
+            <h3>{{ get_text('registration_success_title', lang) }}</h3>
+            <p>{{ get_text('registration_success_desc', lang) }}</p>
         </div>
     </div>
 
@@ -132,13 +140,14 @@
             e.preventDefault();
             const btn = e.target.querySelector('button');
             btn.disabled = true;
-            btn.innerText = 'กำลังส่งข้อมูล...';
+            btn.innerText = '{{ get_text("sending_data", lang) }}';
 
             const data = {
                 full_name: document.getElementById('full_name').value,
                 citizen_id: document.getElementById('citizen_id').value,
                 phone_number: document.getElementById('phone_number').value,
-                requested_move_in_date: document.getElementById('requested_move_in_date').value
+                requested_move_in_date: document.getElementById('requested_move_in_date').value,
+                language: document.getElementById('language').value
             };
 
             try {
@@ -153,14 +162,14 @@
                     document.getElementById('successView').style.display = 'block';
                 } else {
                     const err = await res.json();
-                    alert(err.detail || 'เกิดข้อผิดพลาด');
+                    alert(err.detail || '{{ get_text("error_occurred", lang) }}');
                     btn.disabled = false;
-                    btn.innerText = 'ส่งข้อมูลเพื่อลงทะเบียน';
+                    btn.innerText = '{{ get_text("submit_registration", lang) }}';
                 }
             } catch (err) {
-                alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+                alert('{{ get_text("connection_error", lang) }}');
                 btn.disabled = false;
-                btn.innerText = 'ส่งข้อมูลเพื่อลงทะเบียน';
+                btn.innerText = '{{ get_text("submit_registration", lang) }}';
             }
         };
     </script>

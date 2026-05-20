@@ -564,6 +564,19 @@ def handle_tenant_message(event, *args, **kwargs):
                         tenant_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text=f"เลือกห้องสำหรับ{text}", contents=flex_contents))
                         return
 
+            elif text.lower() in ["language", "lang", "ภาษา", "เปลี่ยนภาษา"]:
+                reply_text = "Please choose your language / กรุณาเลือกภาษา:\n\nType 'TH' for Thai\nType 'EN' for English\nType 'JP' for Japanese"
+            elif text.upper() in ["TH", "EN", "JP"]:
+                new_lang = text.lower()
+                for t in active_tenants:
+                    t.language = new_lang
+                db.commit()
+                msg_map = {
+                    "th": "เปลี่ยนภาษาเป็น ภาษาไทย เรียบร้อยแล้วค่ะ",
+                    "en": "Language has been changed to English.",
+                    "jp": "言語が日本語に変更されました。"
+                }
+                reply_text = msg_map.get(new_lang, "Success")
             elif text == "สนทนา":
                 reply_text = "คุณสามารถพิมพ์ข้อความที่ต้องการสอบถามทิ้งไว้ได้เลยครับ เจ้าหน้าที่จะรีบมาตอบกลับโดยเร็วที่สุด"
             else:
@@ -607,7 +620,8 @@ async def view_registration(request: Request, tenant_uuid: str, db: Session = De
     return templates.TemplateResponse("register.html", {
         "request": request, 
         "tenant_uuid": tenant_uuid,
-        "default_data": default_data
+        "default_data": default_data,
+        "lang": request.query_params.get("lang", "th")
     })
 @app.post("/register/{tenant_uuid}")
 async def submit_registration(tenant_uuid: str, data: dict, db: Session = Depends(get_db)):
@@ -618,6 +632,7 @@ async def submit_registration(tenant_uuid: str, data: dict, db: Session = Depend
     phone_number = data.get("phone_number")
     citizen_id = data.get("citizen_id")
     requested_move_in_date_str = data.get("requested_move_in_date")
+    language = data.get("language", "th")
     
     if not all([full_name, phone_number, citizen_id, requested_move_in_date_str]):
         raise HTTPException(status_code=400, detail="กรุณากรอกข้อมูลให้ครบถ้วน")
@@ -626,6 +641,7 @@ async def submit_registration(tenant_uuid: str, data: dict, db: Session = Depend
     tenant.phone_number = phone_number
     tenant.citizen_id = citizen_id
     tenant.requested_move_in_date = datetime.strptime(requested_move_in_date_str, "%Y-%m-%d")
+    tenant.language = language
     tenant.status = "Pending"
     db.commit()
     
@@ -644,7 +660,8 @@ async def view_move_out(request: Request, tenant_uuid: str, db: Session = Depend
     if not tenant or tenant.status != "Active":
         raise HTTPException(status_code=404, detail="Tenant not found or not active")
     
-    return templates.TemplateResponse("move_out.html", {"request": request, "tenant": tenant})
+    lang = request.query_params.get("lang") or tenant.language or "th"
+    return templates.TemplateResponse("move_out.html", {"request": request, "tenant": tenant, "lang": lang})
 
 @app.post("/move-out/{tenant_uuid}")
 async def submit_move_out(tenant_uuid: str, data: dict, db: Session = Depends(get_db)):
@@ -785,6 +802,13 @@ async def view_bill(request: Request, invoice_uuid: str, db: Session = Depends(g
         except Exception as e:
             print(f"PromptPay Generation Error: {e}")
 
+    # Multi-language: Use lang from query param or tenant's profile
+    lang = request.query_params.get("lang")
+    if not lang and invoice.tenant:
+        lang = invoice.tenant.language
+    if not lang:
+        lang = "th"
+
     return templates.TemplateResponse("bill.html", {
         "request": request,
         "invoice": invoice,
@@ -807,7 +831,8 @@ async def view_bill(request: Request, invoice_uuid: str, db: Session = Depends(g
         "qr_enabled": qr_enabled,
         "promptpay_name": promptpay_name,
         "bank_info": bank_info,
-        "room": invoice.room
+        "room": invoice.room,
+        "lang": lang
     })
 
 @app.post("/bill/{invoice_uuid}/upload-slip")

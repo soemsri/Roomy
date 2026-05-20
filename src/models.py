@@ -109,6 +109,7 @@ class Tenant(Base):
 
     current_room_id = Column(Integer, ForeignKey("rooms.id"))
     rich_menu_id = Column(String)
+    language = Column(String, default="th") # th, en, jp
     status = Column(String, default="Pending") # Pending, Active, Rejected, AwaitingBuilding, AwaitingRoom, AwaitingName, AwaitingPhone
     temp_building_id = Column(Integer, ForeignKey("buildings.id")) # Temporary storage during registration
     requested_move_in_date = Column(DateTime)
@@ -160,6 +161,7 @@ class TenantHistory(Base):
     def citizen_id(self, value):
         self._citizen_id = encrypt_value(value)
 
+    language = Column(String, default="th")
     start_date = Column(DateTime)
     end_date = Column(DateTime)
     residents_json = Column(Text) # JSON list of residents at time of move-out

@@ -1,12 +1,13 @@
 {
     "project": "Roomy",
-    "last_updated": "2026-05-19T18:45:00Z",
+    "last_updated": "2026-05-20T19:00:00Z",
     "features": {
         "multi_language": {
             "supported_languages": ["th", "en", "jp"],
             "status": "fully_implemented",
-            "components": ["main.py", "templates/report.html", "templates/dashboard.html", "i18n/*.json"],
-            "notes": "All hardcoded Thai text in Dashboard and Report has been replaced with dynamic translations via get_text."
+            "coverage": "100% Admin & Tenant UI",
+            "components": ["main.py", "models.py", "templates/*.html", "i18n/*.json"],
+            "notes": "All hardcoded strings in both Admin and Tenant sections have been replaced with dynamic translations via get_text. Added tenant-level language preference."
         },
         "pagination": {
             "status": "standardized",
@@ -28,5 +29,5 @@
         "default_language": "th",
         "i18n_path": "i18n/"
     },
-    "session_notes": "Completed a massive refinement session: 1) Standardized the entire Admin UI look and feel. 2) Rolled out a universal 'beautiful' pagination engine to all data tables. 3) Achieved 100% multi-language coverage for Dashboard and Report sections. 4) Fixed a critical data-loss bug in settings and hardened move-in fee calculations with robust server-side defaults (1 month + 5k). 5) Resolved sidebar accessibility issues for various zoom levels."
+    "session_notes": "Implemented comprehensive multi-language support for the Tenant UI (Bills, Registration, Move-out). Added 'language' field to Tenant model and database migration. Added LINE bot command for tenants to switch languages ('EN', 'TH', 'JP'). All tenant-facing templates are now fully localized."
 }
