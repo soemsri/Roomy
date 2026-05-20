@@ -739,19 +739,19 @@
         </div>
 
         <!-- Room Management -->
-        <div class="section-card" id="roomSection">
+        <div class="card section-card" id="roomSection">
             <div class="section-header">
-                <h2><i class="fa-solid fa-door-closed"></i> จัดการห้องพัก</h2>
+                <h2><i class="fa-solid fa-door-closed"></i> {{ get_text('manage_rooms', lang) }}</h2>
                 <div style="display: flex; gap: 10px;">
-                    <button class="btn btn-outline" onclick="openBuildingListModal()"><i class="fa-solid fa-building"></i> จัดการอาคาร</button>
-                    <button class="btn btn-outline" onclick="openBulkRecurringModal()"><i class="fa-solid fa-layer-group"></i> ตั้งค่าส่วนกลางทุกห้อง</button>
-                    <button class="btn btn-primary" onclick="toggleForm('roomFormContainer')"><i class="fa-solid fa-plus"></i> เพิ่มห้องใหม่</button>
+                    <button class="btn btn-outline" onclick="openBuildingListModal()"><i class="fa-solid fa-building"></i> {{ get_text('manage_buildings', lang) }}</button>
+                    <button class="btn btn-outline" onclick="openBulkRecurringModal()"><i class="fa-solid fa-layer-group"></i> {{ get_text('bulk_settings', lang) }}</button>
+                    <button class="btn btn-primary" onclick="toggleForm('roomFormContainer')"><i class="fa-solid fa-plus"></i> {{ get_text('add_room', lang) }}</button>
                 </div>
             </div>
 
             <!-- Building Tabs -->
             <div class="building-tabs">
-                <div class="building-tab active" onclick="filterRoomsByBuilding('all', this)">ทั้งหมด</div>
+                <div class="building-tab active" onclick="filterRoomsByBuilding('all', this)">{{ get_text('all_rooms', lang) }}</div>
                 {% for b in all_buildings %}
                 <div class="building-tab" onclick="filterRoomsByBuilding({{ b.id }}, this)">{{ b.name }}</div>
                 {% endfor %}
