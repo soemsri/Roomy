@@ -21,7 +21,7 @@ def get_late_fee(db: Session, invoice=None, billing_month=None, billing_year=Non
         if today > due_date:
             days_late = (today - due_date).days
             return days_late * owner.late_fee_per_day
-    except: pass
+    except Exception: pass
     return 0.0
 
 def calculate_bill(db: Session, room_id: int, month: int, year: int, other_charges: list = None, save_only: bool = False):
@@ -71,7 +71,7 @@ def calculate_bill(db: Session, room_id: int, month: int, year: int, other_charg
         try:
             global_recurring = json.loads(owner.default_recurring_charges)
             final_other_charges.extend(global_recurring)
-        except: pass
+        except (json.JSONDecodeError, TypeError): pass
         
     # 2. Room Specific Recurring
     room_recurring = []
@@ -79,7 +79,7 @@ def calculate_bill(db: Session, room_id: int, month: int, year: int, other_charg
         try:
             room_recurring = json.loads(room.recurring_charges)
             final_other_charges.extend(room_recurring)
-        except: pass
+        except (json.JSONDecodeError, TypeError): pass
 
     # Get existing invoice if any
     invoice = db.query(models.Invoice).filter(
@@ -95,7 +95,7 @@ def calculate_bill(db: Session, room_id: int, month: int, year: int, other_charg
             existing_all = json.loads(invoice.other_charges)
             rec_keys = set((c.get('description'), c.get('amount')) for c in global_recurring + room_recurring)
             other_charges = [c for c in existing_all if (c.get('description'), c.get('amount')) not in rec_keys]
-        except:
+        except Exception:
             other_charges = []
 
     if other_charges is not None:
@@ -126,7 +126,7 @@ def calculate_bill(db: Session, room_id: int, month: int, year: int, other_charg
         # Handle potential string dates from SQLite
         if isinstance(lease_start, str):
             try: lease_start = datetime.fromisoformat(lease_start.replace('Z', '').split('.')[0])
-            except: pass
+            except Exception: pass
             
         if lease_start and lease_start.month == month and lease_start.year == year:
             # First month! Calculate pro-rata if not starting on the 1st

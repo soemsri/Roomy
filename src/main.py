@@ -82,7 +82,7 @@ templates.env.globals['get_text'] = get_text
 def from_json(value):
     try:
         return json.loads(value)
-    except:
+    except (json.JSONDecodeError, TypeError):
         return []
 templates.env.filters['from_json'] = from_json
 
@@ -493,7 +493,7 @@ def handle_tenant_message(event, *args, **kwargs):
                         )
                     )
                     return
-                except: pass
+                except Exception: pass
             
             reply_text = f"สวัสดีครับ! กรุณาลงทะเบียนเข้าพักที่นี่:\n{reg_url}"
 
@@ -735,7 +735,7 @@ async def submit_registration(tenant_uuid: str, data: dict, db: Session = Depend
                     messages=[TextMessage(text=msg)]
                 )
             )
-        except: pass
+        except Exception: pass
         
     return {"status": "Success"}
 
@@ -807,7 +807,7 @@ async def submit_move_out(tenant_uuid: str, data: dict, db: Session = Depends(ge
     if owner and owner.line_user_id and admin_bot_api:
         msg = f"🚪 แจ้งย้ายออกใหม่!\nห้อง: {tenant.room.room_number if tenant.room else 'N/A'}\nชื่อ: {tenant.full_name}\nวันที่ต้องการย้าย: {requested_date.strftime('%d/%m/%Y')}"
         try: admin_bot_api.push_message(PushMessageRequest(to=owner.line_user_id, messages=[TextMessage(text=msg)]))
-        except: pass
+        except Exception: pass
         
     return {"status": "Success"}
 
@@ -828,7 +828,7 @@ async def view_bill(request: Request, invoice_uuid: str, db: Session = Depends(g
     if invoice.other_charges:
         try:
             other_amount = sum(float(item.get('amount', 0)) for item in json.loads(invoice.other_charges))
-        except: pass
+        except (json.JSONDecodeError, TypeError, ValueError): pass
         
     # Initial subtotal
     subtotal = invoice.rent_amount + invoice.electricity_amount + invoice.water_amount + other_amount
@@ -858,14 +858,14 @@ async def view_bill(request: Request, invoice_uuid: str, db: Session = Depends(g
             try:
                 bank_list = json.loads(owner.bank_config)
                 bank_info = next((b for b in bank_list if b.get('id') == p_id), None)
-            except: pass
+            except (json.JSONDecodeError, TypeError): pass
         else:
             # PromptPay logic
             target_id = p_id or (invoice.room.promptpay_id if invoice.room else None)
             config_list = []
             try:
                 config_list = json.loads(owner.promptpay_config)
-            except: pass
+            except (json.JSONDecodeError, TypeError): pass
             
             if target_id and isinstance(config_list, list):
                 match = next((c for c in config_list if c.get('id') == target_id), None)
@@ -1588,7 +1588,7 @@ async def reject_registration(tenant_id: int, db: Session = Depends(get_db), adm
                     messages=[TextMessage(text="ขออภัย การลงทะเบียนของคุณถูกปฏิเสธ กรุณาติดต่อเจ้าของหอพัก")]
                 )
             )
-        except: pass
+        except Exception: pass
         
     return {"status": "Success"}
 
@@ -1650,7 +1650,7 @@ async def preview_settlement(tenant_id: int, db: Session = Depends(get_db), admi
             try:
                 fees = json.loads(lease.initial_fees)
                 deposit = sum(float(f.get('amount', 0)) for f in fees)
-            except: pass
+            except (json.JSONDecodeError, TypeError, ValueError): pass
         
     # 4. Unpaid Invoices
     unpaid_total = db.query(func.sum(models.Invoice.total_amount)).filter(
@@ -1720,7 +1720,7 @@ async def get_lease_details(lease_id: int, db: Session = Depends(get_db), admin:
             # (Though in approve_tenant we added them to applied_fees list)
             # The UI can just show everything in initial_fees if it wants, 
             # but we'll provide the specific fields too.
-        except: pass
+        except (json.JSONDecodeError, TypeError): pass
 
     return {
         "id": lease.id,
