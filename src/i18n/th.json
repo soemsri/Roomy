@@ -461,5 +461,6 @@
     "reset_password_title": "ตั้งรหัสผ่านใหม่",
     "new_password_placeholder": "รหัสผ่านใหม่",
     "confirm_password_placeholder": "ยืนยันรหัสผ่าน",
-    "update_password_btn": "อัปเดตรหัสผ่าน"
+    "update_password_btn": "อัปเดตรหัสผ่าน",
+    "login_locked": "เข้าสู่ระบบผิดพลาดเกินกำหนด กรุณารออีก {wait} นาที"
 }

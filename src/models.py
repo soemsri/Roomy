@@ -284,3 +284,10 @@ class MaintenanceRequest(Base):
     
     room = relationship("Room")
     tenant = relationship("Tenant")
+
+class LoginAttempt(Base):
+    __tablename__ = "login_attempts"
+    ip_address = Column(String, primary_key=True, index=True)
+    attempts = Column(Integer, default=0)
+    last_attempt = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    locked_until = Column(DateTime, nullable=True)

@@ -195,3 +195,11 @@ CREATE TABLE system_configs (
     value TEXT NOT NULL,
     description TEXT
 );
+
+-- 11. Login Attempts (Security)
+CREATE TABLE login_attempts (
+    ip_address TEXT PRIMARY KEY,
+    attempts INTEGER DEFAULT 0,
+    last_attempt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    locked_until TIMESTAMP
+);

@@ -6,7 +6,7 @@ import csv
 import io
 import json
 import warnings
-from datetime import datetime
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from linebot.utils import LineBotSdkDeprecatedIn30
 warnings.filterwarnings("ignore", category=LineBotSdkDeprecatedIn30)
@@ -919,15 +919,47 @@ def get_admin(request: Request, db: Session = Depends(get_db)):
 @app.get("/admin/login", response_class=HTMLResponse)
 async def admin_login_page(request: Request):
     lang = request.cookies.get("lang", "th")
-    return templates.TemplateResponse("login.html", {"request": request, "lang": lang})
+    error = request.query_params.get("error")
+    wait = request.query_params.get("wait")
+    return templates.TemplateResponse("login.html", {"request": request, "lang": lang, "error": error, "wait": wait})
 
 @app.post("/admin/login")
-async def admin_login(password: str = Form(...), db: Session = Depends(get_db)):
+async def admin_login(request: Request, password: str = Form(...), db: Session = Depends(get_db)):
+    ip = request.client.host
+    now = datetime.now()
+    
+    # Check for existing lockout
+    attempt = db.query(models.LoginAttempt).filter(models.LoginAttempt.ip_address == ip).first()
+    if attempt and attempt.locked_until and attempt.locked_until > now:
+        remaining = int((attempt.locked_until - now).total_seconds() / 60) + 1
+        return RedirectResponse(url=f"/admin/login?error=locked&wait={remaining}", status_code=303)
+
     owner = db.query(models.Owner).first()
     if owner and security.verify_password(password, owner.password_hash):
+        # Reset attempts on success
+        if attempt:
+            attempt.attempts = 0
+            attempt.locked_until = None
+            db.commit()
+            
         response = RedirectResponse(url="/admin/dashboard", status_code=303)
         response.set_cookie(key="admin_session", value=owner.password_hash, httponly=True)
         return response
+    
+    # Increment attempts on failure
+    if not attempt:
+        attempt = models.LoginAttempt(ip_address=ip, attempts=1)
+        db.add(attempt)
+    else:
+        attempt.attempts += 1
+        if attempt.attempts >= 3:
+            attempt.locked_until = now + timedelta(minutes=30)
+    
+    db.commit()
+    
+    if attempt.attempts >= 3:
+        return RedirectResponse(url="/admin/login?error=locked&wait=30", status_code=303)
+        
     return RedirectResponse(url="/admin/login?error=1", status_code=303)
 
 @app.get("/admin/logout")

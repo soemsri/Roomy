@@ -457,5 +457,6 @@
     "forgot_password_title": "Forgot Password",
     "request_reset_link_btn": "Request Reset Link",
     "back_to_login": "Back to Login",
-    "sent": "Sent!"
+    "sent": "Sent!",
+    "login_locked": "Too many failed attempts. Please wait {wait} minutes."
 }

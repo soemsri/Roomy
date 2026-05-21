@@ -19,8 +19,21 @@
     <div class="login-card">
         <h2>{{ get_text('admin_login_title', lang) }}</h2>
         
+        {% if error == 'locked' %}
+        <div id="error-msg" class="error-msg" style="display: block;">
+            {{ get_text('login_locked', lang).replace('{wait}', wait|string) }}
+        </div>
+        {% elif error %}
+        <div id="error-msg" class="error-msg" style="display: block;">{{ get_text('login_error', lang) }}</div>
+        {% else %}
         <div id="error-msg" class="error-msg">{{ get_text('login_error', lang) }}</div>
+        {% endif %}
+
+        {% if request.query_params.get('reset_success') %}
+        <div id="success-msg" class="success-msg" style="display: block;">{{ get_text('reset_success_msg', lang) }}</div>
+        {% else %}
         <div id="success-msg" class="success-msg">{{ get_text('reset_success_msg', lang) }}</div>
+        {% endif %}
         
         <form action="/admin/login" method="post">
             <input type="password" name="password" placeholder="{{ get_text('admin_password_placeholder', lang) }}" required autofocus>
@@ -31,13 +44,8 @@
     </div>
 
     <script>
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.has('error')) {
-            document.getElementById('error-msg').style.display = 'block';
-        }
-        if (urlParams.has('reset_success')) {
-            document.getElementById('success-msg').style.display = 'block';
-        }
+        // Keeping script for backward compatibility or other query params if needed, 
+        // though Jinja handles the main ones now.
     </script>
 </body>
 </html>

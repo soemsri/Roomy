@@ -457,5 +457,6 @@
     "forgot_password_title": "パスワードを忘れた場合",
     "request_reset_link_btn": "リセットリンクをリクエスト",
     "back_to_login": "ログインに戻る",
-    "sent": "送信しました！"
+    "sent": "送信しました！",
+    "login_locked": "ログイン試行回数が制限を超えました。{wait} 分後にもう一度お試しください。"
 }
