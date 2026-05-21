@@ -1,7 +1,12 @@
 import os
 import json
 import requests
+import logging
 from dotenv import load_dotenv
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
 
@@ -31,11 +36,11 @@ def create_owner_rich_menu():
     # 2. Create Rich Menu
     res = requests.post("https://api.line.me/v2/bot/richmenu", headers=HEADERS, data=json.dumps(rich_menu_data))
     if res.status_code not in [200, 201]:
-        print("Error creating rich menu:", res.text)
+        logger.error(f"Error creating rich menu: {res.text}")
         return None
     
     rich_menu_id = res.json()["richMenuId"]
-    print(f"Successfully created Rich Menu ID: {rich_menu_id}")
+    logger.info(f"Successfully created Rich Menu ID: {rich_menu_id}")
 
     # 3. Upload Image
     image_path = "image/ownerrichmenu.jpg"
@@ -48,7 +53,7 @@ def create_owner_rich_menu():
             },
             data=f
         )
-    print("Image upload status:", img_res.status_code)
+    logger.info(f"Image upload status: {img_res.status_code}")
     
     return rich_menu_id
 
@@ -60,9 +65,10 @@ def link_to_user(user_id, rich_menu_id):
         headers=HEADERS
     )
     if link_res.status_code == 200:
-        print(f"Successfully linked Rich Menu to User: {user_id}")
+        logger.info(f"Successfully linked Rich Menu to User: {user_id}")
     else:
-        print("Error linking rich menu:", link_res.text)
+        logger.error(f"Error linking rich menu: {link_res.text}")
+
 def delete_all_rich_menus():
     # List all rich menus
     res = requests.get("https://api.line.me/v2/bot/richmenu/list", headers={"Authorization": f"Bearer {CHANNEL_ACCESS_TOKEN}"})
@@ -71,7 +77,7 @@ def delete_all_rich_menus():
         for m in menus:
             mid = m["richMenuId"]
             requests.delete(f"https://api.line.me/v2/bot/richmenu/{mid}", headers={"Authorization": f"Bearer {CHANNEL_ACCESS_TOKEN}"})
-            print(f"Deleted old rich menu: {mid}")
+            logger.info(f"Deleted old rich menu: {mid}")
 
 if __name__ == "__main__":
     import sys
@@ -82,11 +88,10 @@ if __name__ == "__main__":
     manual_id = sys.argv[1] if len(sys.argv) > 1 else None
 
     if manual_id:
-        print("Cleaning up old rich menus...")
+        logger.info("Cleaning up old rich menus...")
         delete_all_rich_menus()
 
         db = SessionLocal()
-        # ...
 
         # Create or Update Owner
         owner = db.query(models.Owner).first()
@@ -96,17 +101,19 @@ if __name__ == "__main__":
         else:
             owner.line_user_id = manual_id
         db.commit()
-        print(f"Database updated with Owner ID: {manual_id}")
+        logger.info(f"Database updated with Owner ID: {manual_id}")
         
         menu_id = create_owner_rich_menu()
         if menu_id:
             link_to_user(manual_id, menu_id)
+        db.close()
     else:
+        db = SessionLocal()
         owner = db.query(models.Owner).first()
         if not owner or not owner.line_user_id:
-            print("Error: Owner Line ID not found. Usage: python setup_owner_menu.py YOUR_LINE_USER_ID")
+            logger.error("Error: Owner Line ID not found. Usage: python setup_owner_menu.py YOUR_LINE_USER_ID")
         else:
             menu_id = create_owner_rich_menu()
             if menu_id:
                 link_to_user(owner.line_user_id, menu_id)
-    db.close()
+        db.close()

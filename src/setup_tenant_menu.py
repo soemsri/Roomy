@@ -2,9 +2,14 @@
 import os
 import json
 import requests
+import logging
 from dotenv import load_dotenv
 from database import SessionLocal
 import security
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
 
@@ -20,7 +25,7 @@ def get_access_token():
 
 CHANNEL_ACCESS_TOKEN = get_access_token()
 if not CHANNEL_ACCESS_TOKEN:
-    print("Error: LINE_TENANT_CHANNEL_ACCESS_TOKEN not found in DB or .env")
+    logger.error("Error: LINE_TENANT_CHANNEL_ACCESS_TOKEN not found in DB or .env")
     exit(1)
 
 HEADERS = {
@@ -52,11 +57,11 @@ def create_tenant_rich_menu():
     # 2. Create Rich Menu
     res = requests.post("https://api.line.me/v2/bot/richmenu", headers=HEADERS, data=json.dumps(rich_menu_data))
     if res.status_code not in [200, 201]:
-        print("Error creating rich menu:", res.text)
+        logger.error(f"Error creating rich menu: {res.text}")
         return None
     
     rich_menu_id = res.json()["richMenuId"]
-    print(f"Successfully created Rich Menu ID: {rich_menu_id}")
+    logger.info(f"Successfully created Rich Menu ID: {rich_menu_id}")
 
     # 3. Upload Image
     image_path = "tenant_richmenu.jpg"
@@ -69,14 +74,14 @@ def create_tenant_rich_menu():
             },
             data=f
         )
-    print("Image upload status:", img_res.status_code)
+    logger.info(f"Image upload status: {img_res.status_code}")
     
     # 4. Set as Default Rich Menu
     def_res = requests.post(
         f"https://api.line.me/v2/bot/user/all/richmenu/{rich_menu_id}",
         headers=HEADERS
     )
-    print("Set default status:", def_res.status_code)
+    logger.info(f"Set default status: {def_res.status_code}")
     
     return rich_menu_id
 
@@ -88,11 +93,11 @@ def delete_all_rich_menus():
         for m in menus:
             mid = m["richMenuId"]
             requests.delete(f"https://api.line.me/v2/bot/richmenu/{mid}", headers={"Authorization": f"Bearer {CHANNEL_ACCESS_TOKEN}"})
-            print(f"Deleted old rich menu: {mid}")
+            logger.info(f"Deleted old rich menu: {mid}")
 
 if __name__ == "__main__":
-    print("Cleaning up old rich menus for Tenant channel...")
+    logger.info("Cleaning up old rich menus for Tenant channel...")
     delete_all_rich_menus()
     menu_id = create_tenant_rich_menu()
     if menu_id:
-        print(f"Tenant Rich Menu setup complete. ID: {menu_id}")
+        logger.info(f"Tenant Rich Menu setup complete. ID: {menu_id}")

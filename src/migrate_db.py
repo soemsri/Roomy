@@ -1,10 +1,15 @@
 import sqlite3
 import os
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 def migrate():
     db_path = os.path.join(os.path.dirname(__file__), 'suk_anan.db')
     if not os.path.exists(db_path):
-        print(f"Database not found at {db_path}")
+        logger.error(f"Database not found at {db_path}")
         return
 
     conn = sqlite3.connect(db_path)
@@ -81,27 +86,27 @@ def migrate():
     
     for cmd in commands:
         try:
-            print(f"Executing: {cmd}")
+            logger.info(f"Executing: {cmd}")
             curr.execute(cmd)
         except sqlite3.OperationalError as e:
             if "duplicate column name" in str(e).lower():
-                print(f"  Column already exists, skipping.")
+                logger.info("  Column already exists, skipping.")
             elif "no such index" in str(e).lower():
-                print(f"  Index not found, skipping.")
+                logger.info("  Index not found, skipping.")
             else:
-                print(f"  Error: {e}")
+                logger.warning(f"  Error: {e}")
 
     # Initialization: Create default building and link rooms if needed
     curr.execute("SELECT COUNT(*) FROM buildings")
     if curr.fetchone()[0] == 0:
-        print("Initializing default building...")
+        logger.info("Initializing default building...")
         curr.execute("INSERT INTO buildings (name, description) VALUES (?, ?)", ("อาคารหลัก", "อาคารหลักของหอพัก"))
         default_building_id = curr.lastrowid
         curr.execute("UPDATE rooms SET building_id = ?", (default_building_id,))
                 
     conn.commit()
     conn.close()
-    print("Migration completed.")
+    logger.info("Migration completed.")
 
 if __name__ == "__main__":
     migrate()

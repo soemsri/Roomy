@@ -1,5 +1,10 @@
+import logging
 from PIL import Image, ImageDraw, ImageFont
 import os
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 def draw_icon(draw, icon_type, x, y, size, color):
     """Draws simple geometric icons for the menu."""
@@ -96,7 +101,7 @@ def create_rich_menu_pro(filename, title, buttons, icons):
 
     # Save the image
     img.save(filename)
-    print(f"Professional Rich Menu Created: {filename}")
+    logger.info(f"Professional Rich Menu Created: {filename}")
 
 if __name__ == "__main__":
     # Owner Rich Menu Config

@@ -1,4 +1,9 @@
 import sqlite3
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 def check_nulls():
     conn = sqlite3.connect('suk_anan.db')
@@ -10,7 +15,7 @@ def check_nulls():
            OR electricity_amount IS NULL 
            OR water_amount IS NULL
     """)
-    print("NULL count:", cursor.fetchone()[0])
+    logger.info(f"NULL count: {cursor.fetchone()[0]}")
     conn.close()
 
 if __name__ == "__main__":

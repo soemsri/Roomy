@@ -1,7 +1,10 @@
 import os
+import logging
 from cryptography.fernet import Fernet
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -12,7 +15,7 @@ if not MASTER_KEY:
     MASTER_KEY = Fernet.generate_key().decode()
     with open(".env", "a") as f:
         f.write(f"\nMASTER_ENCRYPTION_KEY={MASTER_KEY}\n")
-    print("Generated new MASTER_ENCRYPTION_KEY and saved to .env")
+    logger.info("Generated new MASTER_ENCRYPTION_KEY and saved to .env")
 
 cipher_suite = Fernet(MASTER_KEY.encode())
 
@@ -25,7 +28,7 @@ def decrypt_value(encrypted_text: str) -> str:
     try:
         return cipher_suite.decrypt(encrypted_text.encode()).decode()
     except Exception as e:
-        print(f"Decryption error: {e}")
+        logger.error(f"Decryption error: {e}")
         return ""
 
 from passlib.context import CryptContext

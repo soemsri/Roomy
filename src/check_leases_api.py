@@ -1,6 +1,11 @@
 import os
 import sys
+import logging
 from datetime import datetime
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # Ensure src is in path
 sys.path.append(os.path.dirname(__file__))
@@ -12,13 +17,13 @@ def check_leases():
     db = SessionLocal()
     try:
         leases = db.query(models.Lease).all()
-        print(f"Total leases found in DB: {len(leases)}")
+        logger.info(f"Total leases found in DB: {len(leases)}")
         
         for l in leases:
-            print(f"\nProcessing Lease ID: {l.id}")
-            print(f"Room ID: {l.room_id}")
-            print(f"Tenant ID: {l.tenant_id}")
-            print(f"Start Date: {l.start_date} (Type: {type(l.start_date)})")
+            logger.info(f"\nProcessing Lease ID: {l.id}")
+            logger.info(f"Room ID: {l.room_id}")
+            logger.info(f"Tenant ID: {l.tenant_id}")
+            logger.info(f"Start Date: {l.start_date} (Type: {type(l.start_date)})")
             
             try:
                 room_no = l.room.room_number if l.room else "N/A"
@@ -35,9 +40,9 @@ def check_leases():
                 
                 date_str = s_date.strftime("%d/%m/%Y") if s_date else "-"
                 
-                print(f"Success! Room: {room_no}, Tenant: {tenant_name}, Date: {date_str}")
+                logger.info(f"Success! Room: {room_no}, Tenant: {tenant_name}, Date: {date_str}")
             except Exception as e:
-                print(f"FAILED for Lease {l.id}: {e}")
+                logger.error(f"FAILED for Lease {l.id}: {e}")
                 
     finally:
         db.close()

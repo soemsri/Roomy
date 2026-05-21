@@ -1,10 +1,15 @@
 import sqlite3
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 def check_utility():
     conn = sqlite3.connect('suk_anan.db')
     cursor = conn.cursor()
     
-    print("--- Income (Utility) ---")
+    logger.info("--- Income (Utility) ---")
     cursor.execute("""
         SELECT billing_month, SUM(electricity_amount), SUM(water_amount) 
         FROM invoices 
@@ -12,9 +17,9 @@ def check_utility():
         GROUP BY billing_month
     """)
     for row in cursor.fetchall():
-        print(f"Month {row[0]}: Elec={row[1]}, Water={row[2]}, Total={row[1]+row[2]}")
+        logger.info(f"Month {row[0]}: Elec={row[1]}, Water={row[2]}, Total={row[1]+row[2]}")
 
-    print("\n--- Expense (Utility) ---")
+    logger.info("\n--- Expense (Utility) ---")
     cursor.execute("""
         SELECT billing_month, SUM(amount) 
         FROM expenses 
@@ -22,7 +27,7 @@ def check_utility():
         GROUP BY billing_month
     """)
     for row in cursor.fetchall():
-        print(f"Month {row[0]}: Total={row[1]}")
+        logger.info(f"Month {row[0]}: Total={row[1]}")
     
     conn.close()
 

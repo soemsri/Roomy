@@ -5,37 +5,106 @@ CREATE TABLE owners (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     line_user_id TEXT UNIQUE NOT NULL,
     display_name TEXT,
-    promptpay_config TEXT DEFAULT '[]', -- JSON string of PromptPay accounts
-    qr_payment_enabled INTEGER DEFAULT 1, -- 0: Disabled, 1: Enabled
+    password_hash TEXT,
+    session_token TEXT UNIQUE,
+    pairing_code TEXT UNIQUE,
+    magic_token TEXT UNIQUE,
+    magic_token_expires TIMESTAMP,
+    magic_link_duration_min INTEGER DEFAULT 5,
+    promptpay_config TEXT DEFAULT '[]',
+    promptpay_name TEXT,
+    bank_config TEXT DEFAULT '[]',
+    qr_payment_enabled INTEGER DEFAULT 1,
     late_fee_enabled INTEGER DEFAULT 0,
     due_day INTEGER DEFAULT 5,
-    late_fee_per_day REAL DEFAULT 50.0
+    late_fee_per_day REAL DEFAULT 50.0,
+    lease_template TEXT,
+    move_in_fees_config TEXT DEFAULT '[{"name": "ค่าเช่าล่วงหน้า 1 เดือน", "value": 1, "is_multiplier": true}, {"name": "ค่าประกันทรัพย์สิน", "value": 5000, "is_multiplier": false}]',
+    default_recurring_charges TEXT DEFAULT '[]',
+    meter_history_page_size INTEGER DEFAULT 10
+);
+
+-- 1.1 Password Reset Tokens
+CREATE TABLE password_reset_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    token TEXT UNIQUE NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP NOT NULL,
+    used INTEGER DEFAULT 0
+);
+
+-- 1.2 System Config
+CREATE TABLE system_configs (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    description TEXT
+);
+
+-- 1.3 Buildings
+CREATE TABLE buildings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    description TEXT
 );
 
 -- 2. Rooms
 CREATE TABLE rooms (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    room_number TEXT UNIQUE NOT NULL,
+    building_id INTEGER,
+    room_number TEXT NOT NULL,
     floor INTEGER,
-    status TEXT DEFAULT 'Vacant', -- Vacant, Occupied, Maintenance
+    status TEXT DEFAULT 'Vacant',
     base_rent REAL DEFAULT 0.0,
     electricity_rate REAL DEFAULT 0.0,
-    water_rate REAL DEFAULT 0.0
+    water_rate REAL DEFAULT 0.0,
+    promptpay_id TEXT,
+    primary_payment_type TEXT DEFAULT 'PromptPay',
+    primary_payment_id TEXT,
+    recurring_charges TEXT,
+    FOREIGN KEY (building_id) REFERENCES buildings(id),
+    UNIQUE(building_id, room_number)
+);
+
+-- 2.1 Room Assets
+CREATE TABLE room_assets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    room_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    quantity INTEGER DEFAULT 1,
+    FOREIGN KEY (room_id) REFERENCES rooms(id)
+);
+
+-- 2.2 Room Payment Channels
+CREATE TABLE room_payment_channels (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    room_id INTEGER NOT NULL,
+    channel_type TEXT DEFAULT 'PromptPay',
+    channel_id TEXT NOT NULL,
+    channel_name TEXT,
+    FOREIGN KEY (room_id) REFERENCES rooms(id)
 );
 
 -- 3. Tenants
 CREATE TABLE tenants (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     uuid TEXT UNIQUE NOT NULL,
-    line_user_id TEXT UNIQUE NOT NULL,
+    line_user_id TEXT NOT NULL,
     full_name TEXT,
     phone_number TEXT,
+    citizen_id TEXT,
     current_room_id INTEGER,
-    status TEXT DEFAULT 'Pending', -- Pending, Active, Rejected
-    FOREIGN KEY (current_room_id) REFERENCES rooms(id)
+    rich_menu_id TEXT,
+    language TEXT DEFAULT 'th',
+    status TEXT DEFAULT 'Pending',
+    temp_building_id INTEGER,
+    requested_move_in_date TIMESTAMP,
+    move_out_date TIMESTAMP,
+    move_out_reason TEXT,
+    FOREIGN KEY (current_room_id) REFERENCES rooms(id),
+    FOREIGN KEY (temp_building_id) REFERENCES buildings(id)
 );
 
--- 3.1 Residents (Individuals in a room)
+-- 3.1 Residents
 CREATE TABLE residents (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     tenant_id INTEGER NOT NULL,
@@ -47,28 +116,39 @@ CREATE TABLE residents (
     FOREIGN KEY (tenant_id) REFERENCES tenants(id)
 );
 
--- 3.2 Tenant History (Archive)
+-- 3.2 Move Out Requests
+CREATE TABLE move_out_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id INTEGER NOT NULL,
+    room_id INTEGER NOT NULL,
+    requested_date TIMESTAMP NOT NULL,
+    reason TEXT,
+    status TEXT DEFAULT 'Pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(id),
+    FOREIGN KEY (room_id) REFERENCES rooms(id)
+);
+
+-- 3.3 Tenant History
 CREATE TABLE tenant_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     room_number TEXT,
     tenant_uuid TEXT,
-    first_name TEXT,
-    last_name TEXT,
-    nickname TEXT,
+    full_name TEXT,
     phone_number TEXT,
-    workplace TEXT,
     start_date TIMESTAMP,
-    end_date TIMESTAMP
+    end_date TIMESTAMP,
+    residents_json TEXT
 );
 
--- 4. Leases (Contracts)
+-- 4. Leases
 CREATE TABLE leases (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     room_id INTEGER NOT NULL,
     tenant_id INTEGER NOT NULL,
     start_date DATE NOT NULL,
     end_date DATE,
-    status TEXT DEFAULT 'Active', -- Active, Closed
+    status TEXT DEFAULT 'Active',
     lease_content TEXT,
     initial_fees TEXT,
     security_deposit_amount REAL DEFAULT 0.0,
@@ -98,29 +178,34 @@ CREATE TABLE invoices (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     uuid TEXT UNIQUE NOT NULL,
     room_id INTEGER NOT NULL,
-    tenant_id INTEGER NOT NULL,
+    tenant_id INTEGER,
     billing_month INTEGER NOT NULL,
     billing_year INTEGER NOT NULL,
-    rent_amount REAL NOT NULL,
-    electricity_amount REAL NOT NULL,
-    water_amount REAL NOT NULL,
+    rent_amount REAL DEFAULT 0.0,
+    electricity_reading REAL,
+    prev_electricity_reading REAL,
+    electricity_amount REAL DEFAULT 0.0,
+    water_reading REAL,
+    prev_water_reading REAL,
+    water_amount REAL DEFAULT 0.0,
+    other_charges TEXT,
     late_fee REAL DEFAULT 0.0,
-    total_amount REAL NOT NULL,
-    status TEXT DEFAULT 'Unpaid', -- Unpaid, Paid, Overdue
-    payment_method TEXT, -- Cash, QR
-    payment_receipt_img TEXT, -- File path
+    total_amount REAL DEFAULT 0.0,
+    status TEXT DEFAULT 'Unpaid',
+    payment_method TEXT,
+    payment_receipt_img TEXT,
     paid_at TIMESTAMP,
     is_pro_rata INTEGER DEFAULT 0,
     FOREIGN KEY (room_id) REFERENCES rooms(id),
     FOREIGN KEY (tenant_id) REFERENCES tenants(id)
 );
 
--- 6.1 Settlements (Move-out)
+-- 7. Settlements (Move-out accounting)
 CREATE TABLE settlements (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     tenant_id INTEGER NOT NULL,
     room_id INTEGER NOT NULL,
-    lease_id INTEGER, -- Optional for legacy data
+    lease_id INTEGER,
     settlement_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     pro_rated_rent REAL DEFAULT 0.0,
     electricity_units REAL DEFAULT 0.0,
@@ -144,59 +229,32 @@ CREATE TABLE settlements (
     FOREIGN KEY (lease_id) REFERENCES leases(id)
 );
 
--- 7. Maintenance Requests
+-- 8. Maintenance Requests
 CREATE TABLE maintenance_requests (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    tenant_id INTEGER NOT NULL,
     room_id INTEGER NOT NULL,
+    tenant_id INTEGER NOT NULL,
     title TEXT NOT NULL,
     description TEXT,
+    status TEXT DEFAULT 'Pending',
     image_url TEXT,
-    status TEXT DEFAULT 'Pending', -- Pending, In Progress, Fixed
-    cost REAL DEFAULT 0.0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id),
-    FOREIGN KEY (room_id) REFERENCES rooms(id)
+    FOREIGN KEY (room_id) REFERENCES rooms(id),
+    FOREIGN KEY (tenant_id) REFERENCES tenants(id)
 );
 
--- 7.1 Expenses
+-- 9. Expenses
 CREATE TABLE expenses (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    category TEXT NOT NULL, -- Common Area, Maintenance, Salary, Utility, Other
+    category TEXT NOT NULL,
     amount REAL NOT NULL,
     description TEXT,
-    date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     billing_month INTEGER,
-    billing_year INTEGER
+    billing_year INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 8. Room Assets
-CREATE TABLE room_assets (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    room_id INTEGER NOT NULL,
-    name TEXT NOT NULL,
-    quantity INTEGER DEFAULT 1,
-    FOREIGN KEY (room_id) REFERENCES rooms(id)
-);
-
--- 9. Room Payment Channels
-CREATE TABLE room_payment_channels (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    room_id INTEGER NOT NULL,
-    channel_type TEXT DEFAULT 'PromptPay', -- PromptPay, Bank, Cash
-    channel_id TEXT NOT NULL, -- e.g. Phone number, Bank account, or 'Cash'
-    channel_name TEXT, -- e.g. Account name
-    FOREIGN KEY (room_id) REFERENCES rooms(id)
-);
-
--- 10. System Configs (Encrypted)
-CREATE TABLE system_configs (
-    key TEXT PRIMARY KEY,
-    value TEXT NOT NULL,
-    description TEXT
-);
-
--- 11. Login Attempts (Security)
+-- 10. Login Attempts (Security)
 CREATE TABLE login_attempts (
     ip_address TEXT PRIMARY KEY,
     attempts INTEGER DEFAULT 0,

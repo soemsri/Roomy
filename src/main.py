@@ -7,7 +7,19 @@ import io
 import json
 import secrets
 import warnings
+import logging
 from datetime import datetime, timedelta
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler("app.log", encoding="utf-8")
+    ]
+)
+logger = logging.getLogger(__name__)
 from dotenv import load_dotenv
 
 from fastapi import FastAPI, Request, HTTPException, Depends, Form, File, UploadFile
@@ -59,7 +71,7 @@ for lang in ["en", "th", "jp"]:
         with open(os.path.join(os.path.dirname(__file__), f"i18n/{lang}.json"), "r", encoding="utf-8") as f:
             translations[lang] = json.load(f)
     except Exception as e:
-        print(f"Error loading {lang} translation: {e}")
+        logger.error(f"Error loading {lang} translation: {e}")
         translations[lang] = {}
 
 def get_text(key, lang="th"):
@@ -170,7 +182,7 @@ refresh_configs()
 
 def send_line_notify(message: str):
     if not LINE_NOTIFY_TOKEN:
-        print(f"LINE NOTIFY (Mock): {message}")
+        logger.info(f"LINE NOTIFY (Mock): {message}")
         return
     url = "https://notify-api.line.me/api/notify"
     headers = {"Authorization": f"Bearer {LINE_NOTIFY_TOKEN}"}
@@ -192,16 +204,16 @@ async def callback_admin(request: Request):
     body_str = body.decode("utf-8")
     
     if not admin_handler:
-        print("Admin Handler not initialized. Check LINE_ADMIN_CHANNEL_SECRET.")
+        logger.warning("Admin Handler not initialized. Check LINE_ADMIN_CHANNEL_SECRET.")
         return "OK"
         
     try:
         admin_handler.handle(body_str, signature)
     except InvalidSignatureError:
-        print("Admin Webhook Error: Invalid Signature. Check LINE_ADMIN_CHANNEL_SECRET.")
+        logger.error("Admin Webhook Error: Invalid Signature. Check LINE_ADMIN_CHANNEL_SECRET.")
         raise HTTPException(status_code=400, detail="Invalid signature")
     except Exception as e:
-        print(f"Admin Webhook Error: {e}")
+        logger.error(f"Admin Webhook Error: {e}")
         import traceback
         traceback.print_exc()
     return "OK"
@@ -213,16 +225,16 @@ async def callback_tenant(request: Request):
     body_str = body.decode("utf-8")
     
     if not tenant_handler:
-        print("Tenant Handler not initialized. Check LINE_TENANT_CHANNEL_SECRET.")
+        logger.warning("Tenant Handler not initialized. Check LINE_TENANT_CHANNEL_SECRET.")
         return "OK"
         
     try:
         tenant_handler.handle(body_str, signature)
     except InvalidSignatureError:
-        print("Tenant Webhook Error: Invalid Signature. Check LINE_TENANT_CHANNEL_SECRET.")
+        logger.error("Tenant Webhook Error: Invalid Signature. Check LINE_TENANT_CHANNEL_SECRET.")
         raise HTTPException(status_code=400, detail="Invalid signature")
     except Exception as e:
-        print(f"Tenant Webhook Error: {e}")
+        logger.error(f"Tenant Webhook Error: {e}")
         import traceback
         traceback.print_exc()
     return "OK"
@@ -296,7 +308,7 @@ def handle_admin_message(event, *args, **kwargs):
                                     try:
                                         send_initial_payment_flex(target_tenant, success_rooms, g_deposit, g_advance, g_other, g_total, owner, tenant_bot_api)
                                     except Exception as e:
-                                        print(f"Failed to notify tenant from LINE: {e}")
+                                        logger.error(f"Failed to notify tenant from LINE: {e}")
                             else:
                                 reply_text = f"ไม่สามารถอนุมัติห้อง {room.room_number} ได้ (ห้องอาจไม่ว่าง)"
                         else:
@@ -873,7 +885,7 @@ async def view_bill(request: Request, invoice_uuid: str, db: Session = Depends(g
         try:
             payload = promptpay.generate_promptpay_payload(promptpay_id, invoice.total_amount)
         except Exception as e:
-            print(f"PromptPay Generation Error: {e}")
+            logger.error(f"PromptPay Generation Error: {e}")
 
     # Multi-language: Use lang from query param or tenant's profile
     lang = request.query_params.get("lang")
@@ -1076,7 +1088,7 @@ async def request_password_reset(db: Session = Depends(get_db)):
         try:
             admin_bot_api.push_message(owner.line_user_id, TextMessage(text=message))
         except Exception as e:
-            print(f"Error sending reset link: {e}")
+            logger.error(f"Error sending reset link: {e}")
             return {"error": "Failed to send LINE message."}
             
     return {"message": "ส่งลิงก์รีเซ็ตรหัสผ่านไปยัง LINE Admin แล้ว"}
@@ -1209,7 +1221,7 @@ async def list_revenue_detail(month: int, year: int, db: Session = Depends(get_d
                 "date": inv.paid_at.strftime("%Y-%m-%d %H:%M") if inv.paid_at else "-"
             })
         except Exception as e:
-            print(f"Error processing invoice {inv.id}: {e}")
+            logger.error(f"Error processing invoice {inv.id}: {e}")
             continue
             
     return results
@@ -1455,7 +1467,7 @@ async def approve_registration(tenant_id: int, room_ids: str = Form(...), db: Se
         try:
             send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_other, g_total, owner, line_bot_api)
         except Exception as e:
-            print(f"Failed to notify tenant: {e}")
+            logger.error(f"Failed to notify tenant: {e}")
             
     # Notify admin via LINE
     if owner and owner.line_user_id and admin_bot_api:
@@ -1472,7 +1484,7 @@ async def approve_registration(tenant_id: int, room_ids: str = Form(...), db: Se
                 )
             )
         except Exception as e:
-            print(f"Failed to notify admin: {e}")
+            logger.error(f"Failed to notify admin: {e}")
         
     return {"status": "Success"}
 
@@ -1512,7 +1524,7 @@ async def list_leases(page: int = 1, page_size: int = 10, db: Session = Depends(
                 "initial_payment_status": l.initial_payment_status
             })
         except Exception as e:
-            print(f"Error processing lease {l.id}: {e}")
+            logger.error(f"Error processing lease {l.id}: {e}")
             continue
             
     return {
@@ -1895,7 +1907,7 @@ async def cancel_move_out(tenant_id: int, db: Session = Depends(get_db), admin: 
             msg = f"📢 แจ้งเตือน: คำขอย้ายออกของคุณได้รับการยกเลิกโดยเจ้าของหอพัก (สถานะห้อง {tenant.room.room_number if tenant.room else ''} ยังคงเป็นปกติ)"
             tenant_bot_api.push_message(tenant.line_user_id, TextMessage(text=msg))
         except Exception as e:
-            print(f"LINE Push Error (Cancel Move-out): {e}")
+            logger.error(f"LINE Push Error (Cancel Move-out): {e}")
 
     return {"status": "Success"}
 
@@ -2313,7 +2325,7 @@ async def approve_invoice(invoice_id: int, db: Session = Depends(get_db), admin:
         try:
             tenant_bot_api.push_message(tenant.line_user_id, FlexMessage(alt_text="ใบเสร็จรับเงิน", contents=flex_json))
         except Exception as e:
-            print(f"LINE Flex Error: {e}")
+            logger.error(f"LINE Flex Error: {e}")
             # Fallback to text
             try:
                 tenant_bot_api.push_message(
@@ -2504,7 +2516,7 @@ async def update_repair_status(repair_id: int, status: str = Form(...), db: Sess
                 )
             )
         except Exception as e:
-            print(f"LINE Push Error: {e}")
+            logger.error(f"LINE Push Error: {e}")
             
     return {"status": "Success"}
 
@@ -2935,7 +2947,7 @@ def send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_oth
                 preview_image_url=qr_large_url
             ))
     except Exception as e:
-        print(f"Error sending initial payment flex/image: {e}")
+        logger.error(f"Error sending initial payment flex/image: {e}")
         # Fallback to text
         msg = f"ยินดีด้วย! การลงทะเบียนห้อง {rooms_str} ได้รับการอนุมัติแล้ว\nยอดรวม: {g_total:,.2f} บาท\nกรุณาชำระเงินที่เคาน์เตอร์หรือผ่านเมนูใน LINE"
         try: bot_api.push_message(tenant.line_user_id, TextMessage(text=msg))
@@ -3039,7 +3051,7 @@ def setup_personal_rich_menu(tenant, db: Session, force=False):
         # 1. Create Rich Menu
         res = requests.post("https://api.line.me/v2/bot/richmenu", headers=headers, json=rich_menu_data)
         if res.status_code not in [200, 201]:
-            print(f"Error creating personal rich menu: {res.text}")
+            logger.error(f"Error creating personal rich menu: {res.text}")
             return None
         
         rich_menu_id = res.json()["richMenuId"]
@@ -3080,7 +3092,7 @@ def setup_personal_rich_menu(tenant, db: Session, force=False):
         
         return rich_menu_id
     except Exception as e:
-        print(f"setup_personal_rich_menu Error: {e}")
+        logger.error(f"setup_personal_rich_menu Error: {e}")
         return None
 
 @app.get("/admin/promptpay/preview")
@@ -3107,9 +3119,9 @@ async def broadcast_announcement(message: str = Form(...), db: Session = Depends
                             )
                 count += 1
             except Exception as e:
-                print(f"Broadcast Error to {t.line_user_id}: {e}")
+                logger.error(f"Broadcast Error to {t.line_user_id}: {e}")
     else:
-        print(f"MOCK BROADCAST: {message}")
+        logger.info(f"MOCK BROADCAST: {message}")
         count = len(tenants)
         
     return {"status": "Success", "sent_count": count}
@@ -3132,10 +3144,10 @@ async def send_direct_line(tenant_id: int, message: str = Form(...), db: Session
                 )
             )
         except Exception as e:
-            print(f"Direct Message Error to {tenant.line_user_id}: {e}")
+            logger.error(f"Direct Message Error to {tenant.line_user_id}: {e}")
             raise HTTPException(status_code=500, detail=f"Failed to send LINE message: {str(e)}")
     else:
-        print(f"MOCK DIRECT MESSAGE to {tenant.line_user_id}: {message}")
+        logger.info(f"MOCK DIRECT MESSAGE to {tenant.line_user_id}: {message}")
         
     return {"status": "Success"}
 
@@ -3549,7 +3561,7 @@ async def submit_repair(
                     preview_image_url=full_image_url
                 ))
         except Exception as e:
-            print(f"Admin Push Error (Repair): {e}")
+            logger.error(f"Admin Push Error (Repair): {e}")
             send_line_notify(msg)
     else:
         send_line_notify(msg)

@@ -1,8 +1,13 @@
 import os
+import logging
 from database import SessionLocal
 import security
 import models
 from dotenv import load_dotenv
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -20,18 +25,18 @@ def migrate():
         "ADMIN_PASSWORD"
     ]
     
-    print("Starting migration of .env secrets to database...")
+    logger.info("Starting migration of .env secrets to database...")
     
     for key in keys_to_migrate:
         val = os.getenv(key)
         if val:
-            print(f"Migrating {key}...")
+            logger.info(f"Migrating {key}...")
             security.set_system_config(db, key, val, description=f"Migrated from .env")
         else:
-            print(f"Skipping {key} (not found in .env)")
+            logger.info(f"Skipping {key} (not found in .env)")
             
     db.close()
-    print("Migration complete.")
+    logger.info("Migration complete.")
 
 if __name__ == "__main__":
     migrate()
