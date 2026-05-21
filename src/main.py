@@ -9,8 +9,6 @@ import secrets
 import warnings
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
-from linebot.utils import LineBotSdkDeprecatedIn30
-warnings.filterwarnings("ignore", category=LineBotSdkDeprecatedIn30)
 
 from fastapi import FastAPI, Request, HTTPException, Depends, Form, File, UploadFile
 from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse, FileResponse
@@ -18,9 +16,27 @@ from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func
 from sqlalchemy.orm import Session
-from linebot import LineBotApi, WebhookHandler
-from linebot.exceptions import InvalidSignatureError
-from linebot.models import MessageEvent, TextMessage, TextSendMessage, FlexSendMessage, FlexContainer, PostbackEvent, ImageSendMessage
+
+# LINE SDK v3 imports
+from linebot.v3 import WebhookHandler
+from linebot.v3.exceptions import InvalidSignatureError
+from linebot.v3.messaging import (
+    Configuration,
+    ApiClient,
+    MessagingApi,
+    MessagingApiBlob,
+    ReplyMessageRequest,
+    PushMessageRequest,
+    TextMessage,
+    ImageMessage,
+    FlexMessage,
+    FlexContainer
+)
+from linebot.v3.webhooks import (
+    MessageEvent,
+    TextMessageContent,
+    PostbackEvent
+)
 
 from database import SessionLocal, engine, get_db
 import models
@@ -123,11 +139,27 @@ def refresh_configs():
     ADMIN_PASSWORD = configs["ADMIN_PASSWORD"]
 
     # Admin Channel
-    admin_bot_api = LineBotApi(LINE_ADMIN_CHANNEL_ACCESS_TOKEN) if LINE_ADMIN_CHANNEL_ACCESS_TOKEN else None
+    if LINE_ADMIN_CHANNEL_ACCESS_TOKEN:
+        admin_config = Configuration(access_token=LINE_ADMIN_CHANNEL_ACCESS_TOKEN)
+        admin_api_client = ApiClient(admin_config)
+        admin_bot_api = MessagingApi(admin_api_client)
+        admin_bot_blob_api = MessagingApiBlob(admin_api_client)
+    else:
+        admin_bot_api = None
+        admin_bot_blob_api = None
+    
     admin_handler = WebhookHandler(LINE_ADMIN_CHANNEL_SECRET) if LINE_ADMIN_CHANNEL_SECRET else None
 
     # Tenant Channel
-    tenant_bot_api = LineBotApi(LINE_TENANT_CHANNEL_ACCESS_TOKEN) if LINE_TENANT_CHANNEL_ACCESS_TOKEN else None
+    if LINE_TENANT_CHANNEL_ACCESS_TOKEN:
+        tenant_config = Configuration(access_token=LINE_TENANT_CHANNEL_ACCESS_TOKEN)
+        tenant_api_client = ApiClient(tenant_config)
+        tenant_bot_api = MessagingApi(tenant_api_client)
+        tenant_bot_blob_api = MessagingApiBlob(tenant_api_client)
+    else:
+        tenant_bot_api = None
+        tenant_bot_blob_api = None
+        
     tenant_handler = WebhookHandler(LINE_TENANT_CHANNEL_SECRET) if LINE_TENANT_CHANNEL_SECRET else None
 
     # Compatibility shim
@@ -228,7 +260,12 @@ def handle_admin_message(event, *args, **kwargs):
                 db.commit()
                 reply_text = "✅ เชื่อมต่อบัญชี LINE Admin เรียบร้อยแล้ว! คุณสามารถใช้ฟีเจอร์แจ้งเตือนและรีเซ็ตรหัสผ่านได้แล้วครับ"
                 if admin_bot_api:
-                    admin_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
+                    admin_bot_api.reply_message(
+                        ReplyMessageRequest(
+                            reply_token=event.reply_token,
+                            messages=[TextMessage(text=reply_text)]
+                        )
+                    )
                 return
 
         owner = db.query(models.Owner).filter(models.Owner.line_user_id == user_id).first()
@@ -252,7 +289,7 @@ def handle_admin_message(event, *args, **kwargs):
                         if room:
                             success_rooms, g_deposit, g_advance, g_other, g_total = perform_approval(db, target_tenant, [room.id], owner)
                             db.commit()
-                            
+
                             if success_rooms:
                                 reply_text = f"อนุมัติผู้เช่าห้อง {room.room_number} เรียบร้อย\n\nอย่าลืมจดมิเตอร์น้ำและไฟฟ้าแรกเข้าด้วยนะครับ"
                                 if tenant_bot_api:
@@ -264,15 +301,21 @@ def handle_admin_message(event, *args, **kwargs):
                                 reply_text = f"ไม่สามารถอนุมัติห้อง {room.room_number} ได้ (ห้องอาจไม่ว่าง)"
                         else:
                             reply_text = "ไม่พบข้อมูลห้อง"
-                    else:
+                    else: # REJECT_REG_
                         target_tenant.status = "Rejected"
                         target_tenant.current_room_id = None
                         db.commit()
                         reply_text = "ปฏิเสธการลงทะเบียนเรียบร้อย"
                         if tenant_bot_api:
-                            tenant_bot_api.push_message(target_tenant.line_user_id, TextSendMessage(text="ขออภัย การลงทะเบียนของคุณถูกปฏิเสธ กรุณาติดต่อเจ้าของหอพัก"))
+                            tenant_bot_api.push_message(
+                                PushMessageRequest(
+                                    to=target_tenant.line_user_id,
+                                    messages=[TextMessage(text="ขออภัย การลงทะเบียนของคุณถูกปฏิเสธ กรุณาติดต่อเจ้าของหอพัก")]
+                                )
+                            )
                 else:
                     reply_text = "ไม่พบข้อมูลผู้เช่า"
+
             elif text == "ผังห้อง":
                 url = get_magic_url(owner, db)
                 reply_text = f"🏠 ดูผังห้องและจัดการผู้เช่า:\n{url}"
@@ -329,7 +372,12 @@ def handle_admin_message(event, *args, **kwargs):
                     }
                 }
                 if admin_bot_api:
-                    admin_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="จดมิเตอร์น้ำ-ไฟ", contents=flex_contents))
+                    admin_bot_api.reply_message(
+                        ReplyMessageRequest(
+                            reply_token=event.reply_token,
+                            messages=[FlexMessage(alt_text="จดมิเตอร์น้ำ-ไฟ", contents=FlexContainer.from_dict(flex_contents))]
+                        )
+                    )
                 return
             elif text == "สรุปรายรับ":
                 url = get_magic_url(owner, db)
@@ -347,7 +395,7 @@ def handle_admin_message(event, *args, **kwargs):
                 reply_text = "สวัสดีครับเจ้าของหอพัก! กรุณาเลือกเมนูจาก Rich Menu เพื่อดำเนินการ"
         
         if admin_bot_api and reply_text:
-            admin_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
+            admin_bot_api.reply_message(ReplyMessageRequest(reply_token=event.reply_token, messages=[TextMessage(text=reply_text)]))
     finally:
         if close_db:
             db.close()
@@ -413,16 +461,25 @@ def handle_tenant_message(event, *args, **kwargs):
             
             # Send as Buttons if possible
             if tenant_bot_api:
-                from linebot.models import ButtonsTemplate, TemplateSendMessage, URITemplateAction
+                from linebot.v3.messaging import (
+                    TemplateMessage,
+                    ButtonsTemplate,
+                    URIAction
+                )
                 buttons_template = ButtonsTemplate(
                     title='ลงทะเบียนเข้าพัก',
                     text='ยินดีต้อนรับ! กรุณากดลงทะเบียนสำหรับห้องใหม่ของคุณ',
                     actions=[
-                        URITemplateAction(label='ลงทะเบียนเข้าพัก', uri=reg_url)
+                        URIAction(label='ลงทะเบียนเข้าพัก', uri=reg_url)
                     ]
                 )
                 try:
-                    tenant_bot_api.reply_message(event.reply_token, TemplateSendMessage(alt_text='ลงทะเบียนเข้าพัก', template=buttons_template))
+                    tenant_bot_api.reply_message(
+                        ReplyMessageRequest(
+                            reply_token=event.reply_token,
+                            messages=[TemplateMessage(alt_text='ลงทะเบียนเข้าพัก', template=buttons_template)]
+                        )
+                    )
                     return
                 except: pass
             
@@ -531,14 +588,18 @@ def handle_tenant_message(event, *args, **kwargs):
                                 ]
                             }
                         }
-                        messages.append(FlexSendMessage(alt_text=f"บิลห้อง {room_no}", contents=flex_contents))
+                        messages.append(FlexMessage(alt_text=f"บิลห้อง {room_no}", contents=flex_contents))
                     else:
-                        messages.append(TextSendMessage(text=f"ห้อง {room_no}: ไม่พบข้อมูลบิลล่าสุด"))
+                        messages.append(TextMessage(text=f"ห้อง {room_no}: ไม่พบข้อมูลบิลล่าสุด"))
 
-                
                 if tenant_bot_api:
                     # LINE reply_message supports up to 5 messages
-                    tenant_bot_api.reply_message(event.reply_token, messages[:5])
+                    tenant_bot_api.reply_message(
+                        ReplyMessageRequest(
+                            reply_token=event.reply_token,
+                            messages=messages[:5]
+                        )
+                    )
                     return
             
             elif text in ["แจ้งซ่อม", "ประวัติ", "ย้ายออก"]:
@@ -580,7 +641,7 @@ def handle_tenant_message(event, *args, **kwargs):
                         }
                     }
                     if tenant_bot_api:
-                        tenant_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text=f"เลือกห้องสำหรับ{text}", contents=flex_contents))
+                        tenant_bot_api.reply_message(event.reply_token, FlexMessage(alt_text=f"เลือกห้องสำหรับ{text}", contents=flex_contents))
                         return
 
             elif text == "สนทนา":
@@ -590,7 +651,7 @@ def handle_tenant_message(event, *args, **kwargs):
                 reply_text = f"สวัสดีครับ! (ห้อง {rooms_str})\nพิมพ์ 'ดูค่าเช่า', 'แจ้งซ่อม' หรือ 'ประวัติ'"
             
         if tenant_bot_api:
-            tenant_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
+            tenant_bot_api.reply_message(ReplyMessageRequest(reply_token=event.reply_token, messages=[TextMessage(text=reply_text)]))
     finally:
         if close_db:
             db.close()
@@ -654,8 +715,14 @@ async def submit_registration(tenant_uuid: str, data: dict, db: Session = Depend
     # Notify Owner
     owner = db.query(models.Owner).first()
     if owner and owner.line_user_id and admin_bot_api:
-        msg = f"🔔 มีผู้ลงทะเบียนใหม่!\nชื่อ: {full_name}\nบัตร ปชช: {citizen_id}\nเบอร์โทร: {phone_number}\nวันที่เข้าพัก: {requested_move_in_date_str}\nกรุณาเลือกห้องและอนุมัติใน Dashboard"
-        try: admin_bot_api.push_message(owner.line_user_id, TextSendMessage(text=msg))
+        msg = f"🔔 มีผู้ลงทะเบียนใหม่!\nชื่อ: {full_name}\nเบอร์โทร: {phone_number}\nวันที่เข้าพัก: {requested_move_in_date_str}\nกรุณาเลือกห้องและอนุมัติใน Dashboard"
+        try: 
+            admin_bot_api.push_message(
+                PushMessageRequest(
+                    to=owner.line_user_id,
+                    messages=[TextMessage(text=msg)]
+                )
+            )
         except: pass
         
     return {"status": "Success"}
@@ -727,7 +794,7 @@ async def submit_move_out(tenant_uuid: str, data: dict, db: Session = Depends(ge
     owner = db.query(models.Owner).first()
     if owner and owner.line_user_id and admin_bot_api:
         msg = f"🚪 แจ้งย้ายออกใหม่!\nห้อง: {tenant.room.room_number if tenant.room else 'N/A'}\nชื่อ: {tenant.full_name}\nวันที่ต้องการย้าย: {requested_date.strftime('%d/%m/%Y')}"
-        try: admin_bot_api.push_message(owner.line_user_id, TextSendMessage(text=msg))
+        try: admin_bot_api.push_message(PushMessageRequest(to=owner.line_user_id, messages=[TextMessage(text=msg)]))
         except: pass
         
     return {"status": "Success"}
@@ -1007,7 +1074,7 @@ async def request_password_reset(db: Session = Depends(get_db)):
         reset_link = f"{BASE_URL}/admin/reset-password?token={token}"
         message = f"คุณได้ทำการขอรีเซ็ตรหัสผ่าน Admin\n\nกรุณากดลิงก์ด้านล่างเพื่อตั้งรหัสผ่านใหม่ (ลิงก์มีอายุ 5 นาที):\n{reset_link}"
         try:
-            admin_bot_api.push_message(owner.line_user_id, TextSendMessage(text=message))
+            admin_bot_api.push_message(owner.line_user_id, TextMessage(text=message))
         except Exception as e:
             print(f"Error sending reset link: {e}")
             return {"error": "Failed to send LINE message."}
@@ -1392,14 +1459,18 @@ async def approve_registration(tenant_id: int, room_ids: str = Form(...), db: Se
             
     # Notify admin via LINE
     if owner and owner.line_user_id and admin_bot_api:
-        from linebot.models import TextSendMessage
         try:
             rooms_str = ", ".join(success_rooms)
             admin_msg = f"🔔 แจ้งเตือน: มีผู้เช่าใหม่เข้าพัก\n"
             admin_msg += f"ห้อง: {rooms_str}\n"
             admin_msg += f"ชื่อผู้เช่า: {tenant.full_name}\n\n"
             admin_msg += f"กรุณาไปจดมิเตอร์น้ำและไฟฟ้าแรกเข้าเพื่อใช้สำหรับคำนวณค่าไฟในรอบถัดไป"
-            admin_bot_api.push_message(owner.line_user_id, TextSendMessage(text=admin_msg))
+            admin_bot_api.push_message(
+                PushMessageRequest(
+                    to=owner.line_user_id,
+                    messages=[TextMessage(text=admin_msg)]
+                )
+            )
         except Exception as e:
             print(f"Failed to notify admin: {e}")
         
@@ -1492,9 +1563,13 @@ async def reject_registration(tenant_id: int, db: Session = Depends(get_db), adm
     
     # Notify tenant
     if line_bot_api:
-        from linebot.models import TextSendMessage
         try:
-            line_bot_api.push_message(tenant.line_user_id, TextSendMessage(text="ขออภัย การลงทะเบียนของคุณถูกปฏิเสธ กรุณาติดต่อเจ้าของหอพัก"))
+            line_bot_api.push_message(
+                PushMessageRequest(
+                    to=tenant.line_user_id,
+                    messages=[TextMessage(text="ขออภัย การลงทะเบียนของคุณถูกปฏิเสธ กรุณาติดต่อเจ้าของหอพัก")]
+                )
+            )
         except: pass
         
     return {"status": "Success"}
@@ -1818,7 +1893,7 @@ async def cancel_move_out(tenant_id: int, db: Session = Depends(get_db), admin: 
     if tenant.line_user_id and tenant_bot_api:
         try:
             msg = f"📢 แจ้งเตือน: คำขอย้ายออกของคุณได้รับการยกเลิกโดยเจ้าของหอพัก (สถานะห้อง {tenant.room.room_number if tenant.room else ''} ยังคงเป็นปกติ)"
-            tenant_bot_api.push_message(tenant.line_user_id, TextSendMessage(text=msg))
+            tenant_bot_api.push_message(tenant.line_user_id, TextMessage(text=msg))
         except Exception as e:
             print(f"LINE Push Error (Cancel Move-out): {e}")
 
@@ -2236,12 +2311,17 @@ async def approve_invoice(invoice_id: int, db: Session = Depends(get_db), admin:
         }
         
         try:
-            tenant_bot_api.push_message(tenant.line_user_id, FlexSendMessage(alt_text="ใบเสร็จรับเงิน", contents=flex_json))
+            tenant_bot_api.push_message(tenant.line_user_id, FlexMessage(alt_text="ใบเสร็จรับเงิน", contents=flex_json))
         except Exception as e:
             print(f"LINE Flex Error: {e}")
             # Fallback to text
             try:
-                tenant_bot_api.push_message(tenant.line_user_id, TextSendMessage(text=f"✅ ชำระเงินเรียบร้อย! บิลเดือน {period} ได้รับการตรวจสอบแล้ว ขอบคุณครับ"))
+                tenant_bot_api.push_message(
+                    PushMessageRequest(
+                        to=tenant.line_user_id,
+                        messages=[TextMessage(text=f"✅ ชำระเงินเรียบร้อย! บิลเดือน {period} ได้รับการตรวจสอบแล้ว ขอบคุณครับ")]
+                    )
+                )
             except: pass
             
     return {"status": "Success"}
@@ -2259,9 +2339,13 @@ async def reject_invoice(invoice_id: int, db: Session = Depends(get_db), admin: 
     # Notify tenant
     tenant = invoice.tenant
     if tenant and tenant.line_user_id and line_bot_api:
-        from linebot.models import TextSendMessage
         try:
-            line_bot_api.push_message(tenant.line_user_id, TextSendMessage(text=f"❌ แจ้งเตือน: สลิปการโอนเงินของบิลเดือน {invoice.billing_month}/{invoice.billing_year} ไม่ถูกต้อง กรุณาตรวจสอบหรืออัปโหลดใหม่อีกครั้ง"))
+            line_bot_api.push_message(
+                PushMessageRequest(
+                    to=tenant.line_user_id,
+                    messages=[TextMessage(text=f"❌ แจ้งเตือน: สลิปการโอนเงินของบิลเดือน {invoice.billing_month}/{invoice.billing_year} ไม่ถูกต้อง กรุณาตรวจสอบหรืออัปโหลดใหม่อีกครั้ง")]
+                )
+            )
         except: pass
         
     return {"status": "Success"}
@@ -2386,7 +2470,7 @@ async def send_invoice_line(invoice_id: int, db: Session = Depends(get_db), admi
     }
     
     try:
-        tenant_bot_api.push_message(tenant.line_user_id, FlexSendMessage(alt_text="ใบแจ้งค่าเช่า", contents=flex_contents))
+        tenant_bot_api.push_message(tenant.line_user_id, FlexMessage(alt_text="ใบแจ้งค่าเช่า", contents=flex_contents))
         return {"status": "Success"}
     except Exception as e:
         # Fallback to text
@@ -2395,7 +2479,7 @@ async def send_invoice_line(invoice_id: int, db: Session = Depends(get_db), admi
         msg += f"ยอดรวม: {total_fmt} บาท\n\n"
         msg += f"ดูรายละเอียดและแจ้งชำระเงินได้ที่:\n{bill_url}"
         try:
-            tenant_bot_api.push_message(tenant.line_user_id, TextSendMessage(text=msg))
+            tenant_bot_api.push_message(tenant.line_user_id, TextMessage(text=msg))
             return {"status": "Success"}
         except Exception as e2:
             raise HTTPException(status_code=500, detail=f"LINE Error: {str(e2)}")
@@ -2411,10 +2495,14 @@ async def update_repair_status(repair_id: int, status: str = Form(...), db: Sess
     # Notify tenant via LINE if possible
     tenant = repair.tenant
     if tenant and tenant.line_user_id and line_bot_api:
-        from linebot.models import TextSendMessage
         try:
             message = f"🛠️ อัปเดตสถานะการแจ้งซ่อม: {repair.title}\nสถานะ: {status}"
-            line_bot_api.push_message(tenant.line_user_id, TextSendMessage(text=message))
+            line_bot_api.push_message(
+                PushMessageRequest(
+                    to=tenant.line_user_id,
+                    messages=[TextMessage(text=message)]
+                )
+            )
         except Exception as e:
             print(f"LINE Push Error: {e}")
             
@@ -2836,7 +2924,7 @@ def send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_oth
 
     try:
         # Send Flex Message first
-        bot_api.push_message(tenant.line_user_id, FlexSendMessage(alt_text="ใบแจ้งยอดชำระแรกเข้า", contents=flex_json))
+        bot_api.push_message(tenant.line_user_id, FlexMessage(alt_text="ใบแจ้งยอดชำระแรกเข้า", contents=flex_json))
         
         # Send Image Message for QR Code (easy to capture/save)
         if qr_enabled and encoded_payload:
@@ -2850,7 +2938,7 @@ def send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_oth
         print(f"Error sending initial payment flex/image: {e}")
         # Fallback to text
         msg = f"ยินดีด้วย! การลงทะเบียนห้อง {rooms_str} ได้รับการอนุมัติแล้ว\nยอดรวม: {g_total:,.2f} บาท\nกรุณาชำระเงินที่เคาน์เตอร์หรือผ่านเมนูใน LINE"
-        try: bot_api.push_message(tenant.line_user_id, TextSendMessage(text=msg))
+        try: bot_api.push_message(tenant.line_user_id, TextMessage(text=msg))
         except: pass
 
 def setup_personal_rich_menu(tenant, db: Session, force=False):
@@ -3011,7 +3099,12 @@ async def broadcast_announcement(message: str = Form(...), db: Session = Depends
         from linebot.models import TextSendMessage
         for t in tenants:
             try:
-                line_bot_api.push_message(t.line_user_id, TextSendMessage(text=f"📢 ประกาศจากหอพัก:\n{message}"))
+                line_bot_api.push_message(
+                                PushMessageRequest(
+                                    to=t.line_user_id,
+                                    messages=[TextMessage(text=f"📢 ประกาศจากหอพัก:\n{message}")]
+                                )
+                            )
                 count += 1
             except Exception as e:
                 print(f"Broadcast Error to {t.line_user_id}: {e}")
@@ -3031,9 +3124,13 @@ async def send_direct_line(tenant_id: int, message: str = Form(...), db: Session
         raise HTTPException(status_code=400, detail="ผู้เช่ายังไม่ได้ลงทะเบียน LINE")
 
     if tenant_bot_api:
-        from linebot.models import TextSendMessage
         try:
-            tenant_bot_api.push_message(tenant.line_user_id, TextSendMessage(text=message))
+            tenant_bot_api.push_message(
+                PushMessageRequest(
+                    to=tenant.line_user_id,
+                    messages=[TextMessage(text=message)]
+                )
+            )
         except Exception as e:
             print(f"Direct Message Error to {tenant.line_user_id}: {e}")
             raise HTTPException(status_code=500, detail=f"Failed to send LINE message: {str(e)}")
@@ -3442,7 +3539,7 @@ async def submit_repair(
         from linebot.models import ImageSendMessage
         try:
             # Send text message first
-            admin_bot_api.push_message(owner.line_user_id, TextSendMessage(text=msg))
+            admin_bot_api.push_message(PushMessageRequest(to=owner.line_user_id, messages=[TextMessage(text=msg)]))
             
             # If there's an image, send it too
             if image_url:

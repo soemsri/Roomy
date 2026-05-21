@@ -1,7 +1,7 @@
 fastapi
 uvicorn
 sqlalchemy
-line-bot-sdk
+line-bot-sdk>=3.0.0
 passlib
 cryptography
 python-dotenv
