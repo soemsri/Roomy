@@ -809,7 +809,7 @@
                         <tr>
                             <th>{{ get_text('room', lang) }}</th>
                             <th>{{ get_text('tenants', lang) }}</th>
-                            <th>{{ get_text('floor', lang) if get_text('floor', lang) != 'floor' else 'Floor' }}</th>
+                            <th>{{ get_text('floor', lang) }}</th>
                             <th>{{ get_text('status', lang) }}</th>
                             <th>{{ get_text('rent', lang) }}</th>
                             <th>{{ get_text('promptpay', lang) }}</th>
@@ -1383,7 +1383,7 @@
     <!-- Edit Room Modal -->
     <div id="roomModal" class="modal">
         <div class="modal-content" style="max-width: 450px;">
-            <div class="modal-header"><h3>{{ get_text('edit_room_title', lang) if get_text('edit_room_title', lang) != 'edit_room_title' else 'Edit Room Info' }}</h3></div>
+            <div class="modal-header"><h3>{{ get_text('edit_room_title', lang) }}</h3></div>
             <form id="editRoomForm">
                 <div class="modal-body">
                     <input type="hidden" id="edit_room_id">
@@ -1855,6 +1855,8 @@
             pending_pay: "{{ get_text('initial_payment_pending', lang) }}",
             no_lease_data: "{{ get_text('no_lease_data', lang) }}",
             initial_payment_success: "{{ get_text('initial_payment_success', lang) }}",
+            save_receipt: "{{ get_text('save_receipt', lang) }}",
+            currency_baht: "{{ get_text('currency_baht', lang) }}",
             initial_payment_error: "{{ get_text('initial_payment_error', lang) }}",
             fee_name_placeholder: "{{ get_text('fee_name_placeholder', lang) }}",
             fixed_baht: "{{ get_text('fixed_baht', lang) }}",
@@ -2461,7 +2463,7 @@
                                 <button class="btn btn-outline" style="padding:5px 10px;" onclick="viewLease(${l.id})"><i class="fa-solid fa-eye"></i> {{ get_text('view', lang) }}</button>
                                 ${l.status === 'Active' && l.initial_payment_status !== 'Paid' ? `
                                     <button class="btn btn-primary" style="padding:5px 10px; background:var(--warning);" onclick="openInitialPaymentModal(${l.id})">
-                                        <i class="fa-solid fa-money-bill-transfer"></i> {{ get_text('save_receipt', lang) if get_text('save_receipt', lang) != 'save_receipt' else 'Record Pay' }}
+                                        <i class="fa-solid fa-money-bill-transfer"></i> ${translations.save_receipt}
                                     </button>` : ''}
                                 ${l.status === 'Active' ? `<button class="btn btn-danger" style="padding:5px 10px;" onclick="unmapTenant(${l.tenant_id})">{{ get_text('move_out', lang) }}</button>` : ''}
                             </div>
@@ -2481,11 +2483,11 @@
                 document.getElementById('ip_tenant_name').innerText = data.tenant_name;
                 const list = document.getElementById('ip_fees_list');
                 let total = 0; let html = '';
-                if (data.security_deposit > 0) { html += `<div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span>${translations.deposit_total}</span><strong>${data.security_deposit.toLocaleString()} บาท</strong></div>`; total += data.security_deposit; }
-                if (data.advance_rent > 0) { html += `<div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span>${translations.pro_rated}</span><strong>${data.advance_rent.toLocaleString()} บาท</strong></div>`; total += data.advance_rent; }
-                (data.initial_fees || []).forEach(f => { if (f.name !== 'ค่าประกัน' && f.name !== 'ค่าเช่าล่วงหน้า') { html += `<div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span>${f.name}</span><strong>${f.amount.toLocaleString()} บาท</strong></div>`; total += f.amount; } });
+                if (data.security_deposit > 0) { html += `<div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span>${translations.deposit_total}</span><strong>${data.security_deposit.toLocaleString()} ${translations.currency_baht}</strong></div>`; total += data.security_deposit; }
+                if (data.advance_rent > 0) { html += `<div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span>${translations.pro_rated}</span><strong>${data.advance_rent.toLocaleString()} ${translations.currency_baht}</strong></div>`; total += data.advance_rent; }
+                (data.initial_fees || []).forEach(f => { if (f.name !== 'ค่าประกัน' && f.name !== 'ค่าเช่าล่วงหน้า') { html += `<div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span>${f.name}</span><strong>${f.amount.toLocaleString()} ${translations.currency_baht}</strong></div>`; total += f.amount; } });
                 list.innerHTML = html;
-                document.getElementById('ip_total_amount').innerText = `${total.toLocaleString()} บาท`;
+                document.getElementById('ip_total_amount').innerText = `${total.toLocaleString()} ${translations.currency_baht}`;
                 document.getElementById('initialPaymentModal').style.display = 'block';
             } catch (err) { alert('Error: ' + err); }
         }

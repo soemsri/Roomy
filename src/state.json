@@ -1,13 +1,19 @@
 {
     "project": "Roomy",
-    "last_updated": "2026-05-20T19:00:00Z",
+    "last_updated": "2026-05-21T09:00:00Z",
     "features": {
         "multi_language": {
             "supported_languages": ["th", "en", "jp"],
             "status": "fully_implemented",
-            "coverage": "100% Admin & Tenant UI",
-            "components": ["main.py", "models.py", "templates/*.html", "i18n/*.json"],
-            "notes": "All hardcoded strings in both Admin and Tenant sections have been replaced with dynamic translations via get_text. Added tenant-level language preference."
+            "coverage": "100% (Admin Dashboard & Tenant UI)",
+            "components": [
+                "i18n/*.json",
+                "templates/*.html",
+                "main.py (Backend Logic)",
+                "models.py (Persistent Preference)",
+                "LINE Bot (Command Interface)"
+            ],
+            "notes": "Seamless language switching for both Owners (via Sidebar) and Tenants (via LINE/Registration). All UI strings, alerts, and table contents are localized."
         },
         "pagination": {
             "status": "standardized",
@@ -15,19 +21,30 @@
             "applied_to": ["Room Management", "Meter History", "Tenant History", "Lease Management"],
             "style": "Modern, Indigo theme, responsive with ellipsis support"
         },
-        "move_in_fees": {
-            "status": "fixed_and_hardened",
-            "logic": "Backend defaults with frontend synchronization",
-            "defaults": "1 month advance rent (multiplier) + 5,000 THB security deposit (fixed)"
+        "database": {
+            "status": "up-to-date",
+            "migrations": ["Added language column to tenants and tenant_history"],
+            "schema_version": "2026-05-20"
         },
         "ui_ux": {
             "sidebar": "Scrollable and compact design for accessibility at 100% zoom",
-            "standardization": "Unified look and feel between Dashboard and Report pages using global.css"
+            "standardization": "Unified look and feel between Dashboard and Report pages using global.css",
+            "mobile_responsiveness": "Enhanced bulk meter input and navigation for small screens"
         }
     },
     "configuration": {
         "default_language": "th",
         "i18n_path": "i18n/"
     },
-    "session_notes": "Implemented comprehensive multi-language support for the Tenant UI (Bills, Registration, Move-out). Added 'language' field to Tenant model and database migration. Added LINE bot command for tenants to switch languages ('EN', 'TH', 'JP'). All tenant-facing templates are now fully localized."
+    "recent_achievements": [
+        "100% Localization of Admin Dashboard (Reports, Settings, Approvals, Repairs).",
+        "100% Localization of Tenant UI (Bills, Registration, Move-out Forms).",
+        "Implemented persistent tenant language preference with DB migration.",
+        "Added LINE bot commands ('EN', 'TH', 'JP') for instant tenant language switching.",
+        "Standardized alerts and confirmation dialogs with localized JS translations.",
+        "Fixed 'Move Out' button captions to show correct local text on all tables.",
+        "Localized 'Initial Payment' (Security Deposit & Advance Rent) recording flow.",
+        "Implemented dynamic localized Rich Menus for Tenants based on language preference."
+    ],
+    "session_notes": "Resumed session on 2026-05-21. Verified localization of Initial Payment modal and Rich Menu generation logic. All major UI components are now fully multi-language capable."
 }

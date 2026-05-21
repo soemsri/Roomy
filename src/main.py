@@ -377,9 +377,33 @@ def handle_tenant_message(event, *args, **kwargs):
     try:
         tenants = db.query(models.Tenant).filter(models.Tenant.line_user_id == user_id).all()
         active_tenants = [t for t in tenants if t.status == "Active"]
+        print(f"DEBUG: found {len(tenants)} total tenants, {len(active_tenants)} active tenants")
         
-        # If not active at all or specifically asking to register a new room
-        if text == "ย้ายเข้า" or not active_tenants:
+        # 1. Handle Language Switching commands (Global)
+        if text.lower() in ["language", "lang", "ภาษา", "เปลี่ยนภาษา"]:
+            reply_text = "Please choose your language / กรุณาเลือกภาษา:\n\nType 'TH' for Thai\nType 'EN' for English\nType 'JP' for Japanese"
+        elif text.upper() in ["TH", "EN", "JP"]:
+            new_lang = text.lower()
+            print(f"DEBUG: Switching language to {new_lang} for {len(tenants)} tenants")
+            # Update language for ALL tenant records (active, pending, etc.) associated with this LINE ID
+            for t in tenants:
+                t.language = new_lang
+            db.commit()
+            print("DEBUG: DB committed")
+            
+            # Refresh rich menu with new language
+            if active_tenants:
+                setup_personal_rich_menu(active_tenants[0], db, force=True)
+            
+            msg_map = {
+                "th": "เปลี่ยนภาษาเป็น ภาษาไทย เรียบร้อยแล้วค่ะ",
+                "en": "Language has been changed to English.",
+                "jp": "言語が日本語に変更されました。"
+            }
+            reply_text = msg_map.get(new_lang, "Success")
+
+        # 2. If not active at all or specifically asking to register a new room
+        elif text == "ย้ายเข้า" or not active_tenants:
             # ... (rest of registration logic)
             # Find a tenant record that is not Active (e.g. Pending or AwaitingRegistration)
             tenant = next((t for t in tenants if t.status != "Active"), None)
@@ -564,19 +588,6 @@ def handle_tenant_message(event, *args, **kwargs):
                         tenant_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text=f"เลือกห้องสำหรับ{text}", contents=flex_contents))
                         return
 
-            elif text.lower() in ["language", "lang", "ภาษา", "เปลี่ยนภาษา"]:
-                reply_text = "Please choose your language / กรุณาเลือกภาษา:\n\nType 'TH' for Thai\nType 'EN' for English\nType 'JP' for Japanese"
-            elif text.upper() in ["TH", "EN", "JP"]:
-                new_lang = text.lower()
-                for t in active_tenants:
-                    t.language = new_lang
-                db.commit()
-                msg_map = {
-                    "th": "เปลี่ยนภาษาเป็น ภาษาไทย เรียบร้อยแล้วค่ะ",
-                    "en": "Language has been changed to English.",
-                    "jp": "言語が日本語に変更されました。"
-                }
-                reply_text = msg_map.get(new_lang, "Success")
             elif text == "สนทนา":
                 reply_text = "คุณสามารถพิมพ์ข้อความที่ต้องการสอบถามทิ้งไว้ได้เลยครับ เจ้าหน้าที่จะรีบมาตอบกลับโดยเร็วที่สุด"
             else:
@@ -1033,7 +1044,7 @@ async def admin_dashboard(
     pending_registrations = db.query(models.Tenant).filter(models.Tenant.status == "Pending").all()
     move_out_requests = db.query(models.MoveOutRequest).filter(models.MoveOutRequest.status == "Pending").all()
     
-    all_rooms = db.query(models.Room).all()
+    all_rooms = db.query(models.Room).options(joinedload(models.Room.tenant)).all()
     all_buildings = db.query(models.Building).all()
     owner = db.query(models.Owner).first()
     
@@ -2814,26 +2825,58 @@ def setup_personal_rich_menu(tenant, db: Session, force=False):
     }
 
     # Define the Rich Menu Structure
+    # Localized Labels and Images
+    lang = tenant.language or "th"
+    
+    # Text mapping for Rich Menu
+    if lang == "en":
+        chat_bar_text = "Tenant Menu"
+        bill_label = "View Bill"
+        repair_label = "Repair"
+        history_label = "History"
+        chat_label = "Chat"
+        move_in_label = "Move-in"
+        move_out_label = "Move-out"
+        img_filename = "tenant_richmenu_en.jpg"
+    elif lang == "jp":
+        chat_bar_text = "テナントメニュー"
+        bill_label = "請求書"
+        repair_label = "修理依頼"
+        history_label = "履歴"
+        chat_label = "チャット"
+        move_in_label = "入居"
+        move_out_label = "退去"
+        img_filename = "tenant_richmenu_jp.jpg"
+    else: # Thai
+        chat_bar_text = "เมนูผู้เช่า"
+        bill_label = "ดูค่าเช่า"
+        repair_label = "แจ้งซ่อม"
+        history_label = "ประวัติ"
+        chat_label = "สนทนา"
+        move_in_label = "ย้ายเข้า"
+        move_out_label = "ย้ายออก"
+        img_filename = "tenant_richmenu.jpg"
+
     if not multi_room:
         # 1-Click direct links for single-room users
-        repair_action = {"type": "uri", "label": "แจ้งซ่อม", "uri": f"{BASE_URL}/repair/{tenant.uuid}"}
-        history_action = {"type": "uri", "label": "ประวัติ", "uri": f"{BASE_URL}/history/{tenant.uuid}"}
-        move_out_action = {"type": "uri", "label": "ย้ายออก", "uri": f"{BASE_URL}/move-out/{tenant.uuid}"}
-        menu_name = f"Tenant Menu Single - {tenant.line_user_id[:10]}"
+        repair_action = {"type": "uri", "label": repair_label, "uri": f"{BASE_URL}/repair/{tenant.uuid}"}
+        history_action = {"type": "uri", "label": history_label, "uri": f"{BASE_URL}/history/{tenant.uuid}"}
+        move_out_action = {"type": "uri", "label": move_out_label, "uri": f"{BASE_URL}/move-out/{tenant.uuid}"}
+        menu_name = f"Tenant Menu {lang.upper()} Single - {tenant.line_user_id[:10]}"
     else:
         # Message-based triggers for multi-room users to allow room selection
-        repair_action = {"type": "message", "text": "แจ้งซ่อม"}
-        history_action = {"type": "message", "text": "ประวัติ"}
-        move_out_action = {"type": "message", "text": "ย้ายออก"}
-        menu_name = f"Tenant Menu Multi - {tenant.line_user_id[:10]}"
+        repair_action = {"type": "message", "text": repair_label}
+        history_action = {"type": "message", "text": history_label}
+        move_out_action = {"type": "message", "text": move_out_label}
+        menu_name = f"Tenant Menu {lang.upper()} Multi - {tenant.line_user_id[:10]}"
     
     rich_menu_data = {
         "size": {"width": 2500, "height": 1686},
         "selected": False,
         "name": menu_name,
-        "chatBarText": "เมนูผู้เช่า",
+        "chatBarText": chat_bar_text,
         "areas": [
-            {"bounds": {"x": 0, "y": 0, "width": 833, "height": 843}, "action": {"type": "message", "text": "ดูค่าเช่า"}},
+            {"bounds": {"x": 0, "y": 0, "width": 833, "height": 843}, "action": {"type": "message", "text": bill_label}},
             {"bounds": {"x": 833, "y": 0, "width": 834, "height": 843}, "action": repair_action},
             {"bounds": {"x": 1667, "y": 0, "width": 833, "height": 843}, "action": history_action},
             {"bounds": {"x": 0, "y": 843, "width": 833, "height": 843}, "action": {
@@ -2841,7 +2884,7 @@ def setup_personal_rich_menu(tenant, db: Session, force=False):
                 "data": "action=chat",
                 "inputOption": "openKeyboard"
             }},
-            {"bounds": {"x": 833, "y": 843, "width": 834, "height": 843}, "action": {"type": "message", "text": "ย้ายเข้า"}},
+            {"bounds": {"x": 833, "y": 843, "width": 834, "height": 843}, "action": {"type": "message", "text": move_in_label}},
             {"bounds": {"x": 1667, "y": 843, "width": 833, "height": 843}, "action": move_out_action}
         ]
     }
@@ -2855,8 +2898,12 @@ def setup_personal_rich_menu(tenant, db: Session, force=False):
         
         rich_menu_id = res.json()["richMenuId"]
 
-        # 2. Upload Image (Prefer compressed JPG to avoid 1MB limit)
-        image_path = os.path.join(os.path.dirname(__file__), "tenant_richmenu.jpg")
+        # 2. Upload Image
+        image_path = os.path.join(os.path.dirname(__file__), img_filename)
+        # Fallback to default if localized image doesn't exist
+        if not os.path.exists(image_path):
+            image_path = os.path.join(os.path.dirname(__file__), "tenant_richmenu.jpg")
+        
         if not os.path.exists(image_path):
              image_path = os.path.join(os.path.dirname(__file__), "tenant_richmenu.png")
         if not os.path.exists(image_path):

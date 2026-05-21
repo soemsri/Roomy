@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Text, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Text, UniqueConstraint, and_
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -78,6 +78,7 @@ class Room(Base):
     building = relationship("Building", back_populates="rooms")
     assets = relationship("RoomAsset", back_populates="room", cascade="all, delete-orphan")
     payment_channels = relationship("RoomPaymentChannel", back_populates="room", cascade="all, delete-orphan")
+    tenant = relationship("Tenant", primaryjoin="and_(Room.id==Tenant.current_room_id, Tenant.status=='Active')", uselist=False, viewonly=True)
 
     __table_args__ = (UniqueConstraint('building_id', 'room_number', name='_building_room_uc'),)
 
