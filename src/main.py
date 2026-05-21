@@ -1489,13 +1489,19 @@ async def approve_registration(tenant_id: int, room_ids: str = Form(...), db: Se
     return {"status": "Success"}
 
 @app.get("/admin/leases/list")
-async def list_leases(page: int = 1, page_size: int = 10, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+async def list_leases(page: int = 1, page_size: int = 10, q: str = None, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
     from sqlalchemy.orm import joinedload
     
-    query = db.query(models.Lease).options(
+    query = db.query(models.Lease).join(models.Room).join(models.Tenant).options(
         joinedload(models.Lease.room),
         joinedload(models.Lease.tenant)
     )
+    
+    if q:
+        query = query.filter(
+            (models.Room.room_number.ilike(f"%{q}%")) |
+            (models.Tenant.full_name.ilike(f"%{q}%"))
+        )
     
     total_count = query.count()
     total_pages = (total_count + page_size - 1) // page_size if page_size > 0 else 1

@@ -460,5 +460,6 @@
     "back_to_login": "Back to Login",
     "sent": "Sent!",
     "login_locked": "Too many failed attempts. Please wait {wait} minutes.",
-    "confirm_logout": "Are you sure you want to logout?"
+    "confirm_logout": "Are you sure you want to logout?",
+    "search_room_tenant": "Search by Room or Tenant..."
 }

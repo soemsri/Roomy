@@ -464,5 +464,6 @@
     "confirm_password_placeholder": "ยืนยันรหัสผ่าน",
     "update_password_btn": "อัปเดตรหัสผ่าน",
     "login_locked": "เข้าสู่ระบบผิดพลาดเกินกำหนด กรุณารออีก {wait} นาที",
-    "confirm_logout": "คุณต้องการออกจากระบบใช่หรือไม่?"
+    "confirm_logout": "คุณต้องการออกจากระบบใช่หรือไม่?",
+    "search_room_tenant": "ค้นหาเลขห้อง หรือ ชื่อผู้เช่า..."
 }

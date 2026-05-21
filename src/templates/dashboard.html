@@ -1279,8 +1279,12 @@
 
         <!-- Lease Management Section -->
         <div class="section-card" id="leaseSection" style="display:none;">
-            <div class="section-header">
+            <div class="section-header" style="flex-wrap: wrap; gap: 15px;">
                 <h2><i class="fa-solid fa-file-contract"></i> {{ get_text('leases_management_title', lang) }}</h2>
+                <div class="search-group" style="max-width: 400px; width: 100%;">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="lease_search_query" placeholder="{{ get_text('search_room_tenant', lang) }}" oninput="loadLeases(1)">
+                </div>
             </div>
             <div class="table-container">
                 <table>
@@ -2451,7 +2455,8 @@
         let currentLeasePage = 1;
         async function loadLeases(page = 1) {
             currentLeasePage = page;
-            const res = await fetch(`/admin/leases/list?page=${page}&page_size=10`);
+            const query = document.getElementById('lease_search_query').value.trim();
+            const res = await fetch(`/admin/leases/list?page=${page}&page_size=10&q=${encodeURIComponent(query)}`);
             const data = await res.json();
             const list = document.getElementById('leaseList');
             if (list) {

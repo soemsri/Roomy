@@ -460,5 +460,6 @@
     "back_to_login": "ログインに戻る",
     "sent": "送信しました！",
     "login_locked": "ログイン試行回数が制限を超えました。{wait} 分後にもう一度お試しください。",
-    "confirm_logout": "ログアウトしてもよろしいですか？"
+    "confirm_logout": "ログアウトしてもよろしいですか？",
+    "search_room_tenant": "部屋番号または入居者名で検索..."
 }
