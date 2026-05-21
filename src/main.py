@@ -879,34 +879,37 @@ async def upload_slip(
 
 @app.get("/repair/{tenant_uuid}", response_class=HTMLResponse)
 async def repair_form(request: Request, tenant_uuid: str, db: Session = Depends(get_db)):
+    lang = request.cookies.get("lang", "th")
     tenant = db.query(models.Tenant).filter(models.Tenant.uuid == tenant_uuid).first()
     if not tenant: raise HTTPException(status_code=404, detail="Tenant not found")
     return templates.TemplateResponse("repair.html", {
         "request": request,
         "tenant_id": tenant.id,
         "room_id": tenant.current_room_id,
-        "room_number": tenant.room.room_number if tenant.room else "N/A"
+        "room_number": tenant.room.room_number if tenant.room else "N/A",
+        "lang": lang
     })
 
 @app.get("/history/{tenant_uuid}", response_class=HTMLResponse)
 async def view_history(request: Request, tenant_uuid: str, db: Session = Depends(get_db)):
+    lang = request.cookies.get("lang", "th")
     tenant = db.query(models.Tenant).filter(models.Tenant.uuid == tenant_uuid).first()
     if not tenant: raise HTTPException(status_code=404, detail="Tenant not found")
-    
+
     # Robust check: fetch by room_id so history is complete for the specific room
     if tenant.current_room_id:
         invoices = db.query(models.Invoice).filter(models.Invoice.room_id == tenant.current_room_id).order_by(models.Invoice.id.desc()).all()
     else:
         invoices = db.query(models.Invoice).filter(models.Invoice.tenant_id == tenant.id).order_by(models.Invoice.id.desc()).all()
-        
-    return templates.TemplateResponse("history.html", {"request": request, "tenant": tenant, "invoices": invoices})
+
+    return templates.TemplateResponse("history.html", {"request": request, "tenant": tenant, "invoices": invoices, "lang": lang})
 
 # Admin Security Dependency
 def get_admin(request: Request, db: Session = Depends(get_db)):
     admin_session = request.cookies.get("admin_session")
     if not admin_session:
         raise HTTPException(status_code=401, detail="Unauthorized")
-    
+
     # Check if the session is the hashed password of the owner
     owner = db.query(models.Owner).first()
     if not owner or admin_session != owner.password_hash:
@@ -915,7 +918,8 @@ def get_admin(request: Request, db: Session = Depends(get_db)):
 
 @app.get("/admin/login", response_class=HTMLResponse)
 async def admin_login_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request})
+    lang = request.cookies.get("lang", "th")
+    return templates.TemplateResponse("login.html", {"request": request, "lang": lang})
 
 @app.post("/admin/login")
 async def admin_login(password: str = Form(...), db: Session = Depends(get_db)):
@@ -934,8 +938,8 @@ async def admin_logout():
 
 @app.get("/admin/forgot-password", response_class=HTMLResponse)
 async def forgot_password_page(request: Request):
-    return templates.TemplateResponse("forgot_password.html", {"request": request})
-
+    lang = request.cookies.get("lang", "th")
+    return templates.TemplateResponse("forgot_password.html", {"request": request, "lang": lang})
 @app.post("/admin/forgot-password")
 async def request_password_reset(db: Session = Depends(get_db)):
     owner = db.query(models.Owner).first()

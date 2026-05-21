@@ -1,28 +1,35 @@
 <!DOCTYPE html>
-<html>
+<html lang="{{ lang or 'th' }}">
 <head>
-    <title>Admin Login - SukAnan Apartment</title>
+    <title>{{ get_text('admin_login_title', lang) }} - Roomy</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f2f5; margin: 0; }
-        .login-card { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 350px; text-align: center; }
-        h2 { color: #2c3e50; margin-bottom: 30px; }
-        input { width: 100%; padding: 12px; margin-bottom: 20px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
-        button { width: 100%; padding: 12px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1em; font-weight: bold; }
-        .error { color: #e74c3c; margin-bottom: 20px; font-size: 0.9em; }
+        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f0f2f5; }
+        .login-card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; }
+        h2 { color: #1c1e21; margin-bottom: 30px; }
+        input[type="password"] { width: 100%; padding: 12px; margin-bottom: 20px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background: #0078d4; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+        button:hover { background: #005a9e; }
+        .error-msg { color: #d93025; background: #fff1f0; padding: 10px; border-radius: 6px; margin-bottom: 20px; display: none; font-size: 14px; }
+        .success-msg { color: #00875a; background: #e6fffa; padding: 10px; border-radius: 6px; margin-bottom: 20px; display: none; font-size: 14px; }
+        .forgot { display: block; margin-top: 20px; color: #0078d4; text-decoration: none; font-size: 14px; }
     </style>
 </head>
 <body>
     <div class="login-card">
-        <h2>Admin Login</h2>
+        <h2>{{ get_text('admin_login_title', lang) }}</h2>
+        
+        <div id="error-msg" class="error-msg">{{ get_text('login_error', lang) }}</div>
+        <div id="success-msg" class="success-msg">{{ get_text('reset_success_msg', lang) }}</div>
+        
         <form action="/admin/login" method="post">
-            <input type="password" name="password" placeholder="Admin Password" required autofocus>
-            <button type="submit">Login</button>
+            <input type="password" name="password" placeholder="{{ get_text('admin_password_placeholder', lang) }}" required autofocus>
+            <button type="submit">{{ get_text('login_btn', lang) }}</button>
         </form>
-        <p id="error-msg" class="error" style="display:none;">รหัสผ่านไม่ถูกต้อง</p>
-        <p id="success-msg" style="display:none; color: #27ae60; font-size: 0.9em; margin-bottom: 20px;">เปลี่ยนรหัสผ่านเรียบร้อยแล้ว กรุณาเข้าสู่ระบบ</p>
-        <a href="/admin/forgot-password" style="display: block; margin-top: 20px; color: #3498db; text-decoration: none; font-size: 0.9em;">ลืมรหัสผ่าน?</a>
+        
+        <a href="/admin/forgot-password" class="forgot">{{ get_text('forgot_password_link', lang) }}</a>
     </div>
+
     <script>
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.has('error')) {

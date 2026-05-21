@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>แจ้งซ่อม - SukAnan Apartment</title>
+    <title>{{ get_text('repairs', lang) }} - Roomy</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body { font-family: sans-serif; padding: 20px; background: #f4f4f4; }
@@ -19,7 +19,7 @@
 <body>
     <div class="card">
         <div class="header">
-            <h2>แจ้งซ่อมห้อง {{ room_number }}</h2>
+            <h2>{{ get_text('repair_room_title', lang) }} {{ room_number }}</h2>
         </div>
         
         <form id="repair-form" enctype="multipart/form-data">
@@ -27,26 +27,26 @@
             <input type="hidden" name="room_id" value="{{ room_id }}">
             
             <div class="form-group">
-                <label>หัวข้อการแจ้งซ่อม</label>
-                <input type="text" name="title" placeholder="เช่น ก๊อกน้ำรั่ว, ไฟเสีย" required>
+                <label>{{ get_text('repair_title_label', lang) }}</label>
+                <input type="text" name="title" placeholder="{{ get_text('repair_title_placeholder', lang) }}" required>
             </div>
             
             <div class="form-group">
-                <label>รายละเอียด</label>
-                <textarea name="description" placeholder="ระบุรายละเอียดเพิ่มเติม..." required></textarea>
+                <label>{{ get_text('description', lang) }}</label>
+                <textarea name="description" placeholder="{{ get_text('repair_desc_placeholder', lang) }}" required></textarea>
             </div>
             
             <div class="form-group">
-                <label>แนบรูปถ่าย (ถ้ามี)</label>
+                <label>{{ get_text('repair_photo_label', lang) }}</label>
                 <input type="file" name="image" accept="image/*">
             </div>
             
-            <button type="submit" class="btn">ส่งข้อมูลแจ้งซ่อม</button>
+            <button type="submit" class="btn">{{ get_text('submit_repair', lang) }}</button>
         </form>
         
         <div id="success" class="success-msg">
-            <h3>ส่งข้อมูลสำเร็จ!</h3>
-            <p>เจ้าหน้าที่รับเรื่องแล้ว และจะดำเนินการตรวจสอบโดยเร็ว</p>
+            <h3>{{ get_text('repair_success_title', lang) }}</h3>
+            <p>{{ get_text('repair_success_desc', lang) }}</p>
         </div>
     </div>
 
@@ -56,7 +56,7 @@
             const formData = new FormData(this);
             const btn = this.querySelector('button');
             btn.disabled = true;
-            btn.innerText = 'กำลังส่ง...';
+            btn.innerText = "{{ get_text('sending_label', lang) }}";
 
             try {
                 const response = await fetch('/repair/submit', {
@@ -68,14 +68,14 @@
                     this.style.display = 'none';
                     document.getElementById('success').style.display = 'block';
                 } else {
-                    alert('เกิดข้อผิดพลาด: ' + result.message);
+                    alert('{{ get_text("error", lang) }}: ' + result.message);
                     btn.disabled = false;
-                    btn.innerText = 'ส่งข้อมูลแจ้งซ่อม';
+                    btn.innerText = "{{ get_text('submit_repair', lang) }}";
                 }
             } catch (error) {
-                alert('ไม่สามารถติดต่อเซิร์ฟเวอร์ได้');
+                alert('{{ get_text("connection_error", lang) }}');
                 btn.disabled = false;
-                btn.innerText = 'ส่งข้อมูลแจ้งซ่อม';
+                btn.innerText = "{{ get_text('submit_repair', lang) }}";
             }
         });
     </script>

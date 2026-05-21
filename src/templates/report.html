@@ -837,20 +837,20 @@
                             </button>
                         </td>
                     </tr>
-                `).join('') || '<tr><td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted);">No expenses recorded yet.</td></tr>';
+                `).join('') || `<tr><td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted);">{{ get_text('no_items', lang) }}</td></tr>`;
             } catch (err) {
                 console.error("Load Expenses Error:", err);
                 const body = document.getElementById('expenseTableBody');
-                if (body) body.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #ef4444; padding: 20px;">Unable to load expense data.</td></tr>';
+                if (body) body.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #ef4444; padding: 20px;">{{ get_text('unable_load_expense', lang) }}</td></tr>`;
             }
         }
 
         async function deleteExpense(id) {
-            if (!confirm('Confirm delete?')) return;
+            if (!confirm('{{ get_text("confirm_delete", lang) }}')) return;
             try {
                 const res = await fetch(`/admin/expenses/${id}`, { method: 'DELETE' });
                 if (res.ok) window.location.reload();
-            } catch (e) { alert("Error deleting expense"); }
+            } catch (e) { alert('{{ get_text("error_deleting_expense", lang) }}'); }
         }
 
         const expForm = document.getElementById('expenseForm');
@@ -861,8 +861,8 @@
                 try {
                     const res = await fetch('/admin/expenses', { method: 'POST', body: formData });
                     if (res.ok) window.location.reload();
-                    else alert("Error saving expense");
-                } catch (e) { alert("Network error"); }
+                    else alert('{{ get_text("error_saving_expense", lang) }}');
+                } catch (e) { alert('{{ get_text("network_error", lang) }}'); }
             };
         }
 

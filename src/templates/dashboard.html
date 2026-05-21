@@ -1898,7 +1898,13 @@
             account_closed_success: "{{ get_text('account_closed_success', lang) }}",
             empty: "{{ get_text('empty', lang) }}",
             save_lease_template_success: "{{ get_text('save_lease_template_success', lang) }}",
-            no_building_data: "{{ get_text('no_building_data', lang) }}"
+            no_building_data: "{{ get_text('no_building_data', lang) }}",
+            error: "{{ get_text('error', lang) }}",
+            success: "{{ get_text('success', lang) }}",
+            upload_failed: "{{ get_text('upload_failed', lang) }}",
+            fetch_error: "{{ get_text('fetch_error', lang) }}",
+            connection_error: "{{ get_text('connection_error', lang) }}",
+            failed_to_send: "{{ get_text('failed_to_send', lang) }}"
         };
 
         function setLanguage(lang) {
@@ -2276,7 +2282,7 @@
                 const res = await fetch(`/admin/tenants/${tenantId}/send-line`, { method: 'POST', body: formData });
                 const data = await res.json();
                 if (res.ok) { alert(translations.send_message_success); }
-                else { alert('Error: ' + (data.detail || 'Failed to send')); }
+                else { alert(translations.error + ': ' + (data.detail || translations.failed_to_send)); }
             } catch (err) { alert(translations.load_error + ': ' + err); }
         }
 
@@ -2491,7 +2497,7 @@
                 list.innerHTML = html;
                 document.getElementById('ip_total_amount').innerText = `${total.toLocaleString()} ${translations.currency_baht}`;
                 document.getElementById('initialPaymentModal').style.display = 'block';
-            } catch (err) { alert('Error: ' + err); }
+            } catch (err) { alert(translations.error + ': ' + err); }
         }
 
         document.getElementById('initialPaymentForm').onsubmit = async (e) => {
@@ -2851,7 +2857,7 @@
                         <p style="font-size:0.8em; color:var(--text-muted); text-align:center; margin-top:15px; font-style:italic;">${translations.preliminary_calculation_note}</p>
                     </div>`;
                 document.getElementById('invoiceDetailModal').style.display = 'block';
-            } catch (err) { alert('Error: ' + err); }
+            } catch (err) { alert(translations.error + ': ' + err); }
         }
 
         async function submitMeter(isIssue) {

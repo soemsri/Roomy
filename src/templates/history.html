@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="th">
+<html lang="{{ lang or 'th' }}">
 <head>
     <meta charset="UTF-8">
-    <title>ประวัติการชำระเงิน - SukAnan Apartment</title>
+    <title>{{ get_text('history_title', lang) }} - Roomy</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -82,22 +82,22 @@
 <body>
     <div class="container">
         <div class="header">
-            <h2><i class="fa-solid fa-clock-rotate-left" style="color: #0078d4; margin-right: 10px;"></i>ประวัติห้อง {{ tenant.room.room_number }}</h2>
+            <h2><i class="fa-solid fa-clock-rotate-left" style="color: #0078d4; margin-right: 10px;"></i>{{ get_text('history_room_title', lang) }} {{ tenant.room.room_number }}</h2>
         </div>
 
         {% for inv in invoices %}
         <a href="/bill/{{ inv.uuid }}" style="text-decoration: none; color: inherit;">
             <div class="card">
                 <div class="card-top">
-                    <div class="period">เดือน {{ inv.billing_month }}/{{ inv.billing_year }}</div>
+                    <div class="period">{{ get_text('month_label', lang) }} {{ inv.billing_month }}/{{ inv.billing_year }}</div>
                     {% if inv.status == 'Paid' %}
-                        <span class="status-badge status-paid"><i class="fa-solid fa-check"></i> ชำระแล้ว</span>
+                        <span class="status-badge status-paid"><i class="fa-solid fa-check"></i> {{ get_text('status_paid', lang) }}</span>
                     {% elif inv.status == 'Unpaid' %}
-                        <span class="status-badge status-unpaid">ค้างชำระ</span>
+                        <span class="status-badge status-unpaid">{{ get_text('status_unpaid', lang) }}</span>
                     {% elif inv.status == 'Pending Verification' %}
-                        <span class="status-badge status-pending">รอตรวจสอบ</span>
+                        <span class="status-badge status-pending">{{ get_text('status_pending', lang) }}</span>
                     {% elif inv.status == 'Draft' %}
-                        <span class="status-badge status-draft">ฉบับร่าง</span>
+                        <span class="status-badge status-draft">{{ get_text('status_draft', lang) }}</span>
                     {% else %}
                         <span class="status-badge status-draft">{{ inv.status }}</span>
                     {% endif %}
@@ -105,7 +105,7 @@
                 <div class="card-bottom">
                     <div class="amount">฿{{ "{:,.2f}".format(inv.total_amount) }}</div>
                     <div class="btn-view">
-                        ดูบิล <i class="fa-solid fa-chevron-right" style="font-size: 0.8em;"></i>
+                        {{ get_text('view_bill', lang) }} <i class="fa-solid fa-chevron-right" style="font-size: 0.8em;"></i>
                     </div>
                 </div>
             </div>
@@ -113,8 +113,8 @@
         {% else %}
         <div class="empty-state">
             <i class="fa-solid fa-receipt"></i>
-            <p>ยังไม่มีประวัติการชำระเงิน</p>
-            <p style="font-size: 0.85em; margin-top: 5px; color: #8a8d91;">เมื่อมีการออกใบแจ้งหนี้ รายการจะแสดงที่นี่</p>
+            <p>{{ get_text('no_history', lang) }}</p>
+            <p style="font-size: 0.85em; margin-top: 5px; color: #8a8d91;">{{ get_text('history_empty_note', lang) }}</p>
         </div>
         {% endfor %}
     </div>
