@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+sqlalchemy
+line-bot-sdk
+passlib
+cryptography
+python-dotenv
+requests
+python-multipart
+jinja2
+pillow
+pytest
