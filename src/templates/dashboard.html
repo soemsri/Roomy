@@ -386,7 +386,10 @@
         <div class="menu-section" style="margin-top: auto;">
             <div class="menu-label">System</div>
             <a href="#settingsSection" class="menu-item"><i class="fa-solid fa-gears"></i> <span>{{ get_text('settings', lang) }}</span></a>
-            <a href="/admin/logout" class="menu-item" style="color: #ef4444;"><i class="fa-solid fa-right-from-bracket"></i> <span>{{ get_text('logout', lang) }}</span></a>
+            <a href="javascript:void(0)" onclick="if(confirm('{{ get_text('confirm_logout', lang) or 'Logout?' }}')) document.getElementById('logout-form').submit();" class="menu-item" style="color: #ef4444;">
+                <i class="fa-solid fa-right-from-bracket"></i> <span>{{ get_text('logout', lang) }}</span>
+            </a>
+            <form id="logout-form" action="/admin/logout" method="POST" style="display: none;"></form>
         </div>
     </aside>
 

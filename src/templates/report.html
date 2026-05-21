@@ -256,7 +256,10 @@
         <div class="menu-section">
             <div class="menu-label">Settings</div>
             <a href="/admin/dashboard#settingsSection" class="menu-item"><i class="fa-solid fa-sliders"></i> {{ get_text('configuration', lang) }}</a>
-            <a href="/admin/logout" class="menu-item" style="color: #ef4444;"><i class="fa-solid fa-arrow-right-from-bracket"></i> {{ get_text('logout', lang) }}</a>
+            <a href="javascript:void(0)" onclick="if(confirm('{{ get_text('confirm_logout', lang) or 'Logout?' }}')) document.getElementById('logout-form').submit();" class="menu-item" style="color: #ef4444;">
+                <i class="fa-solid fa-arrow-right-from-bracket"></i> {{ get_text('logout', lang) }}
+            </a>
+            <form id="logout-form" action="/admin/logout" method="POST" style="display: none;"></form>
         </div>
     </aside>
 

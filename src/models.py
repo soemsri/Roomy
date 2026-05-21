@@ -12,6 +12,7 @@ class Owner(Base):
     line_user_id = Column(String, unique=True, index=True, nullable=False)
     display_name = Column(String)
     password_hash = Column(String) # For admin login
+    session_token = Column(String, unique=True, index=True) # Secure random session token
     pairing_code = Column(String, unique=True, index=True) # Temporary code to link LINE
     magic_token = Column(String, unique=True, index=True) # For auto-login from LINE
     magic_token_expires = Column(DateTime)

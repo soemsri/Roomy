@@ -5,6 +5,7 @@ import requests
 import csv
 import io
 import json
+import secrets
 import warnings
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
@@ -910,9 +911,8 @@ def get_admin(request: Request, db: Session = Depends(get_db)):
     if not admin_session:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    # Check if the session is the hashed password of the owner
-    owner = db.query(models.Owner).first()
-    if not owner or admin_session != owner.password_hash:
+    owner = db.query(models.Owner).filter(models.Owner.session_token == admin_session).first()
+    if not owner:
         raise HTTPException(status_code=401, detail="Unauthorized")
     return True
 
@@ -940,10 +940,20 @@ async def admin_login(request: Request, password: str = Form(...), db: Session =
         if attempt:
             attempt.attempts = 0
             attempt.locked_until = None
-            db.commit()
+        
+        # Generate secure session token
+        token = secrets.token_hex(32)
+        owner.session_token = token
+        db.commit()
             
         response = RedirectResponse(url="/admin/dashboard", status_code=303)
-        response.set_cookie(key="admin_session", value=owner.password_hash, httponly=True)
+        response.set_cookie(
+            key="admin_session", 
+            value=token, 
+            httponly=True, 
+            secure=True, 
+            samesite="lax"
+        )
         return response
     
     # Increment attempts on failure
@@ -962,8 +972,15 @@ async def admin_login(request: Request, password: str = Form(...), db: Session =
         
     return RedirectResponse(url="/admin/login?error=1", status_code=303)
 
-@app.get("/admin/logout")
-async def admin_logout():
+@app.post("/admin/logout")
+async def admin_logout(request: Request, db: Session = Depends(get_db)):
+    admin_session = request.cookies.get("admin_session")
+    if admin_session:
+        owner = db.query(models.Owner).filter(models.Owner.session_token == admin_session).first()
+        if owner:
+            owner.session_token = None
+            db.commit()
+            
     response = RedirectResponse(url="/admin/login", status_code=303)
     response.delete_cookie("admin_session")
     return response
@@ -2521,10 +2538,21 @@ async def magic_login(request: Request, token: str, db: Session = Depends(get_db
     if query_string:
         target_url += "?" + query_string
     
-    # Set session cookie (use the password hash as session token)
-    response = RedirectResponse(url=target_url, status_code=303)
-    response.set_cookie(key="admin_session", value=owner.password_hash, httponly=True)
+    # Generate secure session token
+    token = secrets.token_hex(32)
+    owner.session_token = token
+    owner.magic_token = None # Clear magic token after use
+    db.commit()
     
+    # Set session cookie
+    response = RedirectResponse(url=target_url, status_code=303)
+    response.set_cookie(
+        key="admin_session", 
+        value=token, 
+        httponly=True, 
+        secure=True, 
+        samesite="lax"
+    )
     return response
 
 # Helper for LINE Bot to generate magic links
