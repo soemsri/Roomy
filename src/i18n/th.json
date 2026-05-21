@@ -450,6 +450,7 @@
     "save_status_success": "อัปเดตสถานะเรียบร้อยแล้ว",
     "save_status_error": "เกิดข้อผิดพลาดในการอัปเดตสถานะ",
     "send_message_prompt": "พิมพ์ข้อความที่ต้องการส่งถึง",
+    "send_message_success": "ส่งข้อความเรียบร้อยแล้ว",
     "admin_login_title": "เข้าสู่ระบบ (Admin)",
     "admin_password_placeholder": "รหัสผ่าน Admin",
     "login_btn": "เข้าสู่ระบบ",
@@ -462,5 +463,6 @@
     "new_password_placeholder": "รหัสผ่านใหม่",
     "confirm_password_placeholder": "ยืนยันรหัสผ่าน",
     "update_password_btn": "อัปเดตรหัสผ่าน",
-    "login_locked": "เข้าสู่ระบบผิดพลาดเกินกำหนด กรุณารออีก {wait} นาที"
+    "login_locked": "เข้าสู่ระบบผิดพลาดเกินกำหนด กรุณารออีก {wait} นาที",
+    "confirm_logout": "คุณต้องการออกจากระบบใช่หรือไม่?"
 }

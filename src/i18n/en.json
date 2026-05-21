@@ -450,6 +450,7 @@
     "save_status_success": "Status updated successfully",
     "save_status_error": "Error updating status",
     "send_message_prompt": "Type message to send to",
+    "send_message_success": "Message sent successfully",
     "admin_login_title": "Admin Login",
     "admin_password_placeholder": "Admin Password",
     "login_btn": "Login",
@@ -458,5 +459,6 @@
     "request_reset_link_btn": "Request Reset Link",
     "back_to_login": "Back to Login",
     "sent": "Sent!",
-    "login_locked": "Too many failed attempts. Please wait {wait} minutes."
+    "login_locked": "Too many failed attempts. Please wait {wait} minutes.",
+    "confirm_logout": "Are you sure you want to logout?"
 }

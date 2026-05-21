@@ -450,6 +450,7 @@
     "save_status_success": "ステータスが更新されました",
     "save_status_error": "ステータス更新中にエラーが発生しました",
     "send_message_prompt": "送信先へのメッセージを入力",
+    "send_message_success": "メッセージを送信しました",
     "admin_login_title": "管理者ログイン",
     "admin_password_placeholder": "管理者パスワード",
     "login_btn": "ログイン",
@@ -458,5 +459,6 @@
     "request_reset_link_btn": "リセットリンクをリクエスト",
     "back_to_login": "ログインに戻る",
     "sent": "送信しました！",
-    "login_locked": "ログイン試行回数が制限を超えました。{wait} 分後にもう一度お試しください。"
+    "login_locked": "ログイン試行回数が制限を超えました。{wait} 分後にもう一度お試しください。",
+    "confirm_logout": "ログアウトしてもよろしいですか？"
 }
