@@ -17,7 +17,7 @@
    - ระบบห้อง: ผังห้อง, สถานะ ว่าง/จอง/มีคนอยู่, ประวัติผู้เช่า
    - ระบบการเงิน: คำนวณค่าน้ำไฟแบบมิเตอร์, ค่าปรับล่าช้า, รายรับรายจ่าย, export รายงาน
    - แจ้งเตือน: บิลออก, ใกล้ครบกำหนดจ่าย, งานซ่อมเสร็จ
-   - Tech stack: LINE OA + Backend Python + Database SQLite + Line Notify
+   - Tech stack: LINE OA + Backend Python + Database SQLite + LINE Messaging API
 
 5. อธิบาย Process การทำงานของอพาร์ทเม้นต์
  5.1 การ map LINE user กับระบบ
