@@ -1365,7 +1365,7 @@
                         <input type="text" id="asset_name" name="name" placeholder="{{ get_text('asset_name_placeholder', lang) if get_text('asset_name_placeholder', lang) != 'asset_name_placeholder' else 'Item Name' }}" required style="flex:2;">
                         <input type="number" id="asset_qty" name="quantity" value="1" style="width: 80px;">
                         <label style="display:flex; align-items:center; gap:5px; margin:0; cursor:pointer; font-size:0.8em;">
-                            <input type="checkbox" id="asset_to_all" style="width:16px; height:16px;"> {{ get_text('all_buildings', lang) if get_text('all_buildings', lang) != 'all_buildings' else 'Whole Bldg' }}
+                            <input type="checkbox" id="asset_to_all" style="width:16px; height:16px;"> {{ get_text('all_buildings', lang) }}
                         </label>
                         <button type="submit" class="btn btn-primary">{{ get_text('add', lang) }}</button>
                     </form>
