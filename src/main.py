@@ -196,9 +196,6 @@ async def callback_tenant(request: Request):
     return "OK"
 @admin_handler.add(MessageEvent, message=TextMessage)
 def handle_admin_message(event, *args, **kwargs):
-    # Debug: See what was passed
-    print(f"DEBUG: handle_admin_message called with {len(args)} positional args and {list(kwargs.keys())} keyword args")
-
     # Handle optional arguments from SDK or tests
     destination = args[0] if len(args) > 0 else None
     db = kwargs.get('db')
@@ -378,19 +375,16 @@ def handle_tenant_message(event, *args, **kwargs):
     try:
         tenants = db.query(models.Tenant).filter(models.Tenant.line_user_id == user_id).all()
         active_tenants = [t for t in tenants if t.status == "Active"]
-        print(f"DEBUG: found {len(tenants)} total tenants, {len(active_tenants)} active tenants")
         
         # 1. Handle Language Switching commands (Global)
         if text.lower() in ["language", "lang", "ภาษา", "เปลี่ยนภาษา"]:
             reply_text = "Please choose your language / กรุณาเลือกภาษา:\n\nType 'TH' for Thai\nType 'EN' for English\nType 'JP' for Japanese"
         elif text.upper() in ["TH", "EN", "JP"]:
             new_lang = text.lower()
-            print(f"DEBUG: Switching language to {new_lang} for {len(tenants)} tenants")
             # Update language for ALL tenant records (active, pending, etc.) associated with this LINE ID
             for t in tenants:
                 t.language = new_lang
             db.commit()
-            print("DEBUG: DB committed")
             
             # Refresh rich menu with new language
             if active_tenants:
