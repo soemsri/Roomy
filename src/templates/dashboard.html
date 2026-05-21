@@ -2210,9 +2210,11 @@
                         <td>${m.water}</td>
                         <td><span class="badge ${m.invoice_status === 'Paid' ? 'badge-success' : 'badge-warning'}">${m.invoice_status}</span></td>
                         <td>
+                            ${m.invoice_id ? `
                             <button class="btn btn-outline" style="padding: 5px 10px;" onclick="viewInvoiceDetails(${m.invoice_id})">
                                 <i class="fa-solid fa-eye"></i> {{ get_text('details', lang) }}
                             </button>
+                            ` : '-'}
                         </td>
                     </tr>
                 `).join('');
@@ -2891,7 +2893,11 @@
             document.getElementById('invoiceDetailModal').style.display = 'block';
             body.innerHTML = `<p style="text-align:center;"><i class="fa-solid fa-spinner fa-spin"></i> ${translations.loading}</p>`;
             try {
-                const res = await fetch(`/admin/invoice/${id}/details`); const d = await res.json();
+                const res = await fetch(`/admin/invoice/${id}/details`); 
+                const d = await res.json();
+                if (!res.ok) {
+                    throw new Error(d.detail || `Server error: ${res.status}`);
+                }
                 const ocHtml = (d.other_charges || []).map(c => `<div style="display:flex; justify-content:space-between; font-size:0.9em; margin-bottom:5px; color:var(--text-muted);"><span>${c.description}</span><span>${parseFloat(c.amount).toLocaleString()} บาท</span></div>`).join('');
                 body.innerHTML = `
                     <div style="background:#f8f9fa; padding:20px; border-radius:12px; margin-bottom:20px;">
@@ -2910,7 +2916,7 @@
                     </div>
                     <div style="display:flex; justify-content:space-between; font-size:1.2em; font-weight:700; color:var(--primary);"><span>{{ get_text('total', lang) }}</span><span>${d.total.toLocaleString()} บาท</span></div>
                     ${d.paid_at ? `<div style="margin-top:20px; font-size:0.85em; color:var(--success); border-top:1px dashed var(--border); padding-top:15px;"><i class="fa-solid fa-check-circle"></i> {{ get_text('paid_on', lang) if get_text('paid_on', lang) != 'paid_on' else 'Paid at' }}: ${d.paid_at}${d.receipt_img ? `<br><a href="${d.receipt_img}" target="_blank" style="color:var(--primary); text-decoration:underline;">[ ${translations.view_slip} ]</a>` : ''}</div>` : ''}`;
-            } catch (err) { body.innerHTML = `<p style="color:var(--danger);">${translations.load_error}</p>`; }
+            } catch (err) { body.innerHTML = `<p style="color:var(--danger);">${translations.load_error}: ${err.message}</p>`; }
         }
 
         async function cancelInvoice(id) { if(confirm(translations.cancel_confirm)) { await fetch(`/admin/invoice/${id}/cancel`, {method:'POST'}); location.reload(); } }

@@ -3309,6 +3309,7 @@ async def get_meter_history(room_id: int = None, page: int = 1, page_size: int =
             "electricity": r.electricity_reading,
             "water": r.water_reading,
             "recorded_at": r.recorded_at.strftime("%d/%m/%Y %H:%M"),
+            "invoice_id": invoice.id if invoice else None,
             "invoice_status": invoice.status if invoice else "No Invoice"
         })
         
