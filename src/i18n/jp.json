@@ -150,6 +150,7 @@
     "recurring_label": "共益費/固定費 (部屋管理で設定)",
     "month_year_label": "月/年",
     "select_building_label": "建物商標",
+    "select_building_placeholder": "-- 建物を選択してください --",
     "bulk_meter_instruction": "建物を選択して入力を開始してください",
     "all_buildings": "全棟",
     "room_search_placeholder": "部屋番号またはテナント名で検索...",

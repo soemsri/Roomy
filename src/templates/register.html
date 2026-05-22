@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ get_text('register_title', lang) }} - SukAnan Apartment</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <style>
         :root {
             --primary: #2563eb;
@@ -113,7 +114,7 @@
                 </div>
                 <div class="form-group">
                     <label>{{ get_text('move_in_date', lang) }}</label>
-                    <input type="date" id="requested_move_in_date" required>
+                    <input type="text" id="requested_move_in_date" required readonly style="background: white; cursor: pointer;">
                 </div>
                 <div class="form-group">
                     <label>{{ get_text('language_label', lang) }}</label>
@@ -133,8 +134,20 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    {% if lang == 'th' %}<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/th.js"></script>{% endif %}
+    {% if lang == 'jp' %}<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ja.js"></script>{% endif %}
     <script>
         const tenant_uuid = "{{ tenant_uuid }}";
+        const lang = "{{ lang or 'th' }}";
+
+        // Initialize Flatpickr
+        flatpickr("#requested_move_in_date", {
+            dateFormat: "Y-m-d",
+            defaultDate: new Date(),
+            locale: lang === 'th' ? 'th' : (lang === 'jp' ? 'ja' : 'default'),
+            disableMobile: "true"
+        });
 
         document.getElementById('regForm').onsubmit = async (e) => {
             e.preventDefault();

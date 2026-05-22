@@ -150,6 +150,7 @@
     "recurring_label": "ค่าใช้จ่ายส่วนกลาง/คงที่ (ตั้งค่าที่หน้าจัดการห้องพัก)",
     "month_year_label": "เดือน/ปี",
     "select_building_label": "เลือกตึก",
+    "select_building_placeholder": "-- กรุณาเลือกตึก --",
     "bulk_meter_instruction": "กรุณาเลือกอาคารเพื่อเริ่มกรอกข้อมูล",
     "all_buildings": "ทั้งตึก",
     "room_search_placeholder": "ค้นหาเลขห้อง หรือ ชื่อผู้เช่า...",

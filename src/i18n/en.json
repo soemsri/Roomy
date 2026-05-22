@@ -150,6 +150,7 @@
     "recurring_label": "Recurring/Global Charges (Set in Room Management)",
     "month_year_label": "Month/Year",
     "select_building_label": "Select Building",
+    "select_building_placeholder": "-- Please select building --",
     "bulk_meter_instruction": "Please select a building to start recording",
     "all_buildings": "Whole Bldg",
     "room_search_placeholder": "Search room number or tenant name...",

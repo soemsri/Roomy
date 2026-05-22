@@ -500,7 +500,6 @@
                     <thead>
                         <tr>
                             <th>{{ get_text('full_name', lang) }}</th>
-                            <th>{{ get_text('id_number', lang) }}</th>
                             <th>{{ get_text('phone', lang) }}</th>
                             <th>{{ get_text('move_in_date', lang) }}</th>
                             <th>{{ get_text('building', lang) }}</th>
@@ -512,7 +511,6 @@
                         {% for p in pending_registrations %}
                         <tr>
                             <td style="font-weight: 600;">{{ p.full_name or 'N/A' }}</td>
-                            <td>{{ p.citizen_id or '-' }}</td>
                             <td>{{ p.phone_number or 'N/A' }}</td>
                             <td>
                                 {% if p.requested_move_in_date %}
@@ -1911,7 +1909,11 @@
             upload_failed: "{{ get_text('upload_failed', lang) }}",
             fetch_error: "{{ get_text('fetch_error', lang) }}",
             connection_error: "{{ get_text('connection_error', lang) }}",
-            failed_to_send: "{{ get_text('failed_to_send', lang) }}"
+            failed_to_send: "{{ get_text('failed_to_send', lang) }}",
+            floor: "{{ get_text('floor', lang) }}",
+            select_building_placeholder: "{{ get_text('select_building_placeholder', lang) }}",
+            no_rooms_available: "{{ get_text('no_rooms_available', lang) }}",
+            room_label: "{{ get_text('room', lang) }}"
         };
 
         function setLanguage(lang) {
