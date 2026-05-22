@@ -17,6 +17,7 @@ class Owner(Base):
     magic_token = Column(String, unique=True, index=True) # For auto-login from LINE
     magic_token_expires = Column(DateTime)
     magic_link_duration_min = Column(Integer, default=5) # Duration of magic link in minutes
+    language = Column(String, default="th") # th, en, jp
     promptpay_config = Column(Text, default='[]')
     promptpay_name = Column(String)
     bank_config = Column(Text, default='[]') # JSON: [{"id": "...", "bank": "...", "account": "...", "name": "...", "qr": "..."}]

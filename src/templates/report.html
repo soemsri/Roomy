@@ -366,20 +366,20 @@
                         <div class="input-group">
                             <label>{{ get_text('category', lang) }}</label>
                             <select name="category" required>
-                                <option value="Common Area">Common Area (ค่าส่วนกลาง)</option>
-                                <option value="Maintenance">Maintenance (ค่าซ่อมบำรุง)</option>
-                                <option value="Salary">Salary (เงินเดือน)</option>
-                                <option value="Utility">Utility (ค่าน้ำไฟหลวง)</option>
-                                <option value="Marketing">Marketing (ค่าการตลาด)</option>
-                                <option value="Other">Other (อื่นๆ)</option>
+                                <option value="Common Area">{{ get_text('common_fee', lang) }}</option>
+                                <option value="Maintenance">{{ get_text('maintenance_fee', lang) }}</option>
+                                <option value="Salary">{{ get_text('salary_label', lang) }}</option>
+                                <option value="Utility">{{ get_text('utility_fee', lang) }}</option>
+                                <option value="Marketing">{{ get_text('marketing_fee', lang) }}</option>
+                                <option value="Other">{{ get_text('other', lang) }}</option>
                             </select>
                         </div>
                         <div class="input-group">
-                            <label>Amount (THB)</label>
+                            <label>{{ get_text('amount_baht', lang) or 'Amount (THB)' }}</label>
                             <input type="number" name="amount" step="0.01" required placeholder="0.00">
                         </div>
                         <div class="input-group">
-                            <label>Billing Period (Month/Year)</label>
+                            <label>{{ get_text('billing_period', lang) or 'Billing Period' }} (Month/Year)</label>
                             <div style="display: flex; gap: 8px;">
                                 <input type="number" name="month" value="{{ now.month if now else 5 }}" min="1" max="12">
                                 <input type="number" name="year" value="{{ now.year if now else 2026 }}">
@@ -388,11 +388,11 @@
                     </div>
                     <div class="input-group">
                         <label>{{ get_text('description', lang) }}</label>
-                        <input type="text" name="description" placeholder="Notes for this expense...">
+                        <input type="text" name="description" placeholder="{{ get_text('expense_note_placeholder', lang) or 'Notes for this expense...' }}">
                     </div>
                     <div style="display: flex; gap: 12px; justify-content: flex-end;">
-                        <button type="button" class="btn btn-secondary" onclick="toggleExpenseForm()">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Save Expense</button>
+                        <button type="button" class="btn btn-secondary" onclick="toggleExpenseForm()">{{ get_text('cancel', lang) }}</button>
+                        <button type="submit" class="btn btn-primary">{{ get_text('save_expense_btn', lang) or 'Save Expense' }}</button>
                     </div>
                 </form>
             </div>

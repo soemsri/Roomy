@@ -275,14 +275,15 @@ def handle_admin_message(event, *args, **kwargs):
         
     reply_text = ""
     try:
-        # Check for pairing code FIRST if not already linked or even if linked (to re-pair)
+        # Check for pairing code FIRST
         if text.isdigit() and len(text) == 6:
             owner_by_code = db.query(models.Owner).filter(models.Owner.pairing_code == text).first()
             if owner_by_code:
                 owner_by_code.line_user_id = user_id
-                owner_by_code.pairing_code = None # Clear after use
+                owner_by_code.pairing_code = None 
                 db.commit()
-                reply_text = "✅ เชื่อมต่อบัญชี LINE Admin เรียบร้อยแล้ว! คุณสามารถใช้ฟีเจอร์แจ้งเตือนและรีเซ็ตรหัสผ่านได้แล้วครับ"
+                lang = owner_by_code.language or "th"
+                reply_text = get_text('admin_connected_success', lang)
                 if admin_bot_api:
                     admin_bot_api.reply_message(
                         ReplyMessageRequest(
@@ -293,14 +294,16 @@ def handle_admin_message(event, *args, **kwargs):
                 return
 
         owner = db.query(models.Owner).filter(models.Owner.line_user_id == user_id).first()
+        lang = owner.language if owner else "th"
+
         if not owner:
             if not db.query(models.Owner).first():
                 owner = models.Owner(line_user_id=user_id, display_name="Owner")
                 db.add(owner)
                 db.commit()
-                reply_text = "ยินดีด้วย! คุณได้รับการลงทะเบียนเป็นเจ้าของระบบใน Admin Channel เรียบร้อยแล้ว"
+                reply_text = get_text('owner_registered_success', lang)
             else:
-                reply_text = "ขออภัย คุณไม่ได้รับอนุญาตให้ใช้ Admin Channel นี้"
+                reply_text = get_text('unauthorized_admin', lang)
         else:
             if text.startswith("APPROVE_REG_") or text.startswith("REJECT_REG_"):
                 parts = text.split("_")
@@ -315,44 +318,44 @@ def handle_admin_message(event, *args, **kwargs):
                             db.commit()
 
                             if success_rooms:
-                                reply_text = f"อนุมัติผู้เช่าห้อง {room.room_number} เรียบร้อย\n\nอย่าลืมจดมิเตอร์น้ำและไฟฟ้าแรกเข้าด้วยนะครับ"
+                                reply_text = get_text('approve_tenant_success', lang).format(room=room.room_number)
                                 if tenant_bot_api:
                                     try:
                                         send_initial_payment_flex(target_tenant, success_rooms, g_deposit, g_advance, g_other, g_total, owner, tenant_bot_api)
                                     except Exception as e:
                                         logger.error(f"Failed to notify tenant from LINE: {e}")
                             else:
-                                reply_text = f"ไม่สามารถอนุมัติห้อง {room.room_number} ได้ (ห้องอาจไม่ว่าง)"
+                                reply_text = get_text('approve_tenant_error', lang).format(room=room.room_number)
                         else:
-                            reply_text = "ไม่พบข้อมูลห้อง"
+                            reply_text = get_text('room_not_found', lang)
                     else: # REJECT_REG_
                         target_tenant.status = "Rejected"
                         target_tenant.current_room_id = None
                         db.commit()
-                        reply_text = "ปฏิเสธการลงทะเบียนเรียบร้อย"
+                        reply_text = get_text('reject_registration_success', lang)
                         if tenant_bot_api:
                             tenant_bot_api.push_message(
                                 PushMessageRequest(
                                     to=target_tenant.line_user_id,
-                                    messages=[TextMessage(text="ขออภัย การลงทะเบียนของคุณถูกปฏิเสธ กรุณาติดต่อเจ้าของหอพัก")]
+                                    messages=[TextMessage(text=get_text('registration_rejected_msg', target_tenant.language or "th"))]
                                 )
                             )
                 else:
-                    reply_text = "ไม่พบข้อมูลผู้เช่า"
+                    reply_text = get_text('tenant_not_found', lang)
 
-            elif text == "ผังห้อง":
+            elif text == "ผังห้อง" or text == get_text('rooms', lang):
                 url = get_magic_url(owner, db)
-                reply_text = f"🏠 ดูผังห้องและจัดการผู้เช่า:\n{url}"
-            elif text == "จดมิเตอร์":
+                reply_text = f"🏠 {get_text('manage_rooms', lang)}:\n{url}"
+            elif text == "จดมิเตอร์" or text == get_text('meter_reading', lang):
                 url_single = get_magic_url(owner, db)
-                url_bulk = url_single + "&mode=bulk" # simple append since get_magic_url has ?token=
+                url_bulk = url_single + "&mode=bulk" 
                 flex_contents = {
                     "type": "bubble",
                     "header": {
                         "type": "box",
                         "layout": "vertical",
                         "contents": [
-                            {"type": "text", "text": "📊 จดมิเตอร์น้ำ-ไฟ", "weight": "bold", "size": "xl", "color": "#FFFFFF"}
+                            {"type": "text", "text": f"📊 {get_text('meter_billing', lang)}", "weight": "bold", "size": "xl", "color": "#FFFFFF"}
                         ],
                         "backgroundColor": "#0078d4",
                         "paddingAll": "20px"
@@ -361,7 +364,7 @@ def handle_admin_message(event, *args, **kwargs):
                         "type": "box",
                         "layout": "vertical",
                         "contents": [
-                            {"type": "text", "text": "เลือกรูปแบบที่ต้องการจดมิเตอร์", "size": "sm", "color": "#888888"},
+                            {"type": "text", "text": get_text('bulk_meter_instruction', lang), "size": "sm", "color": "#888888"},
                             {
                                 "type": "box",
                                 "layout": "vertical",
@@ -374,7 +377,7 @@ def handle_admin_message(event, *args, **kwargs):
                                         "height": "sm",
                                         "action": {
                                             "type": "uri",
-                                            "label": "จดทีละห้อง",
+                                            "label": get_text('single_reading', lang),
                                             "uri": url_single + "#meterSection"
                                         }
                                     },
@@ -385,7 +388,7 @@ def handle_admin_message(event, *args, **kwargs):
                                         "color": "#27ae60",
                                         "action": {
                                             "type": "uri",
-                                            "label": "จดรายอาคาร (แนะนำ)",
+                                            "label": get_text('bulk_reading', lang),
                                             "uri": url_bulk + "#meterSection"
                                         }
                                     }
@@ -399,24 +402,24 @@ def handle_admin_message(event, *args, **kwargs):
                     admin_bot_api.reply_message(
                         ReplyMessageRequest(
                             reply_token=event.reply_token,
-                            messages=[FlexMessage(alt_text="จดมิเตอร์น้ำ-ไฟ", contents=FlexContainer.from_dict(flex_contents))]
+                            messages=[FlexMessage(alt_text=get_text('meter_reading', lang), contents=FlexContainer.from_dict(flex_contents))]
                         )
                     )
                 return
-            elif text == "สรุปรายรับ":
+            elif text == "สรุปรายรับ" or text == get_text('analytics', lang):
                 url = get_magic_url(owner, db)
-                reply_text = f"💰 สรุปรายรับและส่งออกรายงาน:\n{url}#billSection"
-            elif text == "จัดการสัญญา":
+                reply_text = f"💰 {get_text('export_report', lang)}:\n{url}#billSection"
+            elif text == "จัดการสัญญา" or text == get_text('manage_leases', lang):
                 url = get_magic_url(owner, db)
-                reply_text = f"📜 จัดการสัญญาเช่า:\n{url}#leaseSection"
-            elif text == "ตั้งค่า":
+                reply_text = f"📜 {get_text('manage_leases', lang)}:\n{url}#leaseSection"
+            elif text == "ตั้งค่า" or text == get_text('settings', lang):
                 url = get_magic_url(owner, db)
-                reply_text = f"⚙️ ตั้งค่าระบบและพร้อมเพย์:\n{url}#settingsSection"
-            elif text == "รายการแจ้งซ่อม":
+                reply_text = f"⚙️ {get_text('settings', lang)}:\n{url}#settingsSection"
+            elif text == "รายการแจ้งซ่อม" or text == get_text('repairs', lang):
                 url = get_magic_url(owner, db)
-                reply_text = f"🛠️ รายการแจ้งซ่อมจากผู้เช่า:\n{url}#repairSection"
+                reply_text = f"🛠️ {get_text('repair_requests', lang)}:\n{url}#repairSection"
             else:
-                reply_text = "สวัสดีครับเจ้าของหอพัก! กรุณาเลือกเมนูจาก Rich Menu เพื่อดำเนินการ"
+                reply_text = get_text('admin_menu_greeting', lang)
         
         if admin_bot_api and reply_text:
             admin_bot_api.reply_message(ReplyMessageRequest(reply_token=event.reply_token, messages=[TextMessage(text=reply_text)]))
@@ -452,41 +455,37 @@ def handle_tenant_message(event, *args, **kwargs):
     try:
         tenants = db.query(models.Tenant).filter(models.Tenant.line_user_id == user_id).all()
         active_tenants = [t for t in tenants if t.status == "Active"]
-        
+        lang = active_tenants[0].language if active_tenants else (tenants[0].language if tenants else "th")
+
         # 1. Handle Language Switching commands (Global)
         if text.lower() in ["language", "lang", "ภาษา", "เปลี่ยนภาษา"]:
-            reply_text = "Please choose your language / กรุณาเลือกภาษา:\n\nType 'TH' for Thai\nType 'EN' for English\nType 'JP' for Japanese"
+            reply_text = get_text('tenant_language_choose', lang)
         elif text.upper() in ["TH", "EN", "JP"]:
             new_lang = text.lower()
-            # Update language for ALL tenant records (active, pending, etc.) associated with this LINE ID
+            # Update language for ALL tenant records
             for t in tenants:
                 t.language = new_lang
             db.commit()
+            lang = new_lang # Update local lang for the immediate response
             
             # Refresh rich menu with new language
             if active_tenants:
                 setup_personal_rich_menu(active_tenants[0], db, force=True)
             
-            msg_map = {
-                "th": "เปลี่ยนภาษาเป็น ภาษาไทย เรียบร้อยแล้วค่ะ",
-                "en": "Language has been changed to English.",
-                "jp": "言語が日本語に変更されました。"
-            }
-            reply_text = msg_map.get(new_lang, "Success")
+            reply_text = get_text('language_changed', lang)
 
         # 2. If not active at all or specifically asking to register a new room
-        elif text == "ย้ายเข้า" or not active_tenants:
-            # ... (rest of registration logic)
-            # Find a tenant record that is not Active (e.g. Pending or AwaitingRegistration)
+        elif text == "ย้ายเข้า" or text == get_text('move_in', lang) or not active_tenants:
+            # Find a tenant record that is not Active
             tenant = next((t for t in tenants if t.status != "Active"), None)
             
             if not tenant:
-                tenant = models.Tenant(line_user_id=user_id, status="AwaitingRegistration")
+                tenant = models.Tenant(line_user_id=user_id, status="AwaitingRegistration", language=lang)
                 db.add(tenant)
                 db.commit()
                 db.refresh(tenant)
             
-            reg_url = f"{BASE_URL}/register/{tenant.uuid}"
+            reg_url = f"{BASE_URL}/register/{tenant.uuid}?lang={lang}"
             
             # Send as Buttons if possible
             if tenant_bot_api:
@@ -496,37 +495,35 @@ def handle_tenant_message(event, *args, **kwargs):
                     URIAction
                 )
                 buttons_template = ButtonsTemplate(
-                    title='ลงทะเบียนเข้าพัก',
-                    text='ยินดีต้อนรับ! กรุณากดลงทะเบียนสำหรับห้องใหม่ของคุณ',
+                    title=get_text('register_title', lang),
+                    text=get_text('register_welcome_msg', lang),
                     actions=[
-                        URIAction(label='ลงทะเบียนเข้าพัก', uri=reg_url)
+                        URIAction(label=get_text('register_btn_label', lang), uri=reg_url)
                     ]
                 )
                 try:
                     tenant_bot_api.reply_message(
                         ReplyMessageRequest(
                             reply_token=event.reply_token,
-                            messages=[TemplateMessage(alt_text='ลงทะเบียนเข้าพัก', template=buttons_template)]
+                            messages=[TemplateMessage(alt_text=get_text('register_alt_text', lang), template=buttons_template)]
                         )
                     )
                     return
                 except Exception: pass
             
-            reply_text = f"สวัสดีครับ! กรุณาลงทะเบียนเข้าพักที่นี่:\n{reg_url}"
+            reply_text = f"{get_text('hello', lang)}! {get_text('register_welcome_msg', lang)}:\n{reg_url}"
 
         elif active_tenants:
             # Multi-room support
             # Ensure personal rich menu is updated
             setup_personal_rich_menu(active_tenants[0], db)
             
-            if text == "ดูค่าเช่า":
+            if text == "ดูค่าเช่า" or text == get_text('view_bill', lang):
                 messages = []
-                # Use language from the first tenant record
-                lang = active_tenants[0].language or "th"
                 owner = db.query(models.Owner).first()
                 
                 for tenant in active_tenants:
-                    # Robust check: search by room_id if available
+                    # Robust check
                     if tenant.current_room_id:
                         invoice = db.query(models.Invoice).filter(models.Invoice.room_id == tenant.current_room_id).order_by(models.Invoice.id.desc()).first()
                     else:
@@ -542,7 +539,6 @@ def handle_tenant_message(event, *args, **kwargs):
                         }
                         status_text, status_color = status_map.get(invoice.status, (invoice.status, "#3498db"))
                         
-                        # Safety check for missing UUID
                         if not invoice.uuid:
                             invoice.uuid = str(uuid.uuid4())
                             db.commit()
@@ -634,45 +630,45 @@ def handle_tenant_message(event, *args, **kwargs):
                                 ]
                             }
                         }
-                        messages.append(FlexMessage(alt_text=f"Bill - {room_no}", contents=FlexContainer.from_dict(flex_contents)))
+                        messages.append(FlexMessage(alt_text=f"{get_text('bill_title', lang)} - {room_no}", contents=FlexContainer.from_dict(flex_contents)))
                     else:
-                        messages.append(TextMessage(text=f"Room {room_no}: " + get_text('bill_not_issued', lang)))
+                        messages.append(TextMessage(text=get_text('room_label_with_no', lang).format(no=room_no) + ": " + get_text('bill_not_issued', lang)))
 
                 if tenant_bot_api:
-                    # LINE reply_message supports up to 5 messages
-                    tenant_bot_api.reply_message(
-                        ReplyMessageRequest(
-                            reply_token=event.reply_token,
-                            messages=messages[:5]
-                        )
-                    )
+                    tenant_bot_api.reply_message(ReplyMessageRequest(reply_token=event.reply_token, messages=messages[:5]))
                     return
             
-            elif text in ["แจ้งซ่อม", "ประวัติ", "ย้ายออก"]:
+            elif text in ["แจ้งซ่อม", "ประวัติ", "ย้ายออก"] or text in [get_text('repairs', lang), get_text('history', lang), get_text('move_out', lang)]:
+                # Normalize text back to standard commands for internal logic
+                cmd = text
+                if text == get_text('repairs', lang): cmd = "แจ้งซ่อม"
+                elif text == get_text('history', lang): cmd = "ประวัติ"
+                elif text == get_text('move_out', lang): cmd = "ย้ายออก"
+
                 if len(active_tenants) == 1:
                     t = active_tenants[0]
                     room_no = t.room.room_number if t.room else "N/A"
-                    if text == "แจ้งซ่อม":
-                        reply_text = f"แจ้งซ่อมห้อง {room_no}:\n{BASE_URL}/repair/{t.uuid}"
-                    elif text == "ประวัติ":
-                        reply_text = f"ดูประวัติห้อง {room_no}:\n{BASE_URL}/history/{t.uuid}"
+                    if cmd == "แจ้งซ่อม":
+                        reply_text = f"{get_text('repairs', lang)} {get_text('room_label_with_no', lang).format(no=room_no)}:\n{BASE_URL}/repair/{t.uuid}?lang={lang}"
+                    elif cmd == "ประวัติ":
+                        reply_text = f"{get_text('history', lang)} {get_text('room_label_with_no', lang).format(no=room_no)}:\n{BASE_URL}/history/{t.uuid}?lang={lang}"
                     else: # ย้ายออก
-                        reply_text = f"แจ้งย้ายออกห้อง {room_no}:\n{BASE_URL}/move-out/{t.uuid}"
+                        reply_text = f"{get_text('move_out', lang)} {get_text('room_label_with_no', lang).format(no=room_no)}:\n{BASE_URL}/move-out/{t.uuid}?lang={lang}"
                 else:
                     # Multi-room: Show selection menu
                     bubble_contents = []
                     for t in active_tenants:
                         room_no = t.room.room_number if t.room else "N/A"
                         url_map = {
-                            "แจ้งซ่อม": f"{BASE_URL}/repair/{t.uuid}",
-                            "ประวัติ": f"{BASE_URL}/history/{t.uuid}",
-                            "ย้ายออก": f"{BASE_URL}/move-out/{t.uuid}"
+                            "แจ้งซ่อม": f"{BASE_URL}/repair/{t.uuid}?lang={lang}",
+                            "ประวัติ": f"{BASE_URL}/history/{t.uuid}?lang={lang}",
+                            "ย้ายออก": f"{BASE_URL}/move-out/{t.uuid}?lang={lang}"
                         }
                         bubble_contents.append({
                             "type": "button",
                             "style": "secondary",
                             "margin": "sm",
-                            "action": {"type": "uri", "label": f"ห้อง {room_no}", "uri": url_map[text]}
+                            "action": {"type": "uri", "label": get_text('room_label_with_no', lang).format(no=room_no), "uri": url_map[cmd]}
                         })
                     
                     flex_contents = {
@@ -681,7 +677,7 @@ def handle_tenant_message(event, *args, **kwargs):
                             "type": "box",
                             "layout": "vertical",
                             "contents": [
-                                {"type": "text", "text": f"กรุณาเลือกห้องที่ต้องการ {text}", "weight": "bold", "size": "md"},
+                                {"type": "text", "text": get_text('select_room_action', lang).format(action=text), "weight": "bold", "size": "md"},
                                 {"type": "box", "layout": "vertical", "margin": "lg", "contents": bubble_contents}
                             ]
                         }
@@ -690,16 +686,16 @@ def handle_tenant_message(event, *args, **kwargs):
                         tenant_bot_api.reply_message(
                             ReplyMessageRequest(
                                 reply_token=event.reply_token,
-                                messages=[FlexMessage(alt_text=f"เลือกห้องสำหรับ{text}", contents=FlexContainer.from_dict(flex_contents))]
+                                messages=[FlexMessage(alt_text=get_text('select_room_action', lang).format(action=text), contents=FlexContainer.from_dict(flex_contents))]
                             )
                         )
                         return
 
-            elif text == "สนทนา":
-                reply_text = "คุณสามารถพิมพ์ข้อความที่ต้องการสอบถามทิ้งไว้ได้เลยครับ เจ้าหน้าที่จะรีบมาตอบกลับโดยเร็วที่สุด"
+            elif text == "สนทนา" or text == get_text('chat_label', lang):
+                reply_text = get_text('tenant_chat_greeting', lang)
             else:
                 rooms_str = ", ".join([t.room.room_number for t in active_tenants if t.room])
-                reply_text = f"สวัสดีครับ! (ห้อง {rooms_str})\nพิมพ์ 'ดูค่าเช่า', 'แจ้งซ่อม' หรือ 'ประวัติ'"
+                reply_text = get_text('tenant_greeting', lang).format(rooms=rooms_str)
             
         if tenant_bot_api:
             tenant_bot_api.reply_message(ReplyMessageRequest(reply_token=event.reply_token, messages=[TextMessage(text=reply_text)]))
@@ -766,7 +762,7 @@ async def submit_registration(tenant_uuid: str, data: dict, db: Session = Depend
     language = data.get("language", "th")
     
     if not all([full_name, phone_number, citizen_id, requested_move_in_date_str]):
-        raise HTTPException(status_code=400, detail="กรุณากรอกข้อมูลให้ครบถ้วน")
+        raise HTTPException(status_code=400, detail=get_text('error_missing_fields', language))
         
     tenant.full_name = full_name
     tenant.phone_number = phone_number
@@ -779,7 +775,12 @@ async def submit_registration(tenant_uuid: str, data: dict, db: Session = Depend
     # Notify Owner
     owner = db.query(models.Owner).first()
     if owner and owner.line_user_id and admin_bot_api:
-        msg = f"🔔 มีผู้ลงทะเบียนใหม่!\nชื่อ: {full_name}\nเบอร์โทร: {phone_number}\nวันที่เข้าพัก: {requested_move_in_date_str}\nกรุณาเลือกห้องและอนุมัติใน Dashboard"
+        lang = owner.language or "th"
+        msg = get_text('notify_new_registration', lang).format(
+            name=full_name, 
+            phone=phone_number, 
+            date=requested_move_in_date_str
+        )
         try: 
             admin_bot_api.push_message(
                 PushMessageRequest(
@@ -810,7 +811,7 @@ async def submit_move_out(tenant_uuid: str, data: dict, db: Session = Depends(ge
     reason = data.get("reason")
     
     if not requested_date_str:
-        raise HTTPException(status_code=400, detail="กรุณาระบุวันที่ต้องการย้ายออก")
+        raise HTTPException(status_code=400, detail=get_text('error_missing_fields', tenant.language or "th"))
         
     requested_date = datetime.strptime(requested_date_str, "%Y-%m-%d")
     
@@ -826,7 +827,7 @@ async def submit_move_out(tenant_uuid: str, data: dict, db: Session = Depends(ge
             room_id = active_lease.room_id
             tenant.current_room_id = room_id
         else:
-            raise HTTPException(status_code=400, detail="ไม่พบข้อมูลห้องที่ท่านพักอยู่ กรุณาติดต่อเจ้าหน้าที่")
+            raise HTTPException(status_code=400, detail=get_text('error_tenant_unmapped', tenant.language or "th"))
 
     # Prevent duplicate pending requests
     existing_req = db.query(models.MoveOutRequest).filter(
@@ -857,7 +858,12 @@ async def submit_move_out(tenant_uuid: str, data: dict, db: Session = Depends(ge
     # Notify Owner
     owner = db.query(models.Owner).first()
     if owner and owner.line_user_id and admin_bot_api:
-        msg = f"🚪 แจ้งย้ายออกใหม่!\nห้อง: {tenant.room.room_number if tenant.room else 'N/A'}\nชื่อ: {tenant.full_name}\nวันที่ต้องการย้าย: {requested_date.strftime('%d/%m/%Y')}"
+        lang = owner.language or "th"
+        msg = get_text('notify_move_out', lang).format(
+            room=tenant.room.room_number if tenant.room else 'N/A',
+            name=tenant.full_name,
+            date=requested_date.strftime('%d/%m/%Y')
+        )
         try: admin_bot_api.push_message(PushMessageRequest(to=owner.line_user_id, messages=[TextMessage(text=msg)]))
         except Exception: pass
         
@@ -978,7 +984,7 @@ async def upload_slip(
     image: UploadFile = File(...), 
     db: Session = Depends(get_db)
 ):
-    invoice = db.query(models.Invoice).filter(models.Invoice.uuid == invoice_uuid).first()
+    invoice = db.query(models.Invoice).options(joinedload(models.Invoice.room)).filter(models.Invoice.uuid == invoice_uuid).first()
     if not invoice: raise HTTPException(status_code=404, detail="Invoice not found")
     
     # Ensure directory exists
@@ -999,15 +1005,17 @@ async def upload_slip(
     
     # Notify Owner
     room_number = invoice.room.room_number if invoice.room else "N/A"
-    send_line_notify(f"💰 สลิปใหม่: ห้อง {room_number}\nยอด: {invoice.total_amount:,.2f} บาท\nตรวจสอบได้ที่ dashboard")
+    owner = db.query(models.Owner).first()
+    lang = owner.language if owner else "th"
+    send_line_notify(get_text('notify_new_slip', lang).format(room=room_number, amount=f"{invoice.total_amount:,.2f}"))
     
     return {"status": "Success", "receipt": invoice.payment_receipt_img}
 
 @app.get("/repair/{tenant_uuid}", response_class=HTMLResponse)
 async def repair_form(request: Request, tenant_uuid: str, db: Session = Depends(get_db)):
-    lang = request.cookies.get("lang", "th")
     tenant = db.query(models.Tenant).filter(models.Tenant.uuid == tenant_uuid).first()
     if not tenant: raise HTTPException(status_code=404, detail="Tenant not found")
+    lang = request.query_params.get("lang") or tenant.language or "th"
     return templates.TemplateResponse("repair.html", {
         "request": request,
         "tenant_id": tenant.id,
@@ -1018,9 +1026,9 @@ async def repair_form(request: Request, tenant_uuid: str, db: Session = Depends(
 
 @app.get("/history/{tenant_uuid}", response_class=HTMLResponse)
 async def view_history(request: Request, tenant_uuid: str, db: Session = Depends(get_db)):
-    lang = request.cookies.get("lang", "th")
     tenant = db.query(models.Tenant).filter(models.Tenant.uuid == tenant_uuid).first()
     if not tenant: raise HTTPException(status_code=404, detail="Tenant not found")
+    lang = request.query_params.get("lang") or tenant.language or "th"
 
     # Robust check: fetch by room_id so history is complete for the specific room
     if tenant.current_room_id:
@@ -1043,7 +1051,7 @@ def get_admin(request: Request, db: Session = Depends(get_db)):
 
 @app.get("/admin/login", response_class=HTMLResponse)
 async def admin_login_page(request: Request):
-    lang = request.cookies.get("lang", "th")
+    lang = request.cookies.get("lang") or request.query_params.get("lang") or "th"
     error = request.query_params.get("error")
     wait = request.query_params.get("wait")
     return templates.TemplateResponse("login.html", {"request": request, "lang": lang, "error": error, "wait": wait})
@@ -1112,7 +1120,7 @@ async def admin_logout(request: Request, db: Session = Depends(get_db)):
 
 @app.get("/admin/forgot-password", response_class=HTMLResponse)
 async def forgot_password_page(request: Request):
-    lang = request.cookies.get("lang", "th")
+    lang = request.cookies.get("lang") or request.query_params.get("lang") or "th"
     return templates.TemplateResponse("forgot_password.html", {"request": request, "lang": lang})
 @app.post("/admin/forgot-password")
 async def request_password_reset(db: Session = Depends(get_db)):
@@ -1135,8 +1143,9 @@ async def request_password_reset(db: Session = Depends(get_db)):
     
     # Send LINE message
     if admin_bot_api:
-        reset_link = f"{BASE_URL}/admin/reset-password?token={token}"
-        message = f"คุณได้ทำการขอรีเซ็ตรหัสผ่าน Admin\n\nกรุณากดลิงก์ด้านล่างเพื่อตั้งรหัสผ่านใหม่ (ลิงก์มีอายุ 5 นาที):\n{reset_link}"
+        lang = owner.language or "th"
+        reset_link = f"{BASE_URL}/admin/magic-login?token={token}&redirect=/admin/reset-password"
+        message = get_text('reset_link_msg', lang).format(link=reset_link)
         try:
             admin_bot_api.push_message(
                 PushMessageRequest(
@@ -1148,42 +1157,50 @@ async def request_password_reset(db: Session = Depends(get_db)):
             logger.error(f"Error sending reset link: {e}")
             return {"error": "Failed to send LINE message."}
             
-    return {"message": "ส่งลิงก์รีเซ็ตรหัสผ่านไปยัง LINE Admin แล้ว"}
+    return {"message": get_text('reset_link_sent', lang)}
 
 @app.get("/admin/reset-password", response_class=HTMLResponse)
-async def reset_password_page(request: Request, token: str, db: Session = Depends(get_db)):
-    from datetime import datetime
-    reset_token = db.query(models.PasswordResetToken).filter(
-        models.PasswordResetToken.token == token,
-        models.PasswordResetToken.used == 0,
-        models.PasswordResetToken.expires_at > datetime.now()
-    ).first()
+async def reset_password_page(request: Request, token: str = None, db: Session = Depends(get_db)):
+    owner = db.query(models.Owner).first()
+    lang = owner.language if owner else "th"
     
-    if not reset_token:
-        return HTMLResponse(content="<h2>ลิงก์หมดอายุหรือไม่ถูกต้อง</h2>", status_code=400)
+    if token:
+        # Check token validity
+        from datetime import datetime
+        reset_token = db.query(models.PasswordResetToken).filter(
+            models.PasswordResetToken.token == token,
+            models.PasswordResetToken.used == 0,
+            models.PasswordResetToken.expires_at > datetime.now()
+        ).first()
+        
+        if not reset_token:
+            return HTMLResponse(content=f"<h2>{get_text('link_expired', lang)}</h2>", status_code=400)
     
-    return templates.TemplateResponse("reset_password.html", {"request": request, "token": token})
+    return templates.TemplateResponse("reset_password.html", {"request": request, "token": token, "lang": lang})
 
 @app.post("/admin/reset-password")
-async def reset_password(token: str = Form(...), new_password: str = Form(...), db: Session = Depends(get_db)):
-    from datetime import datetime
-    reset_token = db.query(models.PasswordResetToken).filter(
-        models.PasswordResetToken.token == token,
-        models.PasswordResetToken.used == 0,
-        models.PasswordResetToken.expires_at > datetime.now()
-    ).first()
-    
-    if not reset_token:
-        return HTMLResponse(content="<h2>ลิงก์หมดอายุหรือไม่ถูกต้อง</h2>", status_code=400)
-    
+async def reset_password(token: str = Form(None), new_password: str = Form(...), db: Session = Depends(get_db)):
     owner = db.query(models.Owner).first()
+    lang = owner.language if owner else "th"
+
+    if token:
+        from datetime import datetime
+        reset_token = db.query(models.PasswordResetToken).filter(
+            models.PasswordResetToken.token == token,
+            models.PasswordResetToken.used == 0,
+            models.PasswordResetToken.expires_at > datetime.now()
+        ).first()
+        
+        if not reset_token:
+            return HTMLResponse(content=f"<h2>{get_text('link_expired', lang)}</h2>", status_code=400)
+        reset_token.used = 1
+
     if owner:
         owner.password_hash = security.hash_password(new_password)
-        reset_token.used = 1
         db.commit()
         return RedirectResponse(url="/admin/login?reset_success=1", status_code=303)
     
-    return HTMLResponse(content="<h2>เกิดข้อผิดพลาดในการรีเซ็ตรหัสผ่าน</h2>", status_code=500)
+    return HTMLResponse(content=f"<h2>{get_text('reset_error', lang)}</h2>", status_code=500)
 
 @app.post("/admin/generate-pairing-code")
 async def generate_pairing_code(db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
@@ -3065,7 +3082,7 @@ def send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_oth
     except Exception as e:
         logger.error(f"Error sending initial payment flex/image: {e}")
         # Fallback to text
-        msg = f"ยินดีด้วย! การลงทะเบียนห้อง {rooms_str} ได้รับการอนุมัติแล้ว\nยอดรวม: {g_total:,.2f} บาท\nกรุณาชำระเงินที่เคาน์เตอร์หรือผ่านเมนูใน LINE"
+        msg = get_text('approve_tenant_success', lang).format(room=rooms_str) + f"\n{get_text('total_sum_label', lang)}: {g_total:,.2f} {get_text('currency_baht', lang)}"
         try:
             bot_api.push_message(
                 PushMessageRequest(
@@ -3108,34 +3125,34 @@ def setup_personal_rich_menu(tenant, db: Session, force=False):
     # Localized Labels and Images
     lang = tenant.language or "th"
     
-    # Text mapping for Rich Menu
-    if lang == "en":
-        chat_bar_text = "Tenant Menu"
-        bill_label = "View Bill"
-        repair_label = "Repair"
-        history_label = "History"
-        chat_label = "Chat"
-        move_in_label = "Move-in"
-        move_out_label = "Move-out"
-        img_filename = "tenant_richmenu_en.jpg"
-    elif lang == "jp":
-        chat_bar_text = "テナントメニュー"
-        bill_label = "請求書"
-        repair_label = "修理依頼"
-        history_label = "履歴"
-        chat_label = "チャット"
-        move_in_label = "入居"
-        move_out_label = "退去"
-        img_filename = "tenant_richmenu_jp.jpg"
-    else: # Thai
-        chat_bar_text = "เมนูผู้เช่า"
-        bill_label = "ดูค่าเช่า"
-        repair_label = "แจ้งซ่อม"
-        history_label = "ประวัติ"
-        chat_label = "สนทนา"
-        move_in_label = "ย้ายเข้า"
-        move_out_label = "ย้ายออก"
-        img_filename = "tenant_richmenu.jpg"
+    # Text mapping for Rich Menu from i18n
+    chat_bar_text = get_text('tenant_chat_bar', lang) or "Tenant Menu"
+    bill_label = get_text('view_bill', lang)
+    repair_label = get_text('repairs', lang)
+    history_label = get_text('history', lang)
+    chat_label = get_text('chat_label', lang)
+    move_in_label = get_text('move_in', lang)
+    move_out_label = get_text('move_out', lang)
+    
+    # Image filenames (assuming localized images exist or fallback to th)
+    img_filename = f"tenant_richmenu_{lang}.jpg"
+    if lang == "th" or not os.path.exists(os.path.join("image", img_filename)):
+        img_filename = "tenant_richmenu.jpg" # default/fallback
+
+    rich_menu_data = {
+        "size": {"width": 2500, "height": 1686},
+        "selected": True,
+        "name": f"Tenant Menu {lang}",
+        "chatBarText": chat_bar_text,
+        "areas": [
+            {"bounds": {"x": 0, "y": 0, "width": 833, "height": 843}, "action": {"type": "message", "text": bill_label}},
+            {"bounds": {"x": 833, "y": 0, "width": 834, "height": 843}, "action": {"type": "message", "text": repair_label}},
+            {"bounds": {"x": 1667, "y": 0, "width": 833, "height": 843}, "action": {"type": "message", "text": history_label}},
+            {"bounds": {"x": 0, "y": 843, "width": 833, "height": 843}, "action": {"type": "message", "text": chat_label}},
+            {"bounds": {"x": 833, "y": 843, "width": 834, "height": 843}, "action": {"type": "message", "text": move_in_label}},
+            {"bounds": {"x": 1667, "y": 843, "width": 833, "height": 843}, "action": {"type": "message", "text": move_out_label}}
+        ]
+    }
 
     if not multi_room:
         # 1-Click direct links for single-room users
@@ -3229,13 +3246,15 @@ async def preview_promptpay(pp_id: str, admin: bool = Depends(get_admin)):
 async def broadcast_announcement(message: str = Form(...), db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
     tenants = db.query(models.Tenant).filter(models.Tenant.line_user_id != None).all()
     count = 0
-    if line_bot_api:
+    if tenant_bot_api:
         for t in tenants:
             try:
-                line_bot_api.push_message(
+                lang = t.language or "th"
+                prefix = get_text('broadcast_prefix', lang)
+                tenant_bot_api.push_message(
                                 PushMessageRequest(
                                     to=t.line_user_id,
-                                    messages=[TextMessage(text=f"📢 ประกาศจากหอพัก:\n{message}")]
+                                    messages=[TextMessage(text=f"{prefix}\n{message}")]
                                 )
                             )
                 count += 1
@@ -3244,7 +3263,7 @@ async def broadcast_announcement(message: str = Form(...), db: Session = Depends
     else:
         logger.info(f"MOCK BROADCAST: {message}")
         count = len(tenants)
-        
+
     return {"status": "Success", "sent_count": count}
 
 @app.post("/admin/tenants/{tenant_id}/send-line")
@@ -3252,9 +3271,9 @@ async def send_direct_line(tenant_id: int, message: str = Form(...), db: Session
     tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
-    
+
     if not tenant.line_user_id:
-        raise HTTPException(status_code=400, detail="ผู้เช่ายังไม่ได้ลงทะเบียน LINE")
+        raise HTTPException(status_code=400, detail=get_text('error_not_registered_line', "th"))
 
     if tenant_bot_api:
         try:
@@ -3269,9 +3288,8 @@ async def send_direct_line(tenant_id: int, message: str = Form(...), db: Session
             raise HTTPException(status_code=500, detail=f"Failed to send LINE message: {str(e)}")
     else:
         logger.info(f"MOCK DIRECT MESSAGE to {tenant.line_user_id}: {message}")
-        
-    return {"status": "Success"}
 
+    return {"status": "Success"}
 @app.get("/admin/report/export")
 async def export_report(month: int, year: int, building_id: int = None, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
     query = db.query(models.Invoice).filter(
@@ -3665,9 +3683,15 @@ async def submit_repair(
     room_number = room.room_number if room else "N/A"
     
     # Notify Owner via Admin Channel
-    msg = f"🛠️ แจ้งซ่อมใหม่: ห้อง {room_number}\nเรื่อง: {title}\nรายละเอียด: {description}\nตรวจสอบได้ที่: {BASE_URL}/admin/dashboard"
-    
     owner = db.query(models.Owner).first()
+    lang = owner.language if owner else "th"
+    msg = get_text('notify_new_repair_admin', lang).format(
+        room=room_number,
+        title=title,
+        description=description,
+        url=f"{BASE_URL}/admin/dashboard"
+    )
+    
     if owner and owner.line_user_id and admin_bot_api:
         try:
             # Send text message first

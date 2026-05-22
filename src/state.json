@@ -1,27 +1,26 @@
 {
     "project": "Roomy",
-    "last_updated": "2026-05-21T14:15:00Z",
+    "last_updated": "2026-05-22T13:45:00Z",
     "features": {
         "multi_language": {
             "supported_languages": ["th", "en", "jp"],
             "status": "fully_implemented",
-            "coverage": "100% UI coverage including alerts, confirms, and all dynamic modals"
+            "coverage": "100% (LINE Bot Interactions, Web Dashboard, Notifications, Errors, and Rich Menus)"
         },
-        "admin_dashboard": {
-            "status": "stable",
-            "recent_fixes": [
-                "Fixed load_error in Meter History details by adding missing invoice_id to backend response.",
-                "Enhanced error reporting in viewInvoiceDetails to show specific error messages.",
-                "Fully localized Repair Details modal captions."
-            ]
+        "line_bot_sdk_v3": {
+            "status": "fully_migrated",
+            "notes": "Migrated from SDK v2 to v3, including WebhookHandler persistence fixes and request-object signature updates."
         }
     },
     "completed_tasks": [
-        "Synchronized all i18n keys across th.json, en.json, and jp.json.",
-        "Replaced remaining hardcoded English/Thai strings in JavaScript with localization keys.",
-        "Localized Login, Register, History, and Report templates.",
-        "Ensured persistent language selection across all backend routes.",
-        "Fixed empty 'Tenant' column in Room Management (previous task)."
+        "Migrated LINE Bot SDK to version 3 in main.py.",
+        "Fixed WebhookHandler re-initialization bug in refresh_configs.",
+        "Corrected all reply_message and push_message call signatures to use SDK v3 request objects.",
+        "Wrapped FlexMessage payloads in FlexContainer.from_dict to fix 400 Bad Request errors.",
+        "Localized all tenant Flex Messages (Bills, Receipts, Initial Payments) for TH, EN, and JP.",
+        "Completed full localization of the /bill web template, including button labels and headers.",
+        "Repaired DB integrity by populating missing UUIDs for 180 invoices and 5 tenants.",
+        "Added safety checks to auto-generate missing UUIDs during bot interactions."
     ],
-    "session_notes": "Completed an exhaustive localization sweep. The application now supports full language switching for both Admin and Tenant users without hardcoded text leakage. Fixed a data fetching bug in the meter history section."
+    "session_notes": "Successfully migrated to LINE Bot SDK v3 and finalized multi-language support for tenants. Resolved a critical data integrity issue involving missing UUIDs that caused broken bill links. The system is now robust against missing UUIDs and fully responsive in all target languages."
 }
