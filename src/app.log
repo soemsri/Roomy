@@ -1,0 +1,22 @@
+2026-05-22 12:26:56,764 - linebot - INFO - No handler of MessageEvent and no default handler
+2026-05-22 12:27:28,636 - linebot - INFO - No handler of MessageEvent and no default handler
+2026-05-22 12:34:45,181 - __main__ - ERROR - Tenant Webhook Error: (400)
+Reason: Bad Request
+HTTP response headers: HTTPHeaderDict({'Server': 'legy', 'Content-Type': 'application/json', 'x-content-type-options': 'nosniff', 'x-frame-options': 'DENY', 'x-line-request-id': 'aa7b700b-3efb-4efe-a599-78e6efc2c7e0', 'x-xss-protection': '1; mode=block', 'Content-Length': '147', 'Expires': 'Fri, 22 May 2026 05:34:42 GMT', 'Cache-Control': 'max-age=0, no-cache, no-store', 'Pragma': 'no-cache', 'Date': 'Fri, 22 May 2026 05:34:42 GMT', 'Connection': 'close'})
+HTTP response body: {"message":"A message (messages[0]) in the request body is invalid","details":[{"message":"At least one block must be specified","property":"/"}]}
+
+2026-05-22 12:44:37,693 - __main__ - ERROR - Tenant Webhook Error: (400)
+Reason: Bad Request
+HTTP response headers: HTTPHeaderDict({'Server': 'legy', 'Content-Type': 'application/json', 'x-content-type-options': 'nosniff', 'x-frame-options': 'DENY', 'x-line-request-id': 'd435b9e8-c454-44a6-9b75-784bdb76a62b', 'x-xss-protection': '1; mode=block', 'Content-Length': '147', 'Expires': 'Fri, 22 May 2026 05:44:35 GMT', 'Cache-Control': 'max-age=0, no-cache, no-store', 'Pragma': 'no-cache', 'Date': 'Fri, 22 May 2026 05:44:35 GMT', 'Connection': 'close'})
+HTTP response body: {"message":"A message (messages[0]) in the request body is invalid","details":[{"message":"At least one block must be specified","property":"/"}]}
+
+2026-05-22 12:45:19,566 - __main__ - ERROR - Tenant Webhook Error: (400)
+Reason: Bad Request
+HTTP response headers: HTTPHeaderDict({'Server': 'legy', 'Content-Type': 'application/json', 'x-content-type-options': 'nosniff', 'x-frame-options': 'DENY', 'x-line-request-id': '1a2b5a5d-0c76-480b-9c22-dcd275773caf', 'x-xss-protection': '1; mode=block', 'Content-Length': '147', 'Expires': 'Fri, 22 May 2026 05:45:17 GMT', 'Cache-Control': 'max-age=0, no-cache, no-store', 'Pragma': 'no-cache', 'Date': 'Fri, 22 May 2026 05:45:17 GMT', 'Connection': 'close'})
+HTTP response body: {"message":"A message (messages[0]) in the request body is invalid","details":[{"message":"At least one block must be specified","property":"/"}]}
+
+2026-05-22 12:45:55,843 - __main__ - ERROR - Tenant Webhook Error: (400)
+Reason: Bad Request
+HTTP response headers: HTTPHeaderDict({'Server': 'legy', 'Content-Type': 'application/json', 'x-content-type-options': 'nosniff', 'x-frame-options': 'DENY', 'x-line-request-id': 'de6001a4-72c3-419a-ad42-37122cb1b37f', 'x-xss-protection': '1; mode=block', 'Content-Length': '147', 'Expires': 'Fri, 22 May 2026 05:45:53 GMT', 'Cache-Control': 'max-age=0, no-cache, no-store', 'Pragma': 'no-cache', 'Date': 'Fri, 22 May 2026 05:45:53 GMT', 'Connection': 'close'})
+HTTP response body: {"message":"A message (messages[0]) in the request body is invalid","details":[{"message":"At least one block must be specified","property":"/"}]}
+
