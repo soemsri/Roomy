@@ -3245,20 +3245,6 @@ def send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_oth
                 messages=[FlexMessage(alt_text="ใบแจ้งยอดชำระแรกเข้า", contents=FlexContainer.from_dict(flex_json))]
             )
         )
-        
-        # We still send the Image Message as it is easier for users to save/share for bank app scan
-        if qr_enabled and encoded_payload:
-            # Re-generate larger QR for clear scanning/saving
-            qr_large_url = f"https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data={encoded_payload}"
-            bot_api.push_message(
-                PushMessageRequest(
-                    to=tenant.line_user_id,
-                    messages=[ImageMessage(
-                        original_content_url=qr_large_url,
-                        preview_image_url=qr_large_url
-                    )]
-                )
-            )
     except Exception as e:
         logger.error(f"Error sending initial payment flex/image: {e}")
         # Fallback to text
