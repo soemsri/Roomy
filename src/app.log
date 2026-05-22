@@ -20,3 +20,7 @@ Reason: Bad Request
 HTTP response headers: HTTPHeaderDict({'Server': 'legy', 'Content-Type': 'application/json', 'x-content-type-options': 'nosniff', 'x-frame-options': 'DENY', 'x-line-request-id': 'de6001a4-72c3-419a-ad42-37122cb1b37f', 'x-xss-protection': '1; mode=block', 'Content-Length': '147', 'Expires': 'Fri, 22 May 2026 05:45:53 GMT', 'Cache-Control': 'max-age=0, no-cache, no-store', 'Pragma': 'no-cache', 'Date': 'Fri, 22 May 2026 05:45:53 GMT', 'Connection': 'close'})
 HTTP response body: {"message":"A message (messages[0]) in the request body is invalid","details":[{"message":"At least one block must be specified","property":"/"}]}
 
+2026-05-22 13:10:44,193 - __main__ - INFO - LINE NOTIFY (Mock): 💰 สลิปใหม่: ห้อง 201
+ยอด: 5,178.00 บาท
+ตรวจสอบได้ที่ dashboard
+2026-05-22 13:14:18,460 - __main__ - ERROR - Tenant Webhook Error: name 'owner' is not defined

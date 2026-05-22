@@ -521,8 +521,11 @@ def handle_tenant_message(event, *args, **kwargs):
             
             if text == "ดูค่าเช่า":
                 messages = []
+                # Use language from the first tenant record
+                lang = active_tenants[0].language or "th"
+                
                 for tenant in active_tenants:
-                    # Robust check: search by room_id if available, as tenant_id might have changed during record management
+                    # Robust check: search by room_id if available
                     if tenant.current_room_id:
                         invoice = db.query(models.Invoice).filter(models.Invoice.room_id == tenant.current_room_id).order_by(models.Invoice.id.desc()).first()
                     else:
@@ -530,15 +533,14 @@ def handle_tenant_message(event, *args, **kwargs):
                     
                     room_no = tenant.room.room_number if tenant.room else "N/A"
                     if invoice:
-                        # ... (rest of invoice logic)
                         status_map = {
-                            "Unpaid": ("ยังไม่ชำระ", "#e74c3c"),
-                            "Pending Verification": ("รอตรวจสอบ", "#f39c12"),
-                            "Draft": ("รอดำเนินการ", "#95a5a6"),
-                            "Paid": ("ชำระแล้ว", "#3498db")
+                            "Unpaid": (get_text('status_unpaid', lang), "#e74c3c"),
+                            "Pending Verification": (get_text('status_pending', lang), "#f39c12"),
+                            "Draft": (get_text('status_draft', lang), "#95a5a6"),
+                            "Paid": (get_text('status_paid', lang), "#3498db")
                         }
                         status_text, status_color = status_map.get(invoice.status, (invoice.status, "#3498db"))
-                        bill_url = f"{BASE_URL}/bill/{invoice.uuid}"
+                        bill_url = f"{BASE_URL}/bill/{invoice.uuid}?lang={lang}"
                         total_fmt = "{:,.2f}".format(invoice.total_amount)
                         
                         flex_contents = {
@@ -547,7 +549,7 @@ def handle_tenant_message(event, *args, **kwargs):
                                 "type": "box",
                                 "layout": "vertical",
                                 "contents": [
-                                    {"type": "text", "text": "สรุปค่าเช่า", "weight": "bold", "size": "xl", "color": "#FFFFFF", "align": "center"}
+                                    {"type": "text", "text": get_text('bill_details', lang), "weight": "bold", "size": "xl", "color": "#FFFFFF", "align": "center"}
                                 ],
                                 "backgroundColor": "#1DB446",
                                 "paddingAll": "20px"
@@ -556,7 +558,7 @@ def handle_tenant_message(event, *args, **kwargs):
                                 "type": "box",
                                 "layout": "vertical",
                                 "contents": [
-                                    {"type": "text", "text": "หอพักสุขอนันต์", "weight": "bold", "size": "md", "margin": "md"},
+                                    {"type": "text", "text": owner.display_name if owner and owner.display_name else "SukAnan Apartment", "weight": "bold", "size": "md", "margin": "md"},
                                     {"type": "separator", "margin": "lg"},
                                     {
                                         "type": "box",
@@ -568,7 +570,7 @@ def handle_tenant_message(event, *args, **kwargs):
                                                 "type": "box",
                                                 "layout": "horizontal",
                                                 "contents": [
-                                                    {"type": "text", "text": "ห้อง", "size": "sm", "color": "#555555", "flex": 0},
+                                                    {"type": "text", "text": get_text('room_label', lang), "size": "sm", "color": "#555555", "flex": 0},
                                                     {"type": "text", "text": room_no, "size": "sm", "color": "#111111", "align": "end"}
                                                 ]
                                             },
@@ -576,7 +578,7 @@ def handle_tenant_message(event, *args, **kwargs):
                                                 "type": "box",
                                                 "layout": "horizontal",
                                                 "contents": [
-                                                    {"type": "text", "text": "รอบบิล", "size": "sm", "color": "#555555", "flex": 0},
+                                                    {"type": "text", "text": get_text('bill_cycle', lang), "size": "sm", "color": "#555555", "flex": 0},
                                                     {"type": "text", "text": f"{invoice.billing_month}/{invoice.billing_year}", "size": "sm", "color": "#111111", "align": "end"}
                                                 ]
                                             },
@@ -584,7 +586,15 @@ def handle_tenant_message(event, *args, **kwargs):
                                                 "type": "box",
                                                 "layout": "horizontal",
                                                 "contents": [
-                                                    {"type": "text", "text": "สถานะ", "size": "sm", "color": "#555555", "flex": 0},
+                                                    {"type": "text", "text": get_text('rent_amount', lang), "size": "sm", "color": "#555555", "flex": 0},
+                                                    {"type": "text", "text": f"฿{invoice.rent_amount:,.2f}", "size": "sm", "color": "#111111", "align": "end"}
+                                                ]
+                                            },
+                                            {
+                                                "type": "box",
+                                                "layout": "horizontal",
+                                                "contents": [
+                                                    {"type": "text", "text": get_text('status', lang), "size": "sm", "color": "#555555", "flex": 0},
                                                     {"type": "text", "text": status_text, "size": "sm", "color": status_color, "align": "end", "weight": "bold"}
                                                 ]
                                             }
@@ -596,7 +606,7 @@ def handle_tenant_message(event, *args, **kwargs):
                                         "layout": "horizontal",
                                         "margin": "lg",
                                         "contents": [
-                                            {"type": "text", "text": "ยอดรวมทั้งสิ้น", "size": "md", "color": "#555555", "flex": 0, "weight": "bold"},
+                                            {"type": "text", "text": get_text('total_sum_label', lang), "size": "md", "color": "#555555", "flex": 0, "weight": "bold"},
                                             {"type": "text", "text": f"฿{total_fmt}", "size": "xl", "color": "#111111", "align": "end", "weight": "bold"}
                                         ]
                                     }
@@ -612,14 +622,14 @@ def handle_tenant_message(event, *args, **kwargs):
                                         "style": "primary",
                                         "color": "#1DB446",
                                         "height": "sm",
-                                        "action": {"type": "uri", "label": "ดูรายละเอียด / ชำระเงิน", "uri": bill_url}
+                                        "action": {"type": "uri", "label": get_text('view_details', lang), "uri": bill_url}
                                     }
                                 ]
                             }
                         }
-                        messages.append(FlexMessage(alt_text=f"บิลห้อง {room_no}", contents=FlexContainer.from_dict(flex_contents)))
+                        messages.append(FlexMessage(alt_text=f"Bill - {room_no}", contents=FlexContainer.from_dict(flex_contents)))
                     else:
-                        messages.append(TextMessage(text=f"ห้อง {room_no}: ไม่พบข้อมูลบิลล่าสุด"))
+                        messages.append(TextMessage(text=f"Room {room_no}: " + get_text('bill_not_issued', lang)))
 
                 if tenant_bot_api:
                     # LINE reply_message supports up to 5 messages
@@ -2285,13 +2295,14 @@ async def approve_invoice(invoice_id: int, db: Session = Depends(get_db), admin:
     # Notify tenant via Flex Message
     tenant = invoice.tenant
     if tenant and tenant.line_user_id and tenant_bot_api:
+        lang = tenant.language or "th"
         owner = db.query(models.Owner).first()
         apt_name = owner.display_name if owner and owner.display_name else "SukAnan Apartment"
         room_no = invoice.room.room_number if invoice.room else "N/A"
         period = f"{invoice.billing_month}/{invoice.billing_year}"
         paid_date = invoice.paid_at.strftime("%d/%m/%Y %H:%M")
         total_fmt = f"{invoice.total_amount:,.2f}"
-        bill_url = f"{BASE_URL}/bill/{invoice.uuid}"
+        bill_url = f"{BASE_URL}/bill/{invoice.uuid}?lang={lang}"
         
         flex_json = {
             "type": "bubble",
@@ -2299,8 +2310,8 @@ async def approve_invoice(invoice_id: int, db: Session = Depends(get_db), admin:
                 "type": "box",
                 "layout": "vertical",
                 "contents": [
-                    {"type": "text", "text": "ใบเสร็จรับเงิน", "weight": "bold", "size": "xl", "color": "#FFFFFF", "align": "center"},
-                    {"type": "text", "text": "ชำระเงินเรียบร้อยแล้ว", "size": "sm", "color": "#FFFFFF", "align": "center", "margin": "sm"}
+                    {"type": "text", "text": get_text('receipt_title', lang), "weight": "bold", "size": "xl", "color": "#FFFFFF", "align": "center"},
+                    {"type": "text", "text": get_text('status_paid', lang), "size": "sm", "color": "#FFFFFF", "align": "center", "margin": "sm"}
                 ],
                 "backgroundColor": "#27ae60",
                 "paddingAll": "20px"
@@ -2321,7 +2332,7 @@ async def approve_invoice(invoice_id: int, db: Session = Depends(get_db), admin:
                                 "type": "box",
                                 "layout": "horizontal",
                                 "contents": [
-                                    {"type": "text", "text": "ห้อง", "size": "sm", "color": "#555555", "flex": 0},
+                                    {"type": "text", "text": get_text('room_label', lang), "size": "sm", "color": "#555555", "flex": 0},
                                     {"type": "text", "text": room_no, "size": "sm", "color": "#111111", "align": "end"}
                                 ]
                             },
@@ -2329,7 +2340,7 @@ async def approve_invoice(invoice_id: int, db: Session = Depends(get_db), admin:
                                 "type": "box",
                                 "layout": "horizontal",
                                 "contents": [
-                                    {"type": "text", "text": "รอบบิล", "size": "sm", "color": "#555555", "flex": 0},
+                                    {"type": "text", "text": get_text('bill_cycle', lang), "size": "sm", "color": "#555555", "flex": 0},
                                     {"type": "text", "text": period, "size": "sm", "color": "#111111", "align": "end"}
                                 ]
                             },
@@ -2337,7 +2348,7 @@ async def approve_invoice(invoice_id: int, db: Session = Depends(get_db), admin:
                                 "type": "box",
                                 "layout": "horizontal",
                                 "contents": [
-                                    {"type": "text", "text": "วันที่ชำระ", "size": "sm", "color": "#555555", "flex": 0},
+                                    {"type": "text", "text": get_text('payment_date_label', lang), "size": "sm", "color": "#555555", "flex": 0},
                                     {"type": "text", "text": paid_date, "size": "sm", "color": "#111111", "align": "end"}
                                 ]
                             }
@@ -2349,11 +2360,11 @@ async def approve_invoice(invoice_id: int, db: Session = Depends(get_db), admin:
                         "layout": "horizontal",
                         "margin": "lg",
                         "contents": [
-                            {"type": "text", "text": "ยอดชำระสุทธิ", "size": "md", "color": "#555555", "flex": 0, "weight": "bold"},
+                            {"type": "text", "text": get_text('total_sum_label', lang), "size": "md", "color": "#555555", "flex": 0, "weight": "bold"},
                             {"type": "text", "text": f"฿{total_fmt}", "size": "xl", "color": "#27ae60", "align": "end", "weight": "bold"}
                         ]
                     },
-                    {"type": "text", "text": "ขอบคุณที่ใช้บริการค่ะ", "size": "sm", "color": "#aaaaaa", "margin": "xxl", "align": "center"}
+                    {"type": "text", "text": get_text('thank_you', lang), "size": "sm", "color": "#aaaaaa", "margin": "xxl", "align": "center"}
                 ],
                 "paddingAll": "20px"
             },
@@ -2366,7 +2377,7 @@ async def approve_invoice(invoice_id: int, db: Session = Depends(get_db), admin:
                         "type": "button",
                         "style": "link",
                         "height": "sm",
-                        "action": {"type": "uri", "label": "ดูรายละเอียดบิล", "uri": bill_url}
+                        "action": {"type": "uri", "label": get_text('view_details', lang), "uri": bill_url}
                     }
                 ],
                 "flex": 0
@@ -2430,17 +2441,21 @@ async def send_invoice_line(invoice_id: int, db: Session = Depends(get_db), admi
     if not tenant_bot_api:
         raise HTTPException(status_code=500, detail="LINE Bot API not configured")
 
+    lang = tenant.language or "th"
     status_map = {
-        "Unpaid": ("ยังไม่ชำระ", "#e74c3c"),
-        "Pending Verification": ("รอตรวจสอบ", "#f39c12"),
-        "Draft": ("รอดำเนินการ", "#95a5a6"),
-        "Paid": ("ชำระแล้ว", "#3498db")
+        "Unpaid": (get_text('status_unpaid', lang), "#e74c3c"),
+        "Pending Verification": (get_text('status_pending', lang), "#f39c12"),
+        "Draft": (get_text('status_draft', lang), "#95a5a6"),
+        "Paid": (get_text('status_paid', lang), "#3498db")
     }
     status_text, status_color = status_map.get(invoice.status, (invoice.status, "#3498db"))
-    bill_url = f"{BASE_URL}/bill/{invoice.uuid}"
+    bill_url = f"{BASE_URL}/bill/{invoice.uuid}?lang={lang}"
     room_number = invoice.room.room_number if invoice.room else "N/A"
     total_fmt = "{:,.2f}".format(invoice.total_amount)
     
+    owner = db.query(models.Owner).first()
+    apt_name = owner.display_name if owner and owner.display_name else "SukAnan Apartment"
+
     flex_contents = {
         "type": "bubble",
         "header": {
@@ -2449,7 +2464,7 @@ async def send_invoice_line(invoice_id: int, db: Session = Depends(get_db), admi
             "contents": [
                 {
                     "type": "text",
-                    "text": "ใบแจ้งค่าเช่า",
+                    "text": get_text('invoice_title', lang),
                     "weight": "bold",
                     "size": "xl",
                     "color": "#FFFFFF",
@@ -2465,7 +2480,7 @@ async def send_invoice_line(invoice_id: int, db: Session = Depends(get_db), admi
             "contents": [
                 {
                     "type": "text",
-                    "text": "หอพักสุขอนันต์",
+                    "text": apt_name,
                     "weight": "bold",
                     "size": "md",
                     "margin": "md"
@@ -2481,7 +2496,7 @@ async def send_invoice_line(invoice_id: int, db: Session = Depends(get_db), admi
                             "type": "box",
                             "layout": "horizontal",
                             "contents": [
-                                {"type": "text", "text": "ห้อง", "size": "sm", "color": "#555555", "flex": 0},
+                                {"type": "text", "text": get_text('room_label', lang), "size": "sm", "color": "#555555", "flex": 0},
                                 {"type": "text", "text": room_number, "size": "sm", "color": "#111111", "align": "end"}
                             ]
                         },
@@ -2489,7 +2504,7 @@ async def send_invoice_line(invoice_id: int, db: Session = Depends(get_db), admi
                             "type": "box",
                             "layout": "horizontal",
                             "contents": [
-                                {"type": "text", "text": "รอบบิล", "size": "sm", "color": "#555555", "flex": 0},
+                                {"type": "text", "text": get_text('bill_cycle', lang), "size": "sm", "color": "#555555", "flex": 0},
                                 {"type": "text", "text": f"{invoice.billing_month}/{invoice.billing_year}", "size": "sm", "color": "#111111", "align": "end"}
                             ]
                         },
@@ -2497,7 +2512,15 @@ async def send_invoice_line(invoice_id: int, db: Session = Depends(get_db), admi
                             "type": "box",
                             "layout": "horizontal",
                             "contents": [
-                                {"type": "text", "text": "สถานะ", "size": "sm", "color": "#555555", "flex": 0},
+                                {"type": "text", "text": get_text('rent_amount', lang), "size": "sm", "color": "#555555", "flex": 0},
+                                {"type": "text", "text": f"฿{invoice.rent_amount:,.2f}", "size": "sm", "color": "#111111", "align": "end"}
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "contents": [
+                                {"type": "text", "text": get_text('status', lang), "size": "sm", "color": "#555555", "flex": 0},
                                 {"type": "text", "text": status_text, "size": "sm", "color": status_color, "align": "end", "weight": "bold"}
                             ]
                         }
@@ -2509,7 +2532,7 @@ async def send_invoice_line(invoice_id: int, db: Session = Depends(get_db), admi
                     "layout": "horizontal",
                     "margin": "lg",
                     "contents": [
-                        {"type": "text", "text": "ยอดรวมทั้งสิ้น", "size": "md", "color": "#555555", "flex": 0, "weight": "bold"},
+                        {"type": "text", "text": get_text('total_sum_label', lang), "size": "md", "color": "#555555", "flex": 0, "weight": "bold"},
                         {"type": "text", "text": f"฿{total_fmt}", "size": "xl", "color": "#111111", "align": "end", "weight": "bold"}
                     ]
                 }
@@ -2528,7 +2551,7 @@ async def send_invoice_line(invoice_id: int, db: Session = Depends(get_db), admi
                     "height": "sm",
                     "action": {
                         "type": "uri",
-                        "label": "ดูรายละเอียด / ชำระเงิน",
+                        "label": get_text('view_details', lang),
                         "uri": bill_url
                     }
                 }
@@ -2850,6 +2873,7 @@ def send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_oth
     import promptpay
     import urllib.parse
     
+    lang = tenant.language or "th"
     rooms_str = ", ".join(success_rooms)
     
     # 1. Payment Method Logic
@@ -2876,7 +2900,7 @@ def send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_oth
         if promptpay_name:
             payment_instruction_contents.append({
                 "type": "text", 
-                "text": f"ชื่อบัญชี: {promptpay_name}", 
+                "text": f"{get_text('account_name', lang)} {promptpay_name}", 
                 "size": "sm", 
                 "color": "#0078d4", 
                 "weight": "bold", 
@@ -2885,7 +2909,7 @@ def send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_oth
             })
 
         payment_instruction_contents.extend([
-            {"type": "text", "text": "👇 กดค้างที่รูป QR ด้านล่างเพื่อบันทึก 👇", "size": "xs", "color": "#e74c3c", "align": "center", "margin": "lg", "weight": "bold"},
+            {"type": "text", "text": "👇 " + ("Hold to save QR" if lang == "en" else "長押しでQRを保存" if lang == "jp" else "กดค้างที่รูป QR ด้านล่างเพื่อบันทึก") + " 👇", "size": "xs", "color": "#e74c3c", "align": "center", "margin": "lg", "weight": "bold"},
             {
                 "type": "image",
                 "url": qr_url,
@@ -2897,15 +2921,15 @@ def send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_oth
                 "type": "button",
                 "action": {
                     "type": "uri",
-                    "label": "ดาวน์โหลด QR Code",
+                    "label": get_text('download_csv', lang).replace("CSV", "QR"), # Hacky but download_csv is "Download ..."
                     "uri": qr_large_url
                 },
                 "style": "secondary",
                 "height": "sm",
                 "margin": "xs"
             },
-            {"type": "text", "text": "💡 ท่านสามารถนำ QR ไปสแกนในแอปธนาคารได้ทันที", "size": "xxs", "color": "#888888", "align": "center", "margin": "md"},
-            {"type": "text", "text": f"พร้อมเพย์: {promptpay_id}", "size": "xs", "color": "#888888", "align": "center", "margin": "sm"}
+            {"type": "text", "text": "💡 " + ("Scan in bank app to pay" if lang == "en" else "銀行アプリでスキャンして支払う" if lang == "jp" else "ท่านสามารถนำ QR ไปสแกนในแอปธนาคารได้ทันที"), "size": "xxs", "color": "#888888", "align": "center", "margin": "md"},
+            {"type": "text", "text": f"{get_text('promptpay', lang)}: {promptpay_id}", "size": "xs", "color": "#888888", "align": "center", "margin": "sm"}
         ])
 
     # Always add cash notice at the bottom of instructions
@@ -2916,8 +2940,7 @@ def send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_oth
         "paddingAll": "md",
         "margin": "lg",
         "contents": [
-            {"type": "text", "text": "หรือชำระเป็นเงินสดได้ที่", "size": "xs", "color": "#888888", "align": "center"},
-            {"type": "text", "text": "หน้าเคาน์เตอร์ออฟฟิศ", "weight": "bold", "size": "sm", "color": "#555555", "align": "center", "margin": "xs"}
+            {"type": "text", "text": get_text('pay_cash_note', lang), "size": "xs", "color": "#888888", "align": "center", "wrap": True}
         ]
     })
 
@@ -2928,8 +2951,8 @@ def send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_oth
             "type": "box",
             "layout": "vertical",
             "contents": [
-                {"type": "text", "text": "ใบแจ้งยอดชำระแรกเข้า", "weight": "bold", "size": "xl", "color": "#FFFFFF", "align": "center"},
-                {"type": "text", "text": "อนุมัติเข้าพักเรียบร้อยแล้ว", "size": "sm", "color": "#FFFFFF", "align": "center", "margin": "xs"}
+                {"type": "text", "text": get_text('initial_payment_type', lang), "weight": "bold", "size": "xl", "color": "#FFFFFF", "align": "center"},
+                {"type": "text", "text": "Approved / อนุมัติเรียบร้อยแล้ว", "size": "sm", "color": "#FFFFFF", "align": "center", "margin": "xs"}
             ],
             "backgroundColor": "#1DB446",
             "paddingAll": "20px"
@@ -2948,7 +2971,7 @@ def send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_oth
                             "type": "box",
                             "layout": "horizontal",
                             "contents": [
-                                {"type": "text", "text": "ห้อง", "size": "sm", "color": "#555555", "flex": 0},
+                                {"type": "text", "text": get_text('room', lang), "size": "sm", "color": "#555555", "flex": 0},
                                 {"type": "text", "text": rooms_str, "size": "sm", "color": "#111111", "align": "end", "wrap": True}
                             ]
                         },
@@ -2956,7 +2979,7 @@ def send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_oth
                             "type": "box",
                             "layout": "horizontal",
                             "contents": [
-                                {"type": "text", "text": "ค่าประกันรวม", "size": "sm", "color": "#555555", "flex": 0},
+                                {"type": "text", "text": get_text('security_deposit', lang), "size": "sm", "color": "#555555", "flex": 0},
                                 {"type": "text", "text": f"฿{g_deposit:,.2f}", "size": "sm", "color": "#111111", "align": "end"}
                             ]
                         },
@@ -2964,7 +2987,7 @@ def send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_oth
                             "type": "box",
                             "layout": "horizontal",
                             "contents": [
-                                {"type": "text", "text": "ค่าเช่าล่วงหน้า", "size": "sm", "color": "#555555", "flex": 0},
+                                {"type": "text", "text": get_text('advance_rent', lang), "size": "sm", "color": "#555555", "flex": 0},
                                 {"type": "text", "text": f"฿{g_advance:,.2f}", "size": "sm", "color": "#111111", "align": "end"}
                             ]
                         }
@@ -2979,7 +3002,7 @@ def send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_oth
             "type": "box",
             "layout": "horizontal",
             "contents": [
-                {"type": "text", "text": "ค่าธรรมเนียมอื่นๆ", "size": "sm", "color": "#555555", "flex": 0},
+                {"type": "text", "text": get_text('other', lang), "size": "sm", "color": "#555555", "flex": 0},
                 {"type": "text", "text": f"฿{g_other:,.2f}", "size": "sm", "color": "#111111", "align": "end"}
             ]
         })
@@ -2991,12 +3014,11 @@ def send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_oth
             "layout": "horizontal",
             "margin": "lg",
             "contents": [
-                {"type": "text", "text": "ยอดรวมทั้งสิ้น", "size": "md", "color": "#555555", "flex": 0, "weight": "bold"},
+                {"type": "text", "text": get_text('total_sum_label', lang), "size": "md", "color": "#555555", "flex": 0, "weight": "bold"},
                 {"type": "text", "text": f"฿{g_total:,.2f}", "size": "xl", "color": "#111111", "align": "end", "weight": "bold"}
             ]
         },
-        *payment_instruction_contents,
-        {"type": "text", "text": "ขออภัยหากท่านชำระเรียบร้อยแล้ว", "size": "xxs", "color": "#aaaaaa", "margin": "xxl", "align": "center"}
+        *payment_instruction_contents
     ])
 
     try:

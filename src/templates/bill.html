@@ -120,7 +120,10 @@
 <body>
     <div class="bill-container">
         <div class="header">
-            <h1>{{ get_text('bill_header', lang) }}</h1>
+            <h1>
+                {% if status == 'Paid' %}{{ get_text('receipt_title', lang) }}
+                {% else %}{{ get_text('bill_header', lang) }}{% endif %}
+            </h1>
             <p>{{ get_text('room_label', lang) }} {{ room_number }} | {{ month }}/{{ year }}</p>
             <div class="status-badge 
                 {% if status == 'Unpaid' %}status-unpaid
@@ -171,7 +174,7 @@
         </div>
 
         <div class="total-box">
-            <span class="total-label">{{ get_text('total_amount', lang) }}</span>
+            <span class="total-label">{{ get_text('total_sum_label', lang) }}</span>
             <span class="total-amount">฿{{ "{:,.2f}".format(total_amount) }}</span>
         </div>
 
