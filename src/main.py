@@ -1242,6 +1242,7 @@ async def admin_dashboard(
         .order_by(models.Tenant.id.desc())\
         .all()
     pending_registrations = db.query(models.Tenant).filter(models.Tenant.status == "Pending").all()
+    awaiting_payment_tenants = db.query(models.Tenant).filter(models.Tenant.status == "Awaiting Payment").all()
     move_out_requests = db.query(models.MoveOutRequest).filter(models.MoveOutRequest.status == "Pending").all()
     
     all_rooms = db.query(models.Room).options(joinedload(models.Room.tenant)).all()
@@ -1258,6 +1259,7 @@ async def admin_dashboard(
         "recent_repairs": recent_repairs,
         "active_tenants": active_tenants,
         "pending_registrations": pending_registrations,
+        "awaiting_payment_tenants": awaiting_payment_tenants,
         "move_out_requests": move_out_requests,
         "all_rooms": all_rooms,
         "all_buildings": all_buildings,
@@ -1518,8 +1520,8 @@ async def admin_report(request: Request, db: Session = Depends(get_db), admin: b
         "lang": lang
     })
 
-@app.post("/admin/registration/{tenant_id}/approve")
-async def approve_registration(tenant_id: int, room_ids: str = Form(...), db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+@app.post("/admin/registration/{tenant_id}/request-payment")
+async def request_initial_payment(tenant_id: int, room_ids: str = Form(...), db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
     tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
@@ -1529,37 +1531,20 @@ async def approve_registration(tenant_id: int, room_ids: str = Form(...), db: Se
         raise HTTPException(status_code=400, detail="กรุณาเลือกอย่างน้อย 1 ห้อง")
     
     owner = db.query(models.Owner).first()
-    success_rooms, g_deposit, g_advance, g_other, g_total = perform_approval(db, tenant, id_list, owner)
+    success_rooms, g_deposit, g_advance, g_other, g_total = create_initial_invoice(db, tenant, id_list, owner)
 
     if not success_rooms:
-        raise HTTPException(status_code=400, detail="ไม่สามารถอนุมัติห้องที่เลือกได้ (ห้องอาจไม่ว่าง)")
+        raise HTTPException(status_code=400, detail="ไม่สามารถสร้างบิลแรกเข้าสำหรับห้องที่เลือกได้")
         
     db.commit()
     
-    # Notify tenant via LINE
-    if line_bot_api:
+    # Notify tenant via LINE with Initial Payment Flex
+    if tenant_bot_api:
         try:
-            send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_other, g_total, owner, line_bot_api)
+            send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_other, g_total, owner, tenant_bot_api)
         except Exception as e:
             logger.error(f"Failed to notify tenant: {e}")
             
-    # Notify admin via LINE
-    if owner and owner.line_user_id and admin_bot_api:
-        try:
-            rooms_str = ", ".join(success_rooms)
-            admin_msg = f"🔔 แจ้งเตือน: มีผู้เช่าใหม่เข้าพัก\n"
-            admin_msg += f"ห้อง: {rooms_str}\n"
-            admin_msg += f"ชื่อผู้เช่า: {tenant.full_name}\n\n"
-            admin_msg += f"กรุณาไปจดมิเตอร์น้ำและไฟฟ้าแรกเข้าเพื่อใช้สำหรับคำนวณค่าไฟในรอบถัดไป"
-            admin_bot_api.push_message(
-                PushMessageRequest(
-                    to=owner.line_user_id,
-                    messages=[TextMessage(text=admin_msg)]
-                )
-            )
-        except Exception as e:
-            logger.error(f"Failed to notify admin: {e}")
-        
     return {"status": "Success"}
 
 @app.get("/admin/leases/list")
@@ -1643,6 +1628,59 @@ async def view_lease_contract(lease_id: int, db: Session = Depends(get_db), admi
     </html>
     """
     return html
+
+@app.get("/admin/receipts/list")
+async def list_receipts(page: int = 1, page_size: int = 10, q: str = "", db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+    query = db.query(models.Invoice).options(joinedload(models.Invoice.room), joinedload(models.Invoice.tenant)).filter(models.Invoice.status == "Paid")
+    
+    if q:
+        query = query.filter(
+            or_(
+                models.Room.room_number.ilike(f"%{q}%"),
+                models.Tenant.full_name.ilike(f"%{q}%")
+            )
+        )
+    
+    total = query.count()
+    items = query.order_by(models.Invoice.paid_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
+    
+    return {
+        "items": [{
+            "id": inv.id,
+            "room_number": inv.room.room_number if inv.room else "N/A",
+            "tenant_name": inv.tenant.full_name if inv.tenant else "N/A",
+            "period": f"{inv.billing_month}/{inv.billing_year}",
+            "total_amount": inv.total_amount,
+            "paid_at": inv.paid_at.strftime("%d/%m/%Y %H:%M") if inv.paid_at else "-",
+            "type": inv.invoice_type
+        } for inv in items],
+        "total_pages": (total + page_size - 1) // page_size,
+        "current_page": page
+    }
+
+@app.get("/admin/receipts/{invoice_id}/print", response_class=HTMLResponse)
+async def print_receipt(request: Request, invoice_id: int, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+    invoice = db.query(models.Invoice).options(joinedload(models.Invoice.room), joinedload(models.Invoice.tenant)).filter(models.Invoice.id == invoice_id).first()
+    if not invoice: raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    owner = db.query(models.Owner).first()
+    lang = invoice.tenant.language if invoice.tenant else "th"
+    
+    other_charges = []
+    if invoice.other_charges:
+        try:
+            other_charges = json.loads(invoice.other_charges)
+        except:
+            pass
+
+    return templates.TemplateResponse("receipt_print.html", {
+        "request": request,
+        "invoice": invoice,
+        "owner": owner,
+        "other_charges": other_charges,
+        "lang": lang,
+        "now": datetime.now()
+    })
 
 @app.post("/admin/registration/{tenant_id}/reject")
 async def reject_registration(tenant_id: int, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
@@ -2245,6 +2283,12 @@ async def confirm_cash_payment(
     invoice.payment_method = "Cash"
     invoice.payment_receipt_img = f"/uploads/{file_name}"
     invoice.paid_at = datetime.now()
+    
+    # NEW: Trigger Final Approval if this was an Initial Move-in Bill
+    if invoice.invoice_type == "Initial":
+        owner = db.query(models.Owner).first()
+        perform_final_approval(db, invoice, owner)
+
     db.commit()
     return {"status": "Success", "receipt": invoice.payment_receipt_img}
 
@@ -2314,6 +2358,12 @@ async def approve_invoice(invoice_id: int, db: Session = Depends(get_db), admin:
     invoice.status = "Paid"
     if not invoice.paid_at:
         invoice.paid_at = datetime.now()
+    
+    # NEW: Trigger Final Approval if this was an Initial Move-in Bill
+    if invoice.invoice_type == "Initial":
+        owner = db.query(models.Owner).first()
+        perform_final_approval(db, invoice, owner)
+
     db.commit()
     
     # Notify tenant via Flex Message
@@ -2791,19 +2841,17 @@ def get_magic_url(owner, db, path=""):
         pass
     return url
 
-def perform_approval(db: Session, tenant, room_ids: list, owner, start_date=None):
+def create_initial_invoice(db: Session, tenant, room_ids: list, owner, start_date=None):
     if not start_date:
         start_date = tenant.requested_move_in_date if tenant.requested_move_in_date else datetime.now()
     
     success_rooms = []
-    first_iter = True
-    
-    # Initialize grand totals for multiple rooms
     g_total = 0.0
     g_deposit = 0.0
     g_advance = 0.0
     g_other = 0.0
     
+    first_iter = True
     for rid in room_ids:
         room = db.query(models.Room).filter(models.Room.id == rid).first()
         if not room or room.status != "Vacant":
@@ -2811,20 +2859,21 @@ def perform_approval(db: Session, tenant, room_ids: list, owner, start_date=None
             
         target_tenant = tenant
         if not first_iter:
-            # Create a clone for subsequent rooms
+            # Create a clone for multi-room if needed (this logic might need refinement for pre-payment)
             target_tenant = models.Tenant(
                 line_user_id=tenant.line_user_id,
                 full_name=tenant.full_name,
                 phone_number=tenant.phone_number,
                 citizen_id=tenant.citizen_id,
                 requested_move_in_date=tenant.requested_move_in_date,
-                status="Active"
+                status="Awaiting Payment",
+                language=tenant.language
             )
             db.add(target_tenant)
             db.flush()
-        
-        target_tenant.current_room_id = room.id
-        room.status = "Occupied"
+        else:
+            tenant.status = "Awaiting Payment"
+            tenant.current_room_id = room.id
         
         # Calculate Initial Fees
         security_deposit = 0.0
@@ -2833,15 +2882,11 @@ def perform_approval(db: Session, tenant, room_ids: list, owner, start_date=None
         room_total = 0.0
         fees_text = ""
         
-        # Load config or use defaults
         config_str = owner.move_in_fees_config if owner and owner.move_in_fees_config else "[]"
-        try:
-            config = json.loads(config_str)
-        except:
-            config = []
+        try: config = json.loads(config_str)
+        except: config = []
 
         if not config:
-            # Server-side Fallback Defaults
             config = [
                 {"name": "ค่าเช่าล่วงหน้า 1 เดือน", "value": 1, "is_multiplier": True},
                 {"name": "ค่าประกันทรัพย์สิน", "value": 5000, "is_multiplier": False}
@@ -2852,52 +2897,90 @@ def perform_approval(db: Session, tenant, room_ids: list, owner, start_date=None
             applied_fees.append({"name": f['name'], "amount": amt})
             room_total += amt
             fees_text += f"<li>{f['name']}: {amt:,.2f} บาท</li>"
-            
-            if "ประกัน" in f['name']:
-                security_deposit += amt
-            elif "ล่วงหน้า" in f['name']:
-                advance_rent += amt
+            if "ประกัน" in f['name']: security_deposit += amt
+            elif "ล่วงหน้า" in f['name']: advance_rent += amt
         
-        if fees_text:
-            fees_text = f"<ul>{fees_text}</ul><p><strong>รวมเงินมัดจำและค่าแรกเข้าห้อง {room.room_number}: {room_total:,.2f} บาท</strong></p>"
-
         # Accumulate totals
         g_deposit += security_deposit
         g_advance += advance_rent
         g_other += (room_total - security_deposit - advance_rent)
         g_total += room_total
 
-        lease_content = ""
-        if owner and owner.lease_template:
-            lease_content = owner.lease_template
-            replacements = {
-                "{tenant_name}": target_tenant.full_name,
-                "{room_number}": room.room_number,
-                "{floor}": str(room.floor),
-                "{base_rent}": f"{room.base_rent:,.2f}",
-                "{start_date}": start_date.strftime("%d/%m/%Y"),
-                "{initial_fees}": fees_text
-            }
-            for placeholder, value in replacements.items():
-                if value is not None:
-                    lease_content = lease_content.replace(placeholder, str(value))
-
-            new_lease = models.Lease(
-                room_id=room.id, 
-                tenant_id=target_tenant.id, 
-                start_date=start_date,
-                lease_content=lease_content,
-                initial_fees=json.dumps(applied_fees),
-                security_deposit_amount=security_deposit,
-                advance_rent_amount=advance_rent,
-                initial_payment_status="Pending"
-            )
-            db.add(new_lease)
-            
-        target_tenant.status = "Active"
+        # Create the Initial Invoice
+        new_invoice = models.Invoice(
+            room_id=room.id,
+            tenant_id=target_tenant.id,
+            billing_month=start_date.month,
+            billing_year=start_date.year,
+            rent_amount=advance_rent,
+            electricity_amount=0.0,
+            water_amount=0.0,
+            other_charges=json.dumps(applied_fees),
+            total_amount=room_total,
+            status="Unpaid",
+            invoice_type="Initial"
+        )
+        db.add(new_invoice)
+        
         success_rooms.append(room.room_number)
-        setup_personal_rich_menu(target_tenant, db)
         first_iter = False
+    
+    return success_rooms, g_deposit, g_advance, g_other, g_total
+
+def perform_final_approval(db: Session, invoice, owner):
+    tenant = invoice.tenant
+    room = invoice.room
+    if not tenant or not room: return False
+
+    # 1. Update Room Status
+    room.status = "Occupied"
+
+    # 2. Create Lease
+    start_date = tenant.requested_move_in_date or datetime.now()
+    lease_content = owner.lease_template or ""
+    
+    # Simple replacements
+    replacements = {
+        "{tenant_name}": tenant.full_name,
+        "{room_number}": room.room_number,
+        "{floor}": str(room.floor),
+        "{base_rent}": f"{room.base_rent:,.2f}",
+        "{start_date}": start_date.strftime("%d/%m/%Y"),
+        "{initial_fees}": invoice.other_charges
+    }
+    for placeholder, value in replacements.items():
+        if value is not None:
+            lease_content = lease_content.replace(placeholder, str(value))
+
+    # Parse applied fees from invoice to get deposit/advance for lease record
+    security_deposit = 0.0
+    advance_rent = 0.0
+    try:
+        fees = json.loads(invoice.other_charges)
+        for f in fees:
+            if "ประกัน" in f['name']: security_deposit += f['amount']
+            elif "ล่วงหน้า" in f['name']: advance_rent += f['amount']
+    except: pass
+
+    new_lease = models.Lease(
+        room_id=room.id,
+        tenant_id=tenant.id,
+        start_date=start_date,
+        lease_content=lease_content,
+        initial_fees=invoice.other_charges,
+        security_deposit_amount=security_deposit,
+        advance_rent_amount=advance_rent,
+        initial_payment_status="Paid",
+        initial_payment_method=invoice.payment_method,
+        initial_payment_date=invoice.paid_at,
+        initial_payment_receipt=invoice.payment_receipt_img
+    )
+    db.add(new_lease)
+
+    # 3. Activate Tenant
+    tenant.status = "Active"
+    setup_personal_rich_menu(tenant, db)
+    return True
         
     return success_rooms, g_deposit, g_advance, g_other, g_total
 

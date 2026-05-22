@@ -254,6 +254,7 @@ class Invoice(Base):
     late_fee = Column(Float, default=0.0)
     total_amount = Column(Float, nullable=False)
     status = Column(String, default="Unpaid")
+    invoice_type = Column(String, default="Monthly") # Monthly, Initial
     payment_method = Column(String)
     payment_receipt_img = Column(String)
     paid_at = Column(DateTime)

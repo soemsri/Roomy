@@ -528,5 +528,18 @@
     "deposit_total": "敷金合計",
     "receipt_title": "領収書",
     "thank_you": "ご利用ありがとうございました",
-    "payment_date_label": "お支払い日"
+    "payment_date_label": "お支払い日",
+    "step": "ステップ",
+    "issue_initial_bill": "初期費用請求書の発行",
+    "send_initial_bill": "請求書を送る",
+    "awaiting_initial_payment": "初期費用の支払い待ち",
+    "payment_verification": "支払いの確認",
+    "approve_payment": "支払いを承認",
+    "receive_cash": "現金受領",
+    "manage_receipts": "領収書管理",
+    "print_receipt": "領収書を印刷",
+    "initial_payment_type": "初期費用合計",
+    "account_name": "口座名義",
+    "pay_cash_note": "管理事務所にて現金でお支払いいただくことも可能です。",
+    "invoice_title": "賃貸借請求書"
 }

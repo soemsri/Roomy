@@ -531,5 +531,18 @@
     "deposit_total": "เงินมัดจำรวม",
     "receipt_title": "ใบเสร็จรับเงิน",
     "thank_you": "ขอบคุณที่ใช้บริการค่ะ",
-    "payment_date_label": "วันที่ชำระ"
+    "payment_date_label": "วันที่ชำระ",
+    "step": "ขั้นตอน",
+    "issue_initial_bill": "ส่งใบแจ้งหนี้แรกเข้า",
+    "send_initial_bill": "ส่งบิลแรกเข้า",
+    "awaiting_initial_payment": "รอชำระเงินแรกเข้า",
+    "payment_verification": "ตรวจสอบการชำระเงิน",
+    "approve_payment": "ยืนยันยอดเงิน",
+    "receive_cash": "รับเงินสด",
+    "manage_receipts": "จัดการใบเสร็จ",
+    "print_receipt": "พิมพ์ใบเสร็จ",
+    "initial_payment_type": "ยอดชำระแรกเข้า",
+    "account_name": "ชื่อบัญชี",
+    "pay_cash_note": "ท่านสามารถชำระเป็นเงินสดได้ที่สำนักงานหอพัก",
+    "invoice_title": "ใบแจ้งค่าเช่า"
 }

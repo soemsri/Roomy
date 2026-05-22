@@ -528,5 +528,18 @@
     "deposit_total": "Total Deposit",
     "receipt_title": "Official Receipt",
     "thank_you": "Thank you for your payment",
-    "payment_date_label": "Payment Date"
+    "payment_date_label": "Payment Date",
+    "step": "Step",
+    "issue_initial_bill": "Issue Initial Bill",
+    "send_initial_bill": "Send Bill",
+    "awaiting_initial_payment": "Awaiting Initial Payment",
+    "payment_verification": "Payment Verification",
+    "approve_payment": "Verify Payment",
+    "receive_cash": "Receive Cash",
+    "manage_receipts": "Manage Receipts",
+    "print_receipt": "Print Receipt",
+    "initial_payment_type": "Initial Move-in Fees",
+    "account_name": "Account Name",
+    "pay_cash_note": "You can also pay by cash at the office.",
+    "invoice_title": "Rental Invoice"
 }
