@@ -26,8 +26,8 @@ from fastapi import FastAPI, Request, HTTPException, Depends, Form, File, Upload
 from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy import func, or_
+from sqlalchemy.orm import Session, joinedload
 
 # LINE SDK v3 imports
 from linebot.v3 import WebhookHandler
@@ -314,14 +314,20 @@ def handle_admin_message(event, *args, **kwargs):
                     if action == "APPROVE":
                         room = target_tenant.room
                         if room:
-                            success_rooms, g_deposit, g_advance, g_other, g_total = perform_approval(db, target_tenant, [room.id], owner)
+                            success_rooms, g_deposit, g_advance, g_other, g_total = create_initial_invoice(db, target_tenant, [room.id], owner)
                             db.commit()
 
                             if success_rooms:
                                 reply_text = get_text('approve_tenant_success', lang).format(room=room.room_number)
                                 if tenant_bot_api:
                                     try:
-                                        send_initial_payment_flex(target_tenant, success_rooms, g_deposit, g_advance, g_other, g_total, owner, tenant_bot_api)
+                                        inv = db.query(models.Invoice).filter(
+                                            models.Invoice.tenant_id == target_tenant.id,
+                                            models.Invoice.invoice_type == "Initial",
+                                            models.Invoice.status == "Unpaid"
+                                        ).first()
+                                        inv_uuid = inv.uuid if inv else None
+                                        send_initial_payment_flex(target_tenant, success_rooms, g_deposit, g_advance, g_other, g_total, owner, tenant_bot_api, invoice_uuid=inv_uuid)
                                     except Exception as e:
                                         logger.error(f"Failed to notify tenant from LINE: {e}")
                             else:
@@ -1009,6 +1015,32 @@ async def upload_slip(
     lang = owner.language if owner else "th"
     send_line_notify(get_text('notify_new_slip', lang).format(room=room_number, amount=f"{invoice.total_amount:,.2f}"))
     
+    if invoice.invoice_type == "Initial":
+        if owner and owner.line_user_id and admin_bot_api:
+            try:
+                # Text message:
+                msg_text = f"ผู้เช่าโอนเงินแรกเข้า กรุณาตรวจสอบ\nห้อง: {room_number}\nยอดเงิน: {invoice.total_amount:,.2f} บาท"
+                admin_bot_api.push_message(
+                    PushMessageRequest(
+                        to=owner.line_user_id,
+                        messages=[TextMessage(text=msg_text)]
+                    )
+                )
+                
+                # Image message with slip image:
+                full_image_url = f"{BASE_URL}{invoice.payment_receipt_img}"
+                admin_bot_api.push_message(
+                    PushMessageRequest(
+                        to=owner.line_user_id,
+                        messages=[ImageMessage(
+                            original_content_url=full_image_url,
+                            preview_image_url=full_image_url
+                        )]
+                    )
+                )
+            except Exception as e:
+                logger.error(f"Failed to push initial slip notification to admin bot: {e}")
+                
     return {"status": "Success", "receipt": invoice.payment_receipt_img}
 
 @app.get("/repair/{tenant_uuid}", response_class=HTMLResponse)
@@ -1541,7 +1573,13 @@ async def request_initial_payment(tenant_id: int, room_ids: str = Form(...), db:
     # Notify tenant via LINE with Initial Payment Flex
     if tenant_bot_api:
         try:
-            send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_other, g_total, owner, tenant_bot_api)
+            inv = db.query(models.Invoice).filter(
+                models.Invoice.tenant_id == tenant.id,
+                models.Invoice.invoice_type == "Initial",
+                models.Invoice.status == "Unpaid"
+            ).first()
+            inv_uuid = inv.uuid if inv else None
+            send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_other, g_total, owner, tenant_bot_api, invoice_uuid=inv_uuid)
         except Exception as e:
             logger.error(f"Failed to notify tenant: {e}")
             
@@ -1689,15 +1727,27 @@ async def reject_registration(tenant_id: int, db: Session = Depends(get_db), adm
     
     tenant.status = "Rejected"
     tenant.current_room_id = None
+    
+    # Cancel unpaid initial invoices for this tenant
+    unpaid_initial_invoices = db.query(models.Invoice).filter(
+        models.Invoice.tenant_id == tenant.id,
+        models.Invoice.invoice_type == "Initial",
+        models.Invoice.status == "Unpaid"
+    ).all()
+    for inv in unpaid_initial_invoices:
+        inv.status = "Cancelled"
+        
     db.commit()
     
     # Notify tenant
-    if line_bot_api:
+    bot = tenant_bot_api or line_bot_api
+    if bot:
         try:
-            line_bot_api.push_message(
+            reject_msg = get_text('registration_rejected_msg', tenant.language or "th")
+            bot.push_message(
                 PushMessageRequest(
                     to=tenant.line_user_id,
-                    messages=[TextMessage(text="ขออภัย การลงทะเบียนของคุณถูกปฏิเสธ กรุณาติดต่อเจ้าของหอพัก")]
+                    messages=[TextMessage(text=reject_msg)]
                 )
             )
         except Exception: pass
@@ -2482,6 +2532,18 @@ async def approve_invoice(invoice_id: int, db: Session = Depends(get_db), admin:
                     )
                 )
             except: pass
+
+        if invoice.invoice_type == "Initial":
+            try:
+                welcome_msg = get_text('move_in_approved_welcome_msg', lang)
+                tenant_bot_api.push_message(
+                    PushMessageRequest(
+                        to=tenant.line_user_id,
+                        messages=[TextMessage(text=welcome_msg)]
+                    )
+                )
+            except Exception as e:
+                logger.error(f"Failed to send welcome message: {e}")
             
     return {"status": "Success"}
 
@@ -2498,14 +2560,21 @@ async def reject_invoice(invoice_id: int, db: Session = Depends(get_db), admin: 
     # Notify tenant
     tenant = invoice.tenant
     if tenant and tenant.line_user_id and line_bot_api:
+        lang = tenant.language or "th"
+        if invoice.invoice_type == "Initial":
+            msg = "❌ แจ้งเตือน: สลิปการโอนเงินแรกเข้าไม่ถูกต้อง กรุณาตรวจสอบหรืออัปโหลดใหม่อีกครั้ง" if lang == "th" else "❌ Notification: Initial payment slip is incorrect. Please check or upload again."
+        else:
+            msg = f"❌ แจ้งเตือน: สลิปการโอนเงินของบิลเดือน {invoice.billing_month}/{invoice.billing_year} ไม่ถูกต้อง กรุณาตรวจสอบหรืออัปโหลดใหม่อีกครั้ง"
+        
         try:
             line_bot_api.push_message(
                 PushMessageRequest(
                     to=tenant.line_user_id,
-                    messages=[TextMessage(text=f"❌ แจ้งเตือน: สลิปการโอนเงินของบิลเดือน {invoice.billing_month}/{invoice.billing_year} ไม่ถูกต้อง กรุณาตรวจสอบหรืออัปโหลดใหม่อีกครั้ง")]
+                    messages=[TextMessage(text=msg)]
                 )
             )
-        except: pass
+        except Exception as e:
+            logger.error(f"Failed to send rejection message: {e}")
         
     return {"status": "Success"}
 
@@ -2984,7 +3053,7 @@ def perform_final_approval(db: Session, invoice, owner):
         
     return success_rooms, g_deposit, g_advance, g_other, g_total
 
-def send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_other, g_total, owner, bot_api):
+def send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_other, g_total, owner, bot_api, invoice_uuid: str = None):
     if not bot_api:
         return
     
@@ -3140,6 +3209,34 @@ def send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_oth
         *payment_instruction_contents
     ])
 
+    if invoice_uuid:
+        upload_url = f"{BASE_URL}/bill/{invoice_uuid}?lang={lang}"
+        flex_json["footer"] = {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "sm",
+            "contents": [
+                {
+                    "type": "button",
+                    "style": "primary",
+                    "color": "#1DB446",
+                    "action": {
+                        "type": "uri",
+                        "label": "แจ้งโอนเงิน / อัพโหลดสลิป" if lang == "th" else "Report Payment / Upload Slip" if lang == "en" else "支払いを報告 / スリップをアップロード",
+                        "uri": upload_url
+                    }
+                },
+                {
+                    "type": "text",
+                    "text": "เมื่อโอนเงินแล้ว กรุณากดปุ่มด้านบนเพื่อแนบหลักฐาน" if lang == "th" else "After transfer, please click above to attach proof." if lang == "en" else "送金後、上のボタンをクリックして証明書を添付してください。",
+                    "size": "xs",
+                    "color": "#888888",
+                    "align": "center",
+                    "margin": "sm"
+                }
+            ]
+        }
+
     try:
         # Send Flex Message first
         bot_api.push_message(
@@ -3149,7 +3246,7 @@ def send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_oth
             )
         )
         
-        # Send Image Message for QR Code (easy to capture/save)
+        # We still send the Image Message as it is easier for users to save/share for bank app scan
         if qr_enabled and encoded_payload:
             # Re-generate larger QR for clear scanning/saving
             qr_large_url = f"https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data={encoded_payload}"

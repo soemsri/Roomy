@@ -508,6 +508,7 @@
     "error_cancel_paid_invoice": "Cannot cancel a paid invoice.",
     "receipt_alt_text": "Receipt",
     "payment_verified_msg": "✅ Payment completed! Bill for month {period} has been verified. Thank you.",
+    "move_in_approved_welcome_msg": "🎉 Warm welcome to our apartment! Your move-in registration has been successfully approved.",
     "payment_invalid_msg": "❌ Notification: The payment slip for month {month}/{year} is invalid. Please check and upload again.",
     "error_not_registered_line": "Cannot send: Tenant has not registered for LINE yet.",
     "error_missing_fields": "Please fill in all required fields.",

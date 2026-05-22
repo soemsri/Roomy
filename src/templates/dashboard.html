@@ -589,6 +589,7 @@
                                     {% if initial_bill %}
                                         {% if initial_bill.status == 'Pending Verification' %}
                                             <button class="btn btn-primary" style="background: var(--success);" onclick="approveInvoice({{ initial_bill.id }})">{{ get_text('approve_payment', lang) }}</button>
+                                            <button class="btn btn-danger" style="background: var(--danger); border:none; margin-left:5px;" onclick="rejectInvoice({{ initial_bill.id }})">{{ get_text('reject', lang) }}</button>
                                         {% else %}
                                             <button class="btn btn-secondary" onclick="confirmCashPayment({{ initial_bill.id }})">
                                                 <i class="fa-solid fa-money-bill-1-wave"></i> {{ get_text('receive_cash', lang) }}
@@ -1907,43 +1908,43 @@
             load_error: "{{ get_text('load_error', lang) }}",
             room: "{{ get_text('room', lang) }}",
             tenant: "{{ get_text('tenant', lang) }}",
-            move_in: "{{ get_text('move_in_date_label', lang) }}",
-            move_out: "{{ get_text('move_out_date_label', lang) }}",
+            move_in: "{{ get_text('move_in_date', lang) }}",
+            move_out: "{{ get_text('move_out_date', lang) }}",
             co_residents: "{{ get_text('co_residents_title', lang) }}",
             no_co_residents: "{{ get_text('no_co_residents', lang) }}",
             no_financial_data: "{{ get_text('no_financial_data', lang) }}",
             settlement_date: "{{ get_text('settlement_date', lang) }}",
             deductions: "{{ get_text('settlement_deductions', lang) }}",
-            pro_rated: "{{ get_text('pro_rated_label', lang) }}",
-            elec: "{{ get_text('elec_units_label', lang) }}",
-            water: "{{ get_text('water_units_label', lang) }}",
-            unpaid: "{{ get_text('unpaid_balance_label', lang) }}",
-            cleaning: "{{ get_text('cleaning_fee_label', lang) }}",
-            damage: "{{ get_text('damage_fee_label', lang) }}",
-            other: "{{ get_text('other_deductions_label', lang) }}",
+            pro_rated: "{{ get_text('pro_rated', lang) }}",
+            elec: "{{ get_text('elec', lang) }}",
+            water: "{{ get_text('water', lang) }}",
+            unpaid: "{{ get_text('unpaid', lang) }}",
+            cleaning: "{{ get_text('cleaning', lang) }}",
+            damage: "{{ get_text('damage', lang) }}",
+            other: "{{ get_text('other', lang) }}",
             deposits: "{{ get_text('settlement_deposits', lang) }}",
-            deposit_total: "{{ get_text('security_deposit_total', lang) }}",
-            refund_summary: "{{ get_text('refund_to_tenant_label', lang) }}",
-            due_summary: "{{ get_text('due_from_tenant_label', lang) }}",
-            refund_method: "{{ get_text('refund_method_display', lang) }}",
-            notes: "{{ get_text('additional_notes_label', lang) }}",
+            deposit_total: "{{ get_text('deposit_total', lang) }}",
+            refund_summary: "{{ get_text('refund_to_tenant', lang) }}",
+            due_summary: "{{ get_text('due_from_tenant', lang) }}",
+            refund_method: "{{ get_text('refund_method', lang) }}",
+            notes: "{{ get_text('notes', lang) }}",
             no_notes: "{{ get_text('none', lang) }}",
             co_residents_at_move_out: "{{ get_text('co_residents_at_move_out_title', lang) }}",
-            view_receipt: "{{ get_text('view_refund_slip_btn', lang) }}",
+            view_receipt: "{{ get_text('view_receipt', lang) }}",
             no_repair_history: "{{ get_text('no_repair_requests', lang) }}",
-            repair_subject: "{{ get_text('repair_subject_label', lang) }}",
-            repair_details: "{{ get_text('repair_details_label', lang) }}",
+            repair_subject: "{{ get_text('repair_title', lang) }}",
+            repair_details: "{{ get_text('repair_desc', lang) }}",
             no_additional_details: "{{ get_text('no_additional_details', lang) }}",
-            attached_images: "{{ get_text('attached_images_label', lang) }}",
+            attached_images: "{{ get_text('repair_image', lang) }}",
             save_status_success: "{{ get_text('save_status_success', lang) }}",
             save_status_error: "{{ get_text('save_status_error', lang) }}",
             send_message_prompt: "{{ get_text('send_message_prompt', lang) }}",
             send_message_success: "{{ get_text('send_message_success', lang) }}",
-            no_data: "{{ get_text('no_data', lang) }}",
+            no_data: "{{ get_text('no_data_found', lang) }}",
             edit: "{{ get_text('edit', lang) }}",
             delete: "{{ get_text('delete', lang) }}",
             confirm_delete_resident: "{{ get_text('confirm_delete_resident', lang) }}",
-            no_template_data: "{{ get_text('no_template_data', lang) }}",
+            no_template_data: "{{ get_text('no_lease_content', lang) }}",
             paid: "{{ get_text('paid', lang) }}",
             pending_pay: "{{ get_text('initial_payment_pending', lang) }}",
             no_lease_data: "{{ get_text('no_lease_data', lang) }}",
@@ -1951,47 +1952,47 @@
             save_receipt: "{{ get_text('save_receipt', lang) }}",
             currency_baht: "{{ get_text('currency_baht', lang) }}",
             initial_payment_error: "{{ get_text('initial_payment_error', lang) }}",
-            fee_name_placeholder: "{{ get_text('fee_name_placeholder', lang) }}",
-            fixed_baht: "{{ get_text('fixed_baht', lang) }}",
-            multiplier_rent: "{{ get_text('multiplier_rent', lang) }}",
-            save_move_in_fees_success: "{{ get_text('save_move_in_fees_success', lang) }}",
+            fee_name_placeholder: "{{ get_text('asset_name', lang) }}",
+            fixed_baht: "{{ get_text('cash', lang) }}",
+            multiplier_rent: "{{ get_text('rent', lang) }}",
+            save_move_in_fees_success: "{{ get_text('save_success', lang) }}",
             detailed_info: "{{ get_text('detailed_info_title', lang) }}",
             no_tenant: "{{ get_text('no_tenant', lang) }}",
             no_items: "{{ get_text('no_items', lang) }}",
             no_payment_data: "{{ get_text('no_payment_data', lang) }}",
             confirm_delete_asset: "{{ get_text('confirm_delete_asset', lang) }}",
-            confirm_delete_building: "{{ get_text('confirm_delete_building', lang) }}",
-            confirm_delete_building_warn: "{{ get_text('confirm_delete_building_warn', lang) }}",
-            upload_qr_success: "{{ get_text('upload_qr_success', lang) }}",
-            no_qr_image: "{{ get_text('no_qr_image', lang) }}",
-            load_image_error: "{{ get_text('load_image_error', lang) }}",
-            broadcast_success: "{{ get_text('broadcast_success', lang) }}",
-            save_settings_success: "{{ get_text('save_settings_success', lang) }}",
-            recurring_desc_placeholder: "{{ get_text('recurring_desc_placeholder', lang) }}",
-            recurring_amount_placeholder: "{{ get_text('recurring_amount_placeholder', lang) }}",
-            other_charge_desc_placeholder: "{{ get_text('other_charge_desc_placeholder', lang) }}",
-            other_charge_amt_placeholder: "{{ get_text('other_charge_amt_placeholder', lang) }}",
+            confirm_delete_building: "{{ get_text('confirm_delete_building_msg', lang) }}",
+            confirm_delete_building_warn: "{{ get_text('confirm_delete_building_msg', lang) }}",
+            upload_qr_success: "{{ get_text('save_success', lang) }}",
+            no_qr_image: "{{ get_text('no_data_found', lang) }}",
+            load_image_error: "{{ get_text('error', lang) }}",
+            broadcast_success: "{{ get_text('success', lang) }}",
+            save_settings_success: "{{ get_text('save_success', lang) }}",
+            recurring_desc_placeholder: "{{ get_text('description', lang) }}",
+            recurring_amount_placeholder: "{{ get_text('amount', lang) }}",
+            other_charge_desc_placeholder: "{{ get_text('description', lang) }}",
+            other_charge_amt_placeholder: "{{ get_text('amount', lang) }}",
             none: "{{ get_text('none', lang) }}",
             recorded_at: "{{ get_text('recorded_at', lang) }}",
-            fill_required_error: "{{ get_text('fill_required_error', lang) }}",
+            fill_required_error: "{{ get_text('fill_required_fields', lang) }}",
             preliminary_calculation_note: "{{ get_text('preliminary_calculation_note', lang) }}",
-            fill_all_required: "{{ get_text('fill_all_required', lang) }}",
-            loading_rooms: "{{ get_text('loading_rooms_msg', lang) }}",
-            vacant_room: "{{ get_text('vacant_room', lang) }}",
+            fill_all_required: "{{ get_text('fill_required_fields', lang) }}",
+            loading_rooms: "{{ get_text('loading_rooms', lang) }}",
+            vacant_room: "{{ get_text('vacant_room_label', lang) }}",
             recorded: "{{ get_text('recorded', lang) }}",
             not_recorded: "{{ get_text('not_recorded', lang) }}",
-            view_slip: "{{ get_text('view_slip', lang) }}",
-            cancel_confirm: "{{ get_text('cancel_confirm', lang) }}",
+            view_slip: "{{ get_text('view_receipt', lang) }}",
+            cancel_confirm: "{{ get_text('confirm_delete', lang) }}",
             select_at_least_one_room: "{{ get_text('select_at_least_one_room', lang) }}",
             processing: "{{ get_text('processing', lang) }}",
             approve_success: "{{ get_text('approve_success', lang) }}",
-            cancel_move_out_confirm: "{{ get_text('cancel_move_out_confirm', lang) }}",
+            cancel_move_out_confirm: "{{ get_text('confirm_cancel_move_out', lang) }}",
             cancel_move_out_error: "{{ get_text('cancel_move_out_error', lang) }}",
             confirm_close_account: "{{ get_text('confirm_close_account', lang) }}",
             account_closed_success: "{{ get_text('account_closed_success', lang) }}",
-            empty: "{{ get_text('empty', lang) }}",
-            save_lease_template_success: "{{ get_text('save_lease_template_success', lang) }}",
-            no_building_data: "{{ get_text('no_building_data', lang) }}",
+            empty: "{{ get_text('none', lang) }}",
+            save_lease_template_success: "{{ get_text('save_success', lang) }}",
+            no_building_data: "{{ get_text('no_data_found', lang) }}",
             error: "{{ get_text('error', lang) }}",
             success: "{{ get_text('success', lang) }}",
             upload_failed: "{{ get_text('upload_failed', lang) }}",
@@ -2000,8 +2001,12 @@
             failed_to_send: "{{ get_text('failed_to_send', lang) }}",
             floor: "{{ get_text('floor', lang) }}",
             select_building_placeholder: "{{ get_text('select_building_placeholder', lang) }}",
-            no_rooms_available: "{{ get_text('no_rooms_available', lang) }}",
-            room_label: "{{ get_text('room', lang) }}"
+            no_rooms_available: "{{ get_text('no_vacant_rooms', lang) }}",
+            room_label: "{{ get_text('room', lang) }}",
+            print_receipt: "{{ get_text('print_receipt', lang) }}",
+            status: "{{ get_text('status', lang) }}",
+            payment_date: "{{ get_text('payment_date_label', lang) }}",
+            view_details: "{{ get_text('view_details', lang) }}"
         };
 
         function setLanguage(lang) {
@@ -3060,9 +3065,24 @@
                         ${ocHtml}
                     </div>
                     <div style="display:flex; justify-content:space-between; font-size:1.2em; font-weight:700; color:var(--primary);"><span>{{ get_text('total', lang) }}</span><span>${d.total.toLocaleString()} บาท</span></div>
-                    ${d.paid_at ? `<div style="margin-top:20px; font-size:0.85em; color:var(--success); border-top:1px dashed var(--border); padding-top:15px;"><i class="fa-solid fa-check-circle"></i> {{ get_text('paid_on', lang) if get_text('paid_on', lang) != 'paid_on' else 'Paid at' }}: ${d.paid_at}${d.receipt_img ? `<br><a href="${d.receipt_img}" target="_blank" style="color:var(--primary); text-decoration:underline;">[ ${translations.view_slip} ]</a>` : ''}</div>` : ''}`;
+                    ${d.paid_at || d.receipt_img ? `
+                        <div style="margin-top:20px; font-size:0.85em; border-top:1px dashed var(--border); padding-top:15px;">
+                            ${d.paid_at ? `<div style="color:var(--success); margin-bottom:10px;"><i class="fa-solid fa-check-circle"></i> {{ get_text('paid_on', lang) if get_text('paid_on', lang) != 'paid_on' else 'Paid at' }}: ${d.paid_at}</div>` : ''}
+                            ${d.receipt_img ? `
+                                <div style="text-align:center;">
+                                    <label style="display:block; margin-bottom:10px; color:var(--text-muted);">{{ get_text('payment_proof', lang) }}</label>
+                                    <a href="${d.receipt_img}" target="_blank">
+                                        <img src="${d.receipt_img}" style="max-width:100%; max-height:300px; border-radius:8px; border:1px solid var(--border); box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+                                    </a>
+                                    <p style="margin-top:5px; font-size:0.9em;"><a href="${d.receipt_img}" target="_blank" style="color:var(--primary); text-decoration:underline;">[ ${translations.view_slip} ]</a></p>
+                                </div>
+                            ` : ''}
+                        </div>
+                    ` : ''}`;
             } catch (err) { body.innerHTML = `<p style="color:var(--danger);">${translations.load_error}: ${err.message}</p>`; }
         }
+
+        function viewSlip(id) { viewInvoiceDetails(id); }
 
         async function cancelInvoice(id) { if(confirm(translations.cancel_confirm)) { await fetch(`/admin/invoice/${id}/cancel`, {method:'POST'}); location.reload(); } }
         async function requestPayment(id) {

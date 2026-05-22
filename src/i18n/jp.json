@@ -508,6 +508,7 @@
     "error_cancel_paid_invoice": "支払い済みの請求書はキャンセルできません。",
     "receipt_alt_text": "領収書",
     "payment_verified_msg": "✅ お支払いが完了しました！{period} 分の請求書が確認されました。ありがとうございます。",
+    "move_in_approved_welcome_msg": "🎉 アパートへようこそ！入居登録が正常に承認されました。",
     "payment_invalid_msg": "❌ 通知: {month}/{year} 分の支払い明細書が正しくありません。確認して再度アップロードしてください。",
     "error_not_registered_line": "送信できません：テナントがまだLINEに登録されていません。",
     "error_missing_fields": "すべての必須項目を入力してください。",
