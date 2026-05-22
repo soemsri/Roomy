@@ -112,16 +112,17 @@ class TestRepairNotification(unittest.TestCase):
         # Verify bot was called twice (once for text, once for image)
         self.assertEqual(mock_bot.push_message.call_count, 2)
         
-        # Check second call (ImageSendMessage)
+        # Check second call (ImageMessage inside PushMessageRequest)
         args, kwargs = mock_bot.push_message.call_args_list[1]
+        req = args[0]
         # The code might be returning the ID from the DB
         db = TestingSessionLocal()
         owner = db.query(models.Owner).first()
         db.close()
-        self.assertEqual(args[0], owner.line_user_id)
-        self.assertIsInstance(args[1], ImageSendMessage)
-        self.assertTrue(args[1].original_content_url.startswith("http"))
-        self.assertIn("/uploads/repair_", args[1].original_content_url)
+        self.assertEqual(req.to, owner.line_user_id)
+        msg_obj = req.messages[0]
+        self.assertTrue(msg_obj.original_content_url.startswith("http"))
+        self.assertIn("/uploads/repair_", msg_obj.original_content_url)
 
     @patch("main.admin_bot_api", None)
     @patch("main.send_line_notify")

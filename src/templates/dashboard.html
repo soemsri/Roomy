@@ -257,6 +257,7 @@
 
         /* Badges & Buttons */
         .badge { padding: 6px 12px; border-radius: 20px; font-size: 0.75em; font-weight: 700; }
+        .badge-primary { background: #e0e7ff; color: #4338ca; }
         .badge-success { background: #dcfce7; color: #166534; }
         .badge-warning { background: #fef3c7; color: #92400e; }
         .badge-danger { background: #fee2e2; color: #991b1b; }
@@ -495,7 +496,7 @@
             {% if pending_registrations|length > 0 %}
             <div class="section-header">
                 <h2><i class="fa-solid fa-user-plus" style="color: var(--warning);"></i> {{ get_text('new_registration_approval_title', lang) }}</h2>
-                <span class="badge" style="background: var(--warning);">{{ get_text('step', lang) }} 1: {{ get_text('issue_initial_bill', lang) }}</span>
+                <span class="badge badge-warning">{{ get_text('step', lang) }} 1: {{ get_text('issue_initial_bill', lang) }}</span>
             </div>
             <div class="table-container" style="margin-bottom: 30px;">
                 <table>
@@ -554,7 +555,7 @@
             {% if awaiting_payment_tenants|length > 0 %}
             <div class="section-header">
                 <h2><i class="fa-solid fa-clock" style="color: var(--primary);"></i> {{ get_text('awaiting_initial_payment', lang) }}</h2>
-                <span class="badge" style="background: var(--primary);">{{ get_text('step', lang) }} 2: {{ get_text('payment_verification', lang) }}</span>
+                <span class="badge badge-primary">{{ get_text('step', lang) }} 2: {{ get_text('payment_verification', lang) }}</span>
             </div>
             <div class="table-container" style="margin-bottom: 30px;">
                 <table>
@@ -569,20 +570,38 @@
                     </thead>
                     <tbody>
                         {% for t in awaiting_payment_tenants %}
-                            {% set initial_bill = t.invoices|selectattr("invoice_type", "equalto", "Initial")|selectattr("status", "ne", "Paid")|first %}
+                            {% set ns = namespace(initial_bill=None) %}
+                            {% for inv in t.invoices %}
+                                {% if inv.invoice_type == "Initial" and inv.status != "Paid" %}
+                                    {% set ns.initial_bill = inv %}
+                                {% endif %}
+                            {% endfor %}
+                            {% set initial_bill = ns.initial_bill %}
                             <tr>
                                 <td style="font-weight: 600;">{{ t.full_name }}</td>
                                 <td>{{ t.room.room_number if t.room else 'N/A' }}</td>
-                                <td>฿{{ "{:,.2f}".format(initial_bill.total_amount) if initial_bill else '-' }}</td>
+                                <td>
+                                    {% if initial_bill %}
+                                        ฿{{ "{:,.2f}".format(initial_bill.total_amount) }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
                                 <td>
                                     {% if initial_bill %}
                                         {% if initial_bill.status == 'Pending Verification' %}
-                                            <span class="badge" style="background: var(--warning); cursor: pointer;" onclick="viewSlip({{ initial_bill.id }})">{{ get_text('status_pending', lang) }}</span>
+                                            <span class="badge badge-warning" style="cursor: pointer;" onclick="viewSlip({{ initial_bill.id }})">
+                                                <i class="fa-solid fa-receipt"></i> {{ get_text('status_slip_uploaded', lang) }}
+                                            </span>
                                         {% else %}
-                                            <span class="badge" style="background: #95a5a6;">{{ get_text('status_unpaid', lang) }}</span>
+                                            <span class="badge badge-info">
+                                                <i class="fa-solid fa-hourglass-start"></i> {{ get_text('status_awaiting_transfer', lang) }}
+                                            </span>
                                         {% endif %}
                                     {% else %}
-                                        -
+                                        <span class="badge badge-danger">
+                                            <i class="fa-solid fa-triangle-exclamation"></i> ไม่พบข้อมูลบิล
+                                        </span>
                                     {% endif %}
                                 </td>
                                 <td>

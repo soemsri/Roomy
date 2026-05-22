@@ -104,12 +104,21 @@ def test_registration_flow():
     # We need to simulate the login or bypass security if needed
     owner = db.query(models.Owner).first()
     owner.password_hash = "fake_hash"
+    owner.session_token = "fake_hash"
     db.commit()
     
     room = db.query(models.Room).filter(models.Room.room_number == "R101").first()
     
     cookies = {"admin_session": "fake_hash"}
-    res = client.post(f"/admin/registration/{tenant.id}/approve", data={"room_ids": str(room.id)}, cookies=cookies)
+    # Step 2a: Request initial payment (Step 1 of approval)
+    res = client.post(f"/admin/registration/{tenant.id}/request-payment", data={"room_ids": str(room.id)}, cookies=cookies)
+    assert res.status_code == 200
+    
+    # Step 2b: Approve the initial payment invoice (Step 2 of approval)
+    invoice = db.query(models.Invoice).filter(models.Invoice.tenant_id == tenant.id).first()
+    assert invoice is not None
+    
+    res = client.post(f"/admin/invoice/{invoice.id}/approve", cookies=cookies)
     assert res.status_code == 200
     
     db.refresh(tenant)

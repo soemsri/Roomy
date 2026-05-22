@@ -47,7 +47,7 @@ class MockEvent:
         self.message = MockMessage(text)
         self.reply_token = reply_token
 
-def run_dual_channel_tests():
+def test_run_dual_channel_tests():
     # Use localized overrides and mocks
     app.dependency_overrides[get_db] = override_get_db
     client = TestClient(app)

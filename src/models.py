@@ -121,6 +121,7 @@ class Tenant(Base):
     
     room = relationship("Room")
     residents = relationship("Resident", back_populates="tenant", cascade="all, delete-orphan")
+    invoices = relationship("Invoice", back_populates="tenant", cascade="all, delete-orphan")
 
 class MoveOutRequest(Base):
     __tablename__ = "move_out_requests"
@@ -261,7 +262,7 @@ class Invoice(Base):
     is_pro_rata = Column(Integer, default=0) # 0 = No, 1 = Yes
     
     room = relationship("Room")
-    tenant = relationship("Tenant")
+    tenant = relationship("Tenant", back_populates="invoices")
 
 class Expense(Base):
     __tablename__ = "expenses"

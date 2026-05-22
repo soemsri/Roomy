@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="{{ lang or 'th' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ get_text('upload_slip', lang) }} - SukAnan Apartment</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #1DB446;
+            --primary-dark: #159e38;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --success: #22c55e;
+            --warning: #f59e0b;
+        }
+        body {
+            font-family: 'Inter', 'Noto Sans Thai', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            width: 100%;
+            max-width: 450px;
+            background: var(--card);
+            border-radius: 16px;
+            box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.05);
+            padding: 40px 30px;
+            text-align: center;
+            box-sizing: border-box;
+            border: 1px solid rgba(226, 232, 240, 0.8);
+        }
+        .title {
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: #475569;
+            margin-bottom: 30px;
+            margin-top: 0;
+        }
+        .upload-box {
+            border: 2px dashed #cbd5e1;
+            border-radius: 12px;
+            padding: 40px 20px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            background: #fafafa;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 220px;
+        }
+        .upload-box:hover {
+            border-color: var(--primary);
+            background: #f0fdf4;
+        }
+        .upload-box i {
+            font-size: 3.5rem;
+            color: #64748b;
+            margin-bottom: 20px;
+            transition: color 0.2s ease;
+        }
+        .upload-box:hover i {
+            color: var(--primary);
+        }
+        .upload-box p {
+            margin: 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #1e293b;
+        }
+        .btn {
+            width: 100%;
+            padding: 16px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-top: 30px;
+            box-shadow: 0 4px 12px rgba(29, 180, 70, 0.2);
+        }
+        .btn:hover {
+            background: var(--primary-dark);
+            box-shadow: 0 6px 16px rgba(29, 180, 70, 0.3);
+            transform: translateY(-1px);
+        }
+        .btn:active {
+            transform: translateY(1px);
+        }
+        .btn:disabled {
+            background: #cbd5e1;
+            color: #94a3b8;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+        #preview-img {
+            max-width: 100%;
+            max-height: 250px;
+            border-radius: 8px;
+            display: none;
+            object-fit: contain;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+        
+        /* Status Views */
+        .status-container {
+            padding: 20px 0;
+        }
+        .status-icon {
+            font-size: 4.5rem;
+            margin-bottom: 25px;
+        }
+        .status-success { color: var(--primary); }
+        .status-pending { color: var(--warning); }
+        
+        .status-title {
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 12px;
+        }
+        .status-desc {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+            line-height: 1.65;
+            margin: 0 auto;
+            max-width: 320px;
+        }
+        .receipt-preview {
+            max-width: 180px;
+            border-radius: 12px;
+            margin-top: 25px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        {% if status == 'Unpaid' %}
+            <h2 class="title">{{ get_text('upload_slip', lang) }}</h2>
+            <div class="upload-box" onclick="document.getElementById('slip-input').click()">
+                <i class="fa-solid fa-cloud-arrow-up" id="upload-icon"></i>
+                <p id="upload-text">{{ get_text('click_to_upload', lang) }}</p>
+                <input type="file" id="slip-input" hidden accept="image/*" onchange="previewSlip(this)">
+                <img id="preview-img">
+            </div>
+            
+            <button class="btn" id="submit-btn" onclick="uploadSlip()" disabled>
+                {{ get_text('confirm_payment', lang) }}
+            </button>
+        {% elif status == 'Pending Verification' %}
+            <div class="status-container">
+                <i class="fa-solid fa-clock-rotate-left status-icon status-pending"></i>
+                <h3 class="status-title">{{ get_text('verifying_payment', lang) }}</h3>
+                <p class="status-desc">{{ get_text('verification_desc', lang) }}</p>
+                {% if invoice.payment_receipt_img %}
+                    <img src="{{ invoice.payment_receipt_img }}" class="receipt-preview">
+                {% endif %}
+            </div>
+        {% else %}
+            <div class="status-container">
+                <i class="fa-solid fa-circle-check status-icon status-success"></i>
+                <h3 class="status-title">{{ get_text('payment_completed', lang) }}</h3>
+                <p class="status-desc">{{ get_text('thank_you', lang) }}</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <script>
+        function previewSlip(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = document.getElementById('preview-img');
+                    const icon = document.getElementById('upload-icon');
+                    const text = document.getElementById('upload-text');
+                    
+                    img.src = e.target.result;
+                    img.style.display = 'block';
+                    
+                    icon.style.display = 'none';
+                    text.style.display = 'none';
+                    
+                    document.getElementById('submit-btn').disabled = false;
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        async function uploadSlip() {
+            const input = document.getElementById('slip-input');
+            if (!input.files[0]) return;
+
+            const btn = document.getElementById('submit-btn');
+            btn.disabled = true;
+            btn.innerText = '{{ get_text("uploading", lang) }}';
+
+            const formData = new FormData();
+            formData.append('image', input.files[0]);
+
+            try {
+                const res = await fetch(`/bill/{{ invoice_uuid }}/upload-slip`, {
+                    method: 'POST',
+                    body: formData
+                });
+                if (res.ok) {
+                    location.reload();
+                } else {
+                    alert('{{ get_text("upload_error", lang) }}');
+                    btn.disabled = false;
+                    btn.innerText = '{{ get_text("confirm_payment", lang) }}';
+                }
+            } catch (err) {
+                alert('{{ get_text("connection_error", lang) }}');
+                btn.disabled = false;
+                btn.innerText = '{{ get_text("confirm_payment", lang) }}';
+            }
+        }
+    </script>
+</body>
+</html>

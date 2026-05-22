@@ -39,7 +39,7 @@ def setup_db():
     # Create default owner for tests
     db = TestingSessionLocal()
     hashed_pw = security.hash_password("admin1234")
-    owner = models.Owner(line_user_id="UADMIN", password_hash=hashed_pw)
+    owner = models.Owner(line_user_id="UADMIN", password_hash=hashed_pw, session_token="test_session_token")
     db.add(owner)
     db.commit()
     db.close()
@@ -49,11 +49,9 @@ def setup_db():
     app.dependency_overrides.clear()
 
 def get_admin_cookie():
-    # In the new system, admin_session cookie stores the password hash
-    # We must use the SAME hash as stored in the DB because it's used as a session token
     db = TestingSessionLocal()
     owner = db.query(models.Owner).first()
-    cookie = {"admin_session": owner.password_hash}
+    cookie = {"admin_session": owner.session_token}
     db.close()
     return cookie
 
@@ -157,3 +155,100 @@ def test_meter_and_billing(setup_db):
     )
     assert response.status_code == 200
     assert response.json()["invoice_uuid"] is not None
+
+def test_bill_not_found(setup_db):
+    response = client.get("/bill/non_existent_uuid")
+    assert response.status_code == 404
+    assert "ไม่พบข้อมูลใบแจ้งหนี้" in response.text
+    
+    response_en = client.get("/bill/non_existent_uuid?lang=en")
+    assert response_en.status_code == 404
+    assert "Invoice Not Found" in response_en.text
+
+    response_jp = client.get("/bill/non_existent_uuid?lang=jp")
+    assert response_jp.status_code == 404
+    assert "請求書が見つかりません" in response_jp.text
+
+
+def test_confirm_cash_payment_notification(setup_db):
+    from unittest.mock import MagicMock
+    import main
+    
+    # 1. Mock tenant_bot_api and BASE_URL
+    main.tenant_bot_api = MagicMock()
+    main.BASE_URL = "https://mockurl.com"
+    
+    # 2. Add Room & Tenant
+    cookies = get_admin_cookie()
+    client.post("/admin/rooms/add", data={
+        "room_number": "D401", "floor": 4, "base_rent": 5000, "electricity_rate": 8, "water_rate": 18
+    }, cookies=cookies)
+    
+    db = TestingSessionLocal()
+    room = db.query(models.Room).filter(models.Room.room_number == "D401").first()
+    
+    tenant = models.Tenant(
+        line_user_id="U_MOCK_TENANT_123", 
+        current_room_id=room.id, 
+        status="Active", 
+        language="th",
+        full_name="Mock Tenant"
+    )
+    db.add(tenant)
+    db.commit()
+    
+    # 3. Create an Initial Move-in Invoice for the tenant
+    invoice = models.Invoice(
+        room_id=room.id,
+        tenant_id=tenant.id,
+        billing_month=5,
+        billing_year=2026,
+        rent_amount=5000.0,
+        electricity_amount=0.0,
+        water_amount=0.0,
+        total_amount=5000.0,
+        status="Unpaid",
+        invoice_type="Initial",
+        uuid="mock-invoice-uuid-12345"
+    )
+    db.add(invoice)
+    db.commit()
+    invoice_id = invoice.id
+    db.close()
+    
+    # 4. Invoke Confirm Cash Payment POST endpoint
+    file_content = b"fake receipt image"
+    files = {"image": ("receipt.png", file_content, "image/png")}
+    
+    response = client.post(
+        f"/admin/invoice/{invoice_id}/confirm-cash",
+        files=files,
+        cookies=cookies
+    )
+    
+    assert response.status_code == 200
+    assert response.json()["status"] == "Success"
+    assert "receipt" in response.json()
+    
+    # 5. Verify database updates
+    db = TestingSessionLocal()
+    updated_inv = db.query(models.Invoice).filter(models.Invoice.id == invoice_id).first()
+    assert updated_inv.status == "Paid"
+    assert updated_inv.payment_method == "Cash"
+    assert updated_inv.payment_receipt_img is not None
+    db.close()
+    
+    # 6. Verify that tenant_bot_api.push_message was invoked to send receipt and welcome messages
+    assert main.tenant_bot_api.push_message.call_count == 2
+    
+    # First call is for Flex Receipt Message
+    first_call_args = main.tenant_bot_api.push_message.call_args_list[0][0][0]
+    assert first_call_args.to == "U_MOCK_TENANT_123"
+    assert len(first_call_args.messages) == 1
+    assert first_call_args.messages[0].alt_text == "ใบเสร็จรับเงิน"
+    
+    # Second call is for Initial Move-in Welcome Message
+    second_call_args = main.tenant_bot_api.push_message.call_args_list[1][0][0]
+    assert second_call_args.to == "U_MOCK_TENANT_123"
+    assert len(second_call_args.messages) == 1
+    assert "ยินดีต้อนรับ" in second_call_args.messages[0].text or "Welcome" in second_call_args.messages[0].text or "✅" in second_call_args.messages[0].text

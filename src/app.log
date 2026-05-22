@@ -24,3 +24,19 @@ HTTP response body: {"message":"A message (messages[0]) in the request body is 
 ยอด: 5,178.00 บาท
 ตรวจสอบได้ที่ dashboard
 2026-05-22 13:14:18,460 - __main__ - ERROR - Tenant Webhook Error: name 'owner' is not defined
+2026-05-22 19:22:20,647 - __main__ - ERROR - Error sending initial payment flex/image: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
+2026-05-22 19:48:34,109 - __main__ - INFO - LINE NOTIFY (Mock): 💰 สลิปใหม่: ห้อง 203
+ยอด: 12,850.00 บาท
+ตรวจสอบได้ที่ dashboard
+2026-05-22 19:54:15,908 - __main__ - INFO - LINE NOTIFY (Mock): 💰 สลิปใหม่: ห้อง 203
+ยอด: 12,850.00 บาท
+ตรวจสอบได้ที่ dashboard
+2026-05-22 20:03:28,858 - __main__ - INFO - LINE NOTIFY (Mock): 💰 สลิปใหม่: ห้อง 203
+ยอด: 12,850.00 บาท
+ตรวจสอบได้ที่ dashboard
+2026-05-22 20:19:58,320 - __main__ - ERROR - Error creating personal rich menu: {"message":"The request body has 1 error(s)","details":[{"message":"must not be longer than 14 characters","property":"chatBarText"}]}
+2026-05-22 21:24:25,409 - __main__ - ERROR - Error creating personal rich menu: {"message":"The request body has 1 error(s)","details":[{"message":"must not be longer than 14 characters","property":"chatBarText"}]}
+2026-05-22 21:30:08,670 - __main__ - INFO - LINE NOTIFY (Mock): 💰 สลิปใหม่: ห้อง 205
+ยอด: 8,500.00 บาท
+ตรวจสอบได้ที่ dashboard
+2026-05-22 21:31:05,657 - __main__ - ERROR - Error creating personal rich menu: {"message":"The request body has 1 error(s)","details":[{"message":"must not be longer than 14 characters","property":"chatBarText"}]}

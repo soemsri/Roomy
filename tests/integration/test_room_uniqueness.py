@@ -25,7 +25,7 @@ def fixture_db_session():
     try:
         # Add Owner for auth
         hashed_pw = security.hash_password("admin1234")
-        owner = models.Owner(line_user_id="UADMIN", password_hash=hashed_pw)
+        owner = models.Owner(line_user_id="UADMIN", password_hash=hashed_pw, session_token="test_session_token")
         db.add(owner)
         
         # Add two buildings for tests
@@ -53,7 +53,7 @@ def fixture_client(db_session):
 
 def get_admin_cookie(db_session):
     owner = db_session.query(models.Owner).first()
-    return {"admin_session": owner.password_hash}
+    return {"admin_session": owner.session_token}
 
 def test_add_duplicate_room_different_buildings(client, db_session):
     cookies = get_admin_cookie(db_session)

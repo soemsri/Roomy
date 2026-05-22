@@ -883,7 +883,30 @@ async def get_vacant_rooms(bid: int, db: Session = Depends(get_db)):
 @app.get("/bill/{invoice_uuid}", response_class=HTMLResponse)
 async def view_bill(request: Request, invoice_uuid: str, db: Session = Depends(get_db)):
     invoice = db.query(models.Invoice).filter(models.Invoice.uuid == invoice_uuid).first()
-    if not invoice: raise HTTPException(status_code=404, detail="Invoice not found")
+    if not invoice:
+        lang = request.query_params.get("lang", "th")
+        if lang not in ["en", "th", "jp"]:
+            lang = "th"
+        return templates.TemplateResponse("bill_not_found.html", {
+            "request": request,
+            "lang": lang
+        }, status_code=404)
+
+    # Multi-language: Use lang from query param or tenant's profile
+    lang = request.query_params.get("lang")
+    if not lang and invoice.tenant:
+        lang = invoice.tenant.language
+    if not lang:
+        lang = "th"
+
+    if invoice.invoice_type == "Initial":
+        return templates.TemplateResponse("uploadslip.html", {
+            "request": request,
+            "invoice": invoice,
+            "invoice_uuid": invoice_uuid,
+            "status": invoice.status,
+            "lang": lang
+        })
     
     owner = db.query(models.Owner).first()
     
@@ -2313,110 +2336,7 @@ async def delete_room_asset(asset_id: int, db: Session = Depends(get_db), admin:
     return {"status": "Success"}
 
 
-@app.post("/admin/invoice/{invoice_id}/confirm-cash")
-async def confirm_cash_payment(
-    invoice_id: int, 
-    image: UploadFile = File(...), 
-    db: Session = Depends(get_db),
-    admin: bool = Depends(get_admin)
-):
-    invoice = db.query(models.Invoice).filter(models.Invoice.id == invoice_id).first()
-    if not invoice: raise HTTPException(status_code=404, detail="Invoice not found")
-    
-    file_ext = os.path.splitext(image.filename)[1]
-    file_name = f"receipt_{invoice_id}_{uuid.uuid4().hex}{file_ext}"
-    file_path = os.path.join(uploads_dir, file_name)
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(image.file, buffer)
-    
-    invoice.status = "Paid"
-    invoice.payment_method = "Cash"
-    invoice.payment_receipt_img = f"/uploads/{file_name}"
-    invoice.paid_at = datetime.now()
-    
-    # NEW: Trigger Final Approval if this was an Initial Move-in Bill
-    if invoice.invoice_type == "Initial":
-        owner = db.query(models.Owner).first()
-        perform_final_approval(db, invoice, owner)
-
-    db.commit()
-    return {"status": "Success", "receipt": invoice.payment_receipt_img}
-
-@app.post("/admin/invoice/{invoice_id}/cancel")
-async def cancel_invoice(invoice_id: int, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
-    invoice = db.query(models.Invoice).filter(models.Invoice.id == invoice_id).first()
-    if not invoice: raise HTTPException(status_code=404, detail="Invoice not found")
-    
-    if invoice.status == "Paid":
-        raise HTTPException(status_code=400, detail="ไม่สามารถยกเลิกบิลที่ชำระเงินเรียบร้อยแล้วได้")
-        
-    # We delete the invoice so it can be re-recorded/re-calculated correctly
-    db.delete(invoice)
-    db.commit()
-    return {"status": "Success"}
-
-@app.get("/admin/invoice/{invoice_id}/details")
-async def get_invoice_details(invoice_id: int, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
-    invoice = db.query(models.Invoice).filter(models.Invoice.id == invoice_id).first()
-    if not invoice: raise HTTPException(status_code=404, detail="Invoice not found")
-    
-    import json
-    other_charges = []
-    if invoice.other_charges:
-        try:
-            other_charges = json.loads(invoice.other_charges)
-        except: pass
-
-    # Dynamic late fee update
-    if invoice.status == "Unpaid":
-        import billing
-        late_fee = billing.get_late_fee(db, invoice=invoice)
-        if late_fee != invoice.late_fee:
-            other_amt = sum(float(c.get('amount', 0)) for c in other_charges)
-            subtotal = invoice.rent_amount + invoice.electricity_amount + invoice.water_amount + other_amt
-            invoice.late_fee = late_fee
-            invoice.total_amount = subtotal + late_fee
-            db.commit()
-
-    return {
-        "id": invoice.id,
-        "uuid": invoice.uuid,
-        "room_number": invoice.room.room_number if invoice.room else "N/A",
-        "tenant_name": invoice.tenant.full_name if invoice.tenant else "N/A",
-        "month": invoice.billing_month,
-        "year": invoice.billing_year,
-        "rent": invoice.rent_amount,
-        "elec_reading": invoice.electricity_reading,
-        "prev_elec_reading": invoice.prev_electricity_reading,
-        "elec_amount": invoice.electricity_amount,
-        "water_reading": invoice.water_reading,
-        "prev_water_reading": invoice.prev_water_reading,
-        "water_amount": invoice.water_amount,
-        "other_charges": other_charges,
-        "late_fee": invoice.late_fee,
-        "total": invoice.total_amount,
-        "status": invoice.status,
-        "paid_at": invoice.paid_at.strftime("%d/%m/%Y %H:%M") if invoice.paid_at else None,
-        "receipt_img": invoice.payment_receipt_img
-    }
-
-@app.post("/admin/invoice/{invoice_id}/approve")
-async def approve_invoice(invoice_id: int, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
-    invoice = db.query(models.Invoice).filter(models.Invoice.id == invoice_id).first()
-    if not invoice: raise HTTPException(status_code=404, detail="Invoice not found")
-    
-    invoice.status = "Paid"
-    if not invoice.paid_at:
-        invoice.paid_at = datetime.now()
-    
-    # NEW: Trigger Final Approval if this was an Initial Move-in Bill
-    if invoice.invoice_type == "Initial":
-        owner = db.query(models.Owner).first()
-        perform_final_approval(db, invoice, owner)
-
-    db.commit()
-    
-    # Notify tenant via Flex Message
+async def send_invoice_paid_notification(db: Session, invoice: models.Invoice):
     tenant = invoice.tenant
     if tenant and tenant.line_user_id and tenant_bot_api:
         lang = tenant.language or "th"
@@ -2424,7 +2344,7 @@ async def approve_invoice(invoice_id: int, db: Session = Depends(get_db), admin:
         apt_name = owner.display_name if owner and owner.display_name else "SukAnan Apartment"
         room_no = invoice.room.room_number if invoice.room else "N/A"
         period = f"{invoice.billing_month}/{invoice.billing_year}"
-        paid_date = invoice.paid_at.strftime("%d/%m/%Y %H:%M")
+        paid_date = invoice.paid_at.strftime("%d/%m/%Y %H:%M") if invoice.paid_at else datetime.now().strftime("%d/%m/%Y %H:%M")
         total_fmt = f"{invoice.total_amount:,.2f}"
         
         # Safety check for missing UUID
@@ -2544,6 +2464,117 @@ async def approve_invoice(invoice_id: int, db: Session = Depends(get_db), admin:
                 )
             except Exception as e:
                 logger.error(f"Failed to send welcome message: {e}")
+
+
+@app.post("/admin/invoice/{invoice_id}/confirm-cash")
+async def confirm_cash_payment(
+    invoice_id: int, 
+    image: UploadFile = File(...), 
+    db: Session = Depends(get_db),
+    admin: bool = Depends(get_admin)
+):
+    invoice = db.query(models.Invoice).filter(models.Invoice.id == invoice_id).first()
+    if not invoice: raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    file_ext = os.path.splitext(image.filename)[1]
+    file_name = f"receipt_{invoice_id}_{uuid.uuid4().hex}{file_ext}"
+    file_path = os.path.join(uploads_dir, file_name)
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(image.file, buffer)
+    
+    invoice.status = "Paid"
+    invoice.payment_method = "Cash"
+    invoice.payment_receipt_img = f"/uploads/{file_name}"
+    invoice.paid_at = datetime.now()
+    
+    # NEW: Trigger Final Approval if this was an Initial Move-in Bill
+    if invoice.invoice_type == "Initial":
+        owner = db.query(models.Owner).first()
+        perform_final_approval(db, invoice, owner)
+
+    db.commit()
+    
+    # Notify tenant via LINE receipt
+    await send_invoice_paid_notification(db, invoice)
+    
+    return {"status": "Success", "receipt": invoice.payment_receipt_img}
+
+@app.post("/admin/invoice/{invoice_id}/cancel")
+async def cancel_invoice(invoice_id: int, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+    invoice = db.query(models.Invoice).filter(models.Invoice.id == invoice_id).first()
+    if not invoice: raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    if invoice.status == "Paid":
+        raise HTTPException(status_code=400, detail="ไม่สามารถยกเลิกบิลที่ชำระเงินเรียบร้อยแล้วได้")
+        
+    # We delete the invoice so it can be re-recorded/re-calculated correctly
+    db.delete(invoice)
+    db.commit()
+    return {"status": "Success"}
+
+@app.get("/admin/invoice/{invoice_id}/details")
+async def get_invoice_details(invoice_id: int, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+    invoice = db.query(models.Invoice).filter(models.Invoice.id == invoice_id).first()
+    if not invoice: raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    import json
+    other_charges = []
+    if invoice.other_charges:
+        try:
+            other_charges = json.loads(invoice.other_charges)
+        except: pass
+
+    # Dynamic late fee update
+    if invoice.status == "Unpaid":
+        import billing
+        late_fee = billing.get_late_fee(db, invoice=invoice)
+        if late_fee != invoice.late_fee:
+            other_amt = sum(float(c.get('amount', 0)) for c in other_charges)
+            subtotal = invoice.rent_amount + invoice.electricity_amount + invoice.water_amount + other_amt
+            invoice.late_fee = late_fee
+            invoice.total_amount = subtotal + late_fee
+            db.commit()
+
+    return {
+        "id": invoice.id,
+        "uuid": invoice.uuid,
+        "room_number": invoice.room.room_number if invoice.room else "N/A",
+        "tenant_name": invoice.tenant.full_name if invoice.tenant else "N/A",
+        "month": invoice.billing_month,
+        "year": invoice.billing_year,
+        "rent": invoice.rent_amount,
+        "elec_reading": invoice.electricity_reading,
+        "prev_elec_reading": invoice.prev_electricity_reading,
+        "elec_amount": invoice.electricity_amount,
+        "water_reading": invoice.water_reading,
+        "prev_water_reading": invoice.prev_water_reading,
+        "water_amount": invoice.water_amount,
+        "other_charges": other_charges,
+        "late_fee": invoice.late_fee,
+        "total": invoice.total_amount,
+        "status": invoice.status,
+        "paid_at": invoice.paid_at.strftime("%d/%m/%Y %H:%M") if invoice.paid_at else None,
+        "receipt_img": invoice.payment_receipt_img
+    }
+
+@app.post("/admin/invoice/{invoice_id}/approve")
+async def approve_invoice(invoice_id: int, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+    invoice = db.query(models.Invoice).filter(models.Invoice.id == invoice_id).first()
+    if not invoice: raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    invoice.status = "Paid"
+    if not invoice.paid_at:
+        invoice.paid_at = datetime.now()
+    
+    # NEW: Trigger Final Approval if this was an Initial Move-in Bill
+    if invoice.invoice_type == "Initial":
+        owner = db.query(models.Owner).first()
+        perform_final_approval(db, invoice, owner)
+
+    db.commit()
+    
+    # Notify tenant via Flex Message
+    await send_invoice_paid_notification(db, invoice)
             
     return {"status": "Success"}
 

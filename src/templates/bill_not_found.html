@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="{{ lang or 'th' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ get_text('bill_not_found', lang) }} - SukAnan Apartment</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #1DB446;
+            --danger: #ef4444;
+            --danger-bg: #fef2f2;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+        }
+        body {
+            font-family: 'Inter', 'Noto Sans Thai', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            width: 100%;
+            max-width: 450px;
+            background: var(--card);
+            border-radius: 16px;
+            box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.05);
+            padding: 40px 30px;
+            text-align: center;
+            box-sizing: border-box;
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            position: relative;
+            overflow: hidden;
+        }
+        .container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, #ef4444, #f59e0b);
+        }
+        .icon-box {
+            width: 80px;
+            height: 80px;
+            background-color: var(--danger-bg);
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 24px;
+            color: var(--danger);
+            font-size: 2.2rem;
+            animation: pulse-danger 2s infinite ease-in-out;
+        }
+        .title {
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 12px;
+            margin-top: 0;
+        }
+        .desc {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+            line-height: 1.65;
+            margin: 0 auto 10px auto;
+            max-width: 320px;
+        }
+        .brand-footer {
+            margin-top: 25px;
+            font-size: 0.8rem;
+            color: #94a3b8;
+        }
+        @keyframes pulse-danger {
+            0% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+            }
+            70% {
+                box-shadow: 0 0 0 12px rgba(239, 68, 68, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon-box">
+            <i class="fa-solid fa-file-circle-xmark"></i>
+        </div>
+        <h1 class="title">{{ get_text('bill_not_found', lang) }}</h1>
+        <p class="desc">{{ get_text('bill_not_found_desc', lang) }}</p>
+        
+        <div class="brand-footer">
+            SukAnan Apartment
+        </div>
+    </div>
+</body>
+</html>

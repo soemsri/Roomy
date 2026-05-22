@@ -116,14 +116,7 @@
                     <label>{{ get_text('move_in_date', lang) }}</label>
                     <input type="text" id="requested_move_in_date" required readonly style="background: white; cursor: pointer;">
                 </div>
-                <div class="form-group">
-                    <label>{{ get_text('language_label', lang) }}</label>
-                    <select id="language">
-                        <option value="th" {{ 'selected' if (lang or 'th') == 'th' else '' }}>ภาษาไทย (Thai)</option>
-                        <option value="en" {{ 'selected' if lang == 'en' else '' }}>English</option>
-                        <option value="jp" {{ 'selected' if lang == 'jp' else '' }}>日本語 (Japanese)</option>
-                    </select>
-                </div>
+
                 <button type="submit" class="btn">{{ get_text('submit_registration', lang) }}</button>
             </form>
         </div>
@@ -160,7 +153,7 @@
                 citizen_id: document.getElementById('citizen_id').value,
                 phone_number: document.getElementById('phone_number').value,
                 requested_move_in_date: document.getElementById('requested_move_in_date').value,
-                language: document.getElementById('language').value
+                language: lang
             };
 
             try {

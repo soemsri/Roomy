@@ -24,7 +24,7 @@ def encrypt_value(plain_text: str) -> str:
     return cipher_suite.encrypt(plain_text.encode()).decode()
 
 def decrypt_value(encrypted_text: str) -> str:
-    if not encrypted_text: return ""
+    if not isinstance(encrypted_text, str) or not encrypted_text: return ""
     try:
         return cipher_suite.decrypt(encrypted_text.encode()).decode()
     except Exception as e:

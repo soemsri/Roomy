@@ -44,7 +44,7 @@ class MockEvent:
         self.message = MockMessage(text)
         self.reply_token = reply_token
 
-def run_approval_tests():
+def test_run_approval_tests():
     # Use localized overrides and mocks
     import main
     from unittest.mock import MagicMock
