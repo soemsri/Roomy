@@ -523,6 +523,7 @@ def handle_tenant_message(event, *args, **kwargs):
                 messages = []
                 # Use language from the first tenant record
                 lang = active_tenants[0].language or "th"
+                owner = db.query(models.Owner).first()
                 
                 for tenant in active_tenants:
                     # Robust check: search by room_id if available
@@ -540,6 +541,12 @@ def handle_tenant_message(event, *args, **kwargs):
                             "Paid": (get_text('status_paid', lang), "#3498db")
                         }
                         status_text, status_color = status_map.get(invoice.status, (invoice.status, "#3498db"))
+                        
+                        # Safety check for missing UUID
+                        if not invoice.uuid:
+                            invoice.uuid = str(uuid.uuid4())
+                            db.commit()
+                            
                         bill_url = f"{BASE_URL}/bill/{invoice.uuid}?lang={lang}"
                         total_fmt = "{:,.2f}".format(invoice.total_amount)
                         
@@ -2302,6 +2309,12 @@ async def approve_invoice(invoice_id: int, db: Session = Depends(get_db), admin:
         period = f"{invoice.billing_month}/{invoice.billing_year}"
         paid_date = invoice.paid_at.strftime("%d/%m/%Y %H:%M")
         total_fmt = f"{invoice.total_amount:,.2f}"
+        
+        # Safety check for missing UUID
+        if not invoice.uuid:
+            invoice.uuid = str(uuid.uuid4())
+            db.commit()
+            
         bill_url = f"{BASE_URL}/bill/{invoice.uuid}?lang={lang}"
         
         flex_json = {
@@ -2449,6 +2462,12 @@ async def send_invoice_line(invoice_id: int, db: Session = Depends(get_db), admi
         "Paid": (get_text('status_paid', lang), "#3498db")
     }
     status_text, status_color = status_map.get(invoice.status, (invoice.status, "#3498db"))
+    
+    # Safety check for missing UUID
+    if not invoice.uuid:
+        invoice.uuid = str(uuid.uuid4())
+        db.commit()
+        
     bill_url = f"{BASE_URL}/bill/{invoice.uuid}?lang={lang}"
     room_number = invoice.room.room_number if invoice.room else "N/A"
     total_fmt = "{:,.2f}".format(invoice.total_amount)
