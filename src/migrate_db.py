@@ -8,18 +8,63 @@ logger = logging.getLogger(__name__)
 
 def migrate():
     """
-    Executes the database migration commands. If the database file (suk_anan.db) does not exist,
-    it automatically initializes a new SQLite database with the full schema first.
+    Executes the database migration commands. Supports both SQLite and PostgreSQL.
     """
-    db_path = os.path.join(os.path.dirname(__file__), 'suk_anan.db')
-    if not os.path.exists(db_path):
-        logger.info(f"Database not found at {db_path}. Initializing new database...")
-        from models.database import Base
-        from sqlalchemy import create_engine
-        import models
-        engine = create_engine(f"sqlite:///{db_path}", connect_args={"check_same_thread": False})
+    from models.database import SQLALCHEMY_DATABASE_URL, engine, Base
+    import models
+    from sqlalchemy.orm import sessionmaker
+
+    logger.info(f"Detected DATABASE_URL: {SQLALCHEMY_DATABASE_URL}")
+
+    if not SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
+        # PostgreSQL Migration Flow
+        logger.info("Initializing PostgreSQL schema using SQLAlchemy create_all()...")
         Base.metadata.create_all(bind=engine)
-        logger.info("New database schema created successfully.")
+        logger.info("Database schema synchronized successfully.")
+
+        # Initialize default building using a session
+        Session = sessionmaker(bind=engine)
+        session = Session()
+        try:
+            building_count = session.query(models.Building).count()
+            if building_count == 0:
+                logger.info("Initializing default building in PostgreSQL...")
+                default_building = models.Building(name="อาคารหลัก", description="อาคารหลักของหอพัก")
+                session.add(default_building)
+                session.commit()
+                
+                # Link existing rooms to the default building if any
+                session.query(models.Room).update({models.Room.building_id: default_building.id})
+                session.commit()
+                logger.info("Default building initialized and rooms linked.")
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Error during default building initialization: {e}")
+        finally:
+            session.close()
+        
+        logger.info("PostgreSQL migration completed successfully.")
+        return
+
+    # SQLite Migration Flow (Backward Compatible)
+    if "sqlite:///" in SQLALCHEMY_DATABASE_URL:
+        db_path = SQLALCHEMY_DATABASE_URL.replace("sqlite:///", "")
+        # Resolve path relative to current file if it's relative
+        if not os.path.isabs(db_path) and not db_path.startswith("./") and not db_path.startswith(".\\"):
+            db_path_resolved = os.path.abspath(db_path)
+            if not os.path.exists(db_path_resolved):
+                db_path_resolved = os.path.join(os.path.dirname(__file__), os.path.basename(db_path))
+            db_path = db_path_resolved
+    else:
+        db_path = os.path.join(os.path.dirname(__file__), 'suk_anan.db')
+
+    logger.info(f"Using SQLite database path: {db_path}")
+    if not os.path.exists(db_path):
+        logger.info(f"Database not found at {db_path}. Initializing new SQLite database...")
+        from sqlalchemy import create_engine
+        engine_sqlite = create_engine(f"sqlite:///{db_path}", connect_args={"check_same_thread": False})
+        Base.metadata.create_all(bind=engine_sqlite)
+        logger.info("New SQLite database schema created successfully.")
 
     conn = sqlite3.connect(db_path)
     curr = conn.cursor()

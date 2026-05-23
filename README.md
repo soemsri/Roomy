@@ -38,7 +38,7 @@ Exposes tailored interfaces and route guards for different organization roles, k
 
 ## 🛠️ Technology Stack
 *   **Backend**: FastAPI (Python 3.10+)
-*   **Database & ORM**: SQLite & SQLAlchemy (with pre-built automated migrations)
+*   **Database & ORM**: SQLite / PostgreSQL & SQLAlchemy (with pre-built dynamic migrations)
 *   **Security & Encryption**: Google Identity Services OAuth 2.0 (JWT), Bcrypt, Cryptography (AES-256 for system configurations values)
 *   **Frontend**: HTML5, Vanilla CSS3 (modern glassmorphism cards, glowing gradients, responsive layout transitions), ES6+ JavaScript (Fetch API)
 *   **Linting**: Ruff (for Python code styling compliance)
@@ -85,7 +85,13 @@ pip install -r requirements.txt
 Create a file named `.env` in the root of the project directory and supply the following variables:
 ```env
 # Database Settings
+# For SQLite (Default):
 DATABASE_URL=sqlite:///src/suk_anan.db
+
+# For PostgreSQL (Optional):
+# DATABASE_URL=postgresql://username:password@localhost:5432/roomy_db
+# OR (explicit driver):
+# DATABASE_URL=postgresql+psycopg2://username:password@localhost:5432/roomy_db
 
 # Google OAuth Credentials (Mandatory for Admin Sign-In)
 GOOGLE_CLIENT_ID=your-google-client-id-here.apps.googleusercontent.com
