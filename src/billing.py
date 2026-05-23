@@ -3,6 +3,7 @@ import models
 from datetime import datetime
 import json
 import uuid
+from utils import parse_sqlite_datetime
 
 def get_late_fee(db: Session, invoice=None, billing_month=None, billing_year=None):
     owner = db.query(models.Owner).first()
@@ -123,10 +124,7 @@ def calculate_bill(db: Session, room_id: int, month: int, year: int, other_charg
     
     if lease:
         lease_start = lease.start_date
-        # Handle potential string dates from SQLite
-        if isinstance(lease_start, str):
-            try: lease_start = datetime.fromisoformat(lease_start.replace('Z', '').split('.')[0])
-            except Exception: pass
+        lease_start = parse_sqlite_datetime(lease_start)
             
         if lease_start and lease_start.month == month and lease_start.year == year:
             # First month! Calculate pro-rata if not starting on the 1st

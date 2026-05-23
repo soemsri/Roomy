@@ -12,6 +12,7 @@ sys.path.append(os.path.dirname(__file__))
 
 from database import SessionLocal
 import models
+from utils import parse_sqlite_datetime
 
 def check_leases():
     db = SessionLocal()
@@ -30,13 +31,7 @@ def check_leases():
                 tenant_name = l.tenant.full_name if l.tenant else "N/A"
                 
                 # Check if it's a string instead of datetime
-                s_date = l.start_date
-                if isinstance(s_date, str):
-                    # Try to parse it
-                    try:
-                        s_date = datetime.fromisoformat(s_date.split('.')[0])
-                    except:
-                        s_date = None
+                s_date = parse_sqlite_datetime(l.start_date)
                 
                 date_str = s_date.strftime("%d/%m/%Y") if s_date else "-"
                 

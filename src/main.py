@@ -55,6 +55,7 @@ import models
 import billing
 import promptpay
 import security
+from utils import parse_sqlite_datetime
 
 # Load env from src/.env
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
@@ -1633,12 +1634,7 @@ async def list_leases(page: int = 1, page_size: int = 10, q: str = None, db: Ses
     for l in leases:
         try:
             # Defensive date handling for SQLite
-            s_date = l.start_date
-            if isinstance(s_date, str):
-                try:
-                    s_date = datetime.fromisoformat(s_date.replace('Z', '').split('.')[0])
-                except:
-                    s_date = None
+            s_date = parse_sqlite_datetime(l.start_date)
             
             results.append({
                 "id": l.id,
