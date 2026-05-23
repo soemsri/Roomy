@@ -1,0 +1,11 @@
+# Roomy - Apartment Management System (Development & Testing Dependencies)
+
+# Inherit all core production dependencies
+-r requirements.txt
+
+# Testing & Mocking
+pytest==9.0.3
+httpx==0.28.1
+
+# Linting & Code Quality
+ruff==0.12.0

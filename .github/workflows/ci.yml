@@ -1,0 +1,38 @@
+name: Roomy CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "**" ] # Trigger on push to any branch
+  pull_request:
+    branches: [ "main", "master", "develop" ] # Trigger on PRs targeting main branches
+
+jobs:
+  lint-and-test:
+    name: Lint & Test Suite
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout the code
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Step 2: Set up Python environment with dependency caching
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip' # Speeds up subsequent runs by caching pip packages
+
+      # Step 3: Install project dependencies
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+
+      # Step 4: Run Ruff Linter
+      - name: Run Linter (Ruff)
+        run: ruff check .
+
+      # Step 5: Run Pytest Suite
+      - name: Run Tests (Pytest)
+        run: pytest
