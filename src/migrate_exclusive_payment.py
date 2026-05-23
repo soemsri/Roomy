@@ -7,7 +7,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger(__name__)
 
 def migrate():
-    db_path = "suk_anan.db"
+    db_path = "roomy.db"
     if not os.path.exists(db_path):
         logger.error(f"Database {db_path} not found.")
         return

@@ -56,7 +56,7 @@ def migrate():
                 db_path_resolved = os.path.join(os.path.dirname(__file__), os.path.basename(db_path))
             db_path = db_path_resolved
     else:
-        db_path = os.path.join(os.path.dirname(__file__), 'suk_anan.db')
+        db_path = os.path.join(os.path.dirname(__file__), 'roomy.db')
 
     logger.info(f"Using SQLite database path: {db_path}")
     if not os.path.exists(db_path):

@@ -6,7 +6,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def fix_invoice_uuids():
-    conn = sqlite3.connect('suk_anan.db')
+    conn = sqlite3.connect('roomy.db')
     cursor = conn.cursor()
     
     # Check if uuid column exists

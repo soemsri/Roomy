@@ -8,7 +8,7 @@ load_dotenv()
 # Explicitly try to load from src/.env
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
 
-SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./suk_anan.db")
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./roomy.db")
 
 # If using PostgreSQL or another engine, configure pooling arguments appropriately
 if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):

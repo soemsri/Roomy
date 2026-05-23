@@ -6,7 +6,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 def check_utility():
-    conn = sqlite3.connect('suk_anan.db')
+    conn = sqlite3.connect('roomy.db')
     cursor = conn.cursor()
     
     logger.info("--- Income (Utility) ---")

@@ -6,7 +6,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger(__name__)
 
 def check_nulls():
-    conn = sqlite3.connect('suk_anan.db')
+    conn = sqlite3.connect('roomy.db')
     cursor = conn.cursor()
     cursor.execute("""
         SELECT COUNT(*) FROM invoices 

@@ -82,16 +82,17 @@ pip install -r requirements.txt
 ```
 
 ### 4. Configure Environment Variables
-Create a file named `.env` in the root of the project directory and supply the following variables:
+Create a file named `.env` in the root of the project directory and supply the following variables. The system dynamically detects the database type and driver from `DATABASE_URL` to configure SQLite or PostgreSQL automatically.
+
 ```env
 # Database Settings
 # For SQLite (Default):
-DATABASE_URL=sqlite:///src/suk_anan.db
+DATABASE_URL=sqlite:///src/roomy.db
 
 # For PostgreSQL (Optional):
-# DATABASE_URL=postgresql://username:password@localhost:5432/roomy_db
+# DATABASE_URL=postgresql://username:password@localhost:5432/roomy
 # OR (explicit driver):
-# DATABASE_URL=postgresql+psycopg2://username:password@localhost:5432/roomy_db
+# DATABASE_URL=postgresql+psycopg2://username:password@localhost:5432/roomy
 
 # Google OAuth Credentials (Mandatory for Admin Sign-In)
 GOOGLE_CLIENT_ID=your-google-client-id-here.apps.googleusercontent.com
@@ -107,12 +108,46 @@ TENANT_CHANNEL_SECRET=your-tenant-channel-secret
 SECRET_KEY=generate-your-key-here-with-fernet
 ```
 
+#### 🐘 PostgreSQL Connection Guide (Optional)
+If you prefer using an enterprise-grade PostgreSQL database instead of SQLite, follow these instructions to install, configure, and connect it:
+
+1. **Install PostgreSQL & pgAdmin 4 (Windows via winget)**:
+   ```bash
+   # Install PostgreSQL 16 Server
+   winget install PostgreSQL.PostgreSQL.16
+
+   # Install pgAdmin 4 (GUI Management Tool)
+   winget install PostgreSQL.pgAdmin
+   ```
+2. **Create Database**:
+   Open **pgAdmin 4**, connect to your local server (default port `5432` with user `postgres`), right-click on `Databases` -> `Create` -> `Database...` and name it `roomy`.
+3. **Reset Password (If Forgotten/Needed)**:
+   If you forgot or need to reset the `postgres` password to `1234`, open **PowerShell as Administrator** and execute:
+   ```powershell
+   Stop-Service -Name "postgresql-x64-16"
+   $path = "C:\Program Files\PostgreSQL\16\data\pg_hba.conf"
+   (Get-Content $path) -replace "scram-sha-256", "trust" | Set-Content $path
+   Start-Service -Name "postgresql-x64-16"
+   & "C:\Program Files\PostgreSQL\16\bin\psql.exe" -U postgres -d postgres -c "ALTER USER postgres WITH PASSWORD '1234';"
+   (Get-Content $path) -replace "trust", "scram-sha-256" | Set-Content $path
+   Restart-Service -Name "postgresql-x64-16"
+   ```
+4. **Update `.env`**:
+   Specify your PostgreSQL connection URI in `DATABASE_URL`:
+   ```env
+   DATABASE_URL=postgresql://postgres:1234@localhost:5432/roomy
+   ```
+
 ### 5. Run Database Migrations
-Roomy uses an automated database migration script to generate all database structures, configure constraints, and seed properties schemas safely:
+Roomy uses an automated database migration script to generate all database structures, configure constraints, and seed properties schemas safely. The migration script dynamically detects the database type:
+* **For SQLite**: Sequentially executes pre-built schema migrations and column additions.
+* **For PostgreSQL**: Automatically builds the entire schema and initializes default properties parameters on the target database using SQLAlchemy.
+
+Run the migration script:
 ```bash
 python src/migrate_db.py
 ```
-*   *Note: If you want to start fresh or re-test the onboarding setup bootstrap wizard, simply delete the generated `src/suk_anan.db` file and run `python src/migrate_db.py` again.*
+*   *Note: If using SQLite and you want to start fresh or re-test the onboarding setup bootstrap wizard, simply delete the generated `src/roomy.db` file and run `python src/migrate_db.py` again.*
 
 ### 6. Run the Application Local Server
 Boot the web server locally using Uvicorn:
