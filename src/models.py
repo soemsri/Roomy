@@ -55,7 +55,7 @@ class Building(Base):
 class RoomPaymentChannel(Base):
     __tablename__ = "room_payment_channels"
     id = Column(Integer, primary_key=True, index=True)
-    room_id = Column(Integer, ForeignKey("rooms.id"), nullable=False)
+    room_id = Column(Integer, ForeignKey("rooms.id"), index=True, nullable=False)
     channel_type = Column(String, default="PromptPay") # PromptPay, Bank, Cash
     channel_id = Column(String, nullable=False) # e.g. Phone number for PromptPay
     channel_name = Column(String) # Account owner name
@@ -65,7 +65,7 @@ class RoomPaymentChannel(Base):
 class Room(Base):
     __tablename__ = "rooms"
     id = Column(Integer, primary_key=True, index=True)
-    building_id = Column(Integer, ForeignKey("buildings.id"))
+    building_id = Column(Integer, ForeignKey("buildings.id"), index=True)
     room_number = Column(String, index=True, nullable=False)
     floor = Column(Integer)
     status = Column(String, default="Vacant")
@@ -87,7 +87,7 @@ class Room(Base):
 class RoomAsset(Base):
     __tablename__ = "room_assets"
     id = Column(Integer, primary_key=True, index=True)
-    room_id = Column(Integer, ForeignKey("rooms.id"), nullable=False)
+    room_id = Column(Integer, ForeignKey("rooms.id"), index=True, nullable=False)
     name = Column(String, nullable=False)
     quantity = Column(Integer, default=1)
     
@@ -110,11 +110,11 @@ class Tenant(Base):
     def citizen_id(self, value):
         self._citizen_id = encrypt_value(value)
 
-    current_room_id = Column(Integer, ForeignKey("rooms.id"))
+    current_room_id = Column(Integer, ForeignKey("rooms.id"), index=True)
     rich_menu_id = Column(String)
     language = Column(String, default="th") # th, en, jp
     status = Column(String, default="Pending") # Pending, Active, Rejected, AwaitingBuilding, AwaitingRoom, AwaitingName, AwaitingPhone
-    temp_building_id = Column(Integer, ForeignKey("buildings.id")) # Temporary storage during registration
+    temp_building_id = Column(Integer, ForeignKey("buildings.id"), index=True) # Temporary storage during registration
     requested_move_in_date = Column(DateTime)
     move_out_date = Column(DateTime) # Requested move-out date
     move_out_reason = Column(String)
@@ -126,8 +126,8 @@ class Tenant(Base):
 class MoveOutRequest(Base):
     __tablename__ = "move_out_requests"
     id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
-    room_id = Column(Integer, ForeignKey("rooms.id"), nullable=False)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), index=True, nullable=False)
+    room_id = Column(Integer, ForeignKey("rooms.id"), index=True, nullable=False)
     requested_date = Column(DateTime, nullable=False)
     reason = Column(Text)
     status = Column(String, default="Pending") # Pending, Approved, Cancelled
@@ -139,7 +139,7 @@ class MoveOutRequest(Base):
 class Resident(Base):
     __tablename__ = "residents"
     id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), index=True, nullable=False)
     first_name = Column(String)
     last_name = Column(String)
     nickname = Column(String, nullable=False)
@@ -173,9 +173,9 @@ class TenantHistory(Base):
 class Settlement(Base):
     __tablename__ = "settlements"
     id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
-    room_id = Column(Integer, ForeignKey("rooms.id"), nullable=False)
-    lease_id = Column(Integer, ForeignKey("leases.id")) # Optional for legacy data
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), index=True, nullable=False)
+    room_id = Column(Integer, ForeignKey("rooms.id"), index=True, nullable=False)
+    lease_id = Column(Integer, ForeignKey("leases.id"), index=True) # Optional for legacy data
     settlement_date = Column(DateTime, server_default=func.now())
     
     # Financial Details
@@ -207,8 +207,8 @@ class Settlement(Base):
 class Lease(Base):
     __tablename__ = "leases"
     id = Column(Integer, primary_key=True, index=True)
-    room_id = Column(Integer, ForeignKey("rooms.id"), nullable=False)
-    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
+    room_id = Column(Integer, ForeignKey("rooms.id"), index=True, nullable=False)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), index=True, nullable=False)
     start_date = Column(DateTime, nullable=False)
     end_date = Column(DateTime)
     status = Column(String, default="Active")
@@ -229,7 +229,7 @@ class Lease(Base):
 class MeterReading(Base):
     __tablename__ = "meter_readings"
     id = Column(Integer, primary_key=True, index=True)
-    room_id = Column(Integer, ForeignKey("rooms.id"), nullable=False)
+    room_id = Column(Integer, ForeignKey("rooms.id"), index=True, nullable=False)
     billing_month = Column(Integer, nullable=False)
     billing_year = Column(Integer, nullable=False)
     electricity_reading = Column(Float, nullable=False)
@@ -240,8 +240,8 @@ class Invoice(Base):
     __tablename__ = "invoices"
     id = Column(Integer, primary_key=True, index=True)
     uuid = Column(String, unique=True, index=True, default=lambda: str(uuid.uuid4()))
-    room_id = Column(Integer, ForeignKey("rooms.id"), nullable=False)
-    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
+    room_id = Column(Integer, ForeignKey("rooms.id"), index=True, nullable=False)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), index=True, nullable=False)
     billing_month = Column(Integer, nullable=False)
     billing_year = Column(Integer, nullable=False)
     rent_amount = Column(Float, nullable=False)
@@ -277,8 +277,8 @@ class Expense(Base):
 class MaintenanceRequest(Base):
     __tablename__ = "maintenance_requests"
     id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
-    room_id = Column(Integer, ForeignKey("rooms.id"), nullable=False)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), index=True, nullable=False)
+    room_id = Column(Integer, ForeignKey("rooms.id"), index=True, nullable=False)
     title = Column(String, nullable=False)
     description = Column(Text)
     image_url = Column(String)

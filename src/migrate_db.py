@@ -81,7 +81,25 @@ def migrate():
 
         # Room uniqueness migration (building-scoped)
         "DROP INDEX IF EXISTS ix_rooms_room_number",
-        "CREATE UNIQUE INDEX IF NOT EXISTS _building_room_uc ON rooms (building_id, room_number)"
+        "CREATE UNIQUE INDEX IF NOT EXISTS _building_room_uc ON rooms (building_id, room_number)",
+
+        # Foreign Key Optimization Indexes
+        "CREATE INDEX IF NOT EXISTS ix_rooms_building_id ON rooms (building_id)",
+        "CREATE INDEX IF NOT EXISTS ix_tenants_current_room_id ON tenants (current_room_id)",
+        "CREATE INDEX IF NOT EXISTS ix_leases_room_id ON leases (room_id)",
+        "CREATE INDEX IF NOT EXISTS ix_leases_tenant_id ON leases (tenant_id)",
+        "CREATE INDEX IF NOT EXISTS ix_invoices_room_id ON invoices (room_id)",
+        "CREATE INDEX IF NOT EXISTS ix_invoices_tenant_id ON invoices (tenant_id)",
+        "CREATE INDEX IF NOT EXISTS ix_meter_readings_room_id ON meter_readings (room_id)",
+        "CREATE INDEX IF NOT EXISTS ix_residents_tenant_id ON residents (tenant_id)",
+        "CREATE INDEX IF NOT EXISTS ix_maintenance_requests_room_id ON maintenance_requests (room_id)",
+        "CREATE INDEX IF NOT EXISTS ix_maintenance_requests_tenant_id ON maintenance_requests (tenant_id)",
+        "CREATE INDEX IF NOT EXISTS ix_room_payment_channels_room_id ON room_payment_channels (room_id)",
+        "CREATE INDEX IF NOT EXISTS ix_room_assets_room_id ON room_assets (room_id)",
+        "CREATE INDEX IF NOT EXISTS ix_move_out_requests_tenant_id ON move_out_requests (tenant_id)",
+        "CREATE INDEX IF NOT EXISTS ix_move_out_requests_room_id ON move_out_requests (room_id)",
+        "CREATE INDEX IF NOT EXISTS ix_settlements_tenant_id ON settlements (tenant_id)",
+        "CREATE INDEX IF NOT EXISTS ix_settlements_room_id ON settlements (room_id)"
     ]
     
     for cmd in commands:
