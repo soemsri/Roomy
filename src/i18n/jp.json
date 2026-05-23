@@ -579,5 +579,7 @@
     "save_failed": "失敗: ",
     "connection_error_alert": "接続エラー: ",
     "failed_to_load_users": "ユーザーリストの読み込みに失敗しました",
-    "no_staff_data": "システムにスタッフ情報がありません"
+    "no_staff_data": "システムにスタッフ情報がありません",
+    "payer_signature": "支払者署名",
+    "receiver_signature": "受領者署名"
 }

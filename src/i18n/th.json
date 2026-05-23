@@ -582,5 +582,7 @@
     "save_failed": "ล้มเหลว: ",
     "connection_error_alert": "เกิดข้อผิดพลาดในการเชื่อมต่อ: ",
     "failed_to_load_users": "ไม่สามารถโหลดข้อมูลผู้ใช้ได้",
-    "no_staff_data": "ไม่มีข้อมูลพนักงานในระบบ"
+    "no_staff_data": "ไม่มีข้อมูลพนักงานในระบบ",
+    "payer_signature": "ลายมือชื่อผู้ชำระเงิน",
+    "receiver_signature": "ลายมือชื่อผู้รับเงิน"
 }

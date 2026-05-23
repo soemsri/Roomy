@@ -843,7 +843,7 @@ async def print_receipt(request: Request, invoice_id: int, db: Session = Depends
     if not invoice: raise HTTPException(status_code=404, detail="Invoice not found")
     
     owner = db.query(models.Owner).first()
-    lang = invoice.tenant.language if invoice.tenant else "th"
+    lang = request.cookies.get("lang") or request.query_params.get("lang") or (invoice.tenant.language if invoice.tenant else "th")
     
     other_charges = []
     if invoice.other_charges:

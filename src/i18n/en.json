@@ -579,5 +579,7 @@
     "save_failed": "Failed: ",
     "connection_error_alert": "Connection error: ",
     "failed_to_load_users": "Failed to load staff list",
-    "no_staff_data": "No staff users registered in the system"
+    "no_staff_data": "No staff users registered in the system",
+    "payer_signature": "Payer Signature",
+    "receiver_signature": "Receiver Signature"
 }
