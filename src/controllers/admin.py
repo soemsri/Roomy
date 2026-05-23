@@ -1904,6 +1904,7 @@ async def save_config(
 @router.post("/settings/save")
 async def save_settings(
     display_name: str = Form(None),
+    address: str = Form(None),
     promptpay_config: str = Form("[]"),
     bank_config: str = Form("[]"),
     qr_enabled: str = Form("1"),
@@ -1924,6 +1925,9 @@ async def save_settings(
 
     if display_name is not None:
         owner.display_name = display_name
+
+    if address is not None:
+        owner.address = address
 
     owner.promptpay_config = promptpay_config
     owner.bank_config = bank_config
@@ -3168,7 +3172,8 @@ async def update_user(
     role: str = Form(...),
     status: str = Form(...),
     db: Session = Depends(get_db),
-    admin: bool = Depends(get_super_admin)
+    admin: bool = Depends(get_super_admin),
+    current_user: models.User = Depends(get_current_user)
 ):
     """
     Updates a staff user's role or active status.
@@ -3176,6 +3181,12 @@ async def update_user(
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="ไม่พบข้อมูลผู้ใช้งาน")
+        
+    if user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="คุณไม่สามารถแก้ไขสิทธิ์หรือสถานะของตนเองได้")
+        
+    if user.id == 1:
+        raise HTTPException(status_code=400, detail="ไม่สามารถแก้ไขสิทธิ์ของผู้ดูแลระบบหลักได้")
         
     # Prevent the superadmin from suspending themselves
     if user.role == "Admin" and status == "Suspended":
@@ -3189,13 +3200,24 @@ async def update_user(
     return {"status": "Success"}
 
 @router.delete("/users/{user_id}")
-async def delete_user(user_id: int, db: Session = Depends(get_db), admin: bool = Depends(get_super_admin)):
+async def delete_user(
+    user_id: int, 
+    db: Session = Depends(get_db), 
+    admin: bool = Depends(get_super_admin),
+    current_user: models.User = Depends(get_current_user)
+):
     """
     Deletes a staff user from the system.
     """
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="ไม่พบข้อมูลผู้ใช้งาน")
+        
+    if user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="คุณไม่สามารถลบบัญชีของตัวเองได้")
+        
+    if user.id == 1:
+        raise HTTPException(status_code=400, detail="ไม่สามารถลบผู้ดูแลระบบหลักได้")
         
     if user.role == "Admin":
         admin_count = db.query(models.User).filter(models.User.role == "Admin", models.User.status == "Active").count()

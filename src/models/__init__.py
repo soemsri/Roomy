@@ -30,6 +30,7 @@ class Owner(Base):
     move_in_fees_config = Column(Text, default='[{"name": "ค่าเช่าล่วงหน้า 1 เดือน", "value": 1, "is_multiplier": true}, {"name": "ค่าประกันทรัพย์สิน", "value": 5000, "is_multiplier": false}]') # JSON: [{"name": "...", "value": 0, "is_multiplier": bool}]
     default_recurring_charges = Column(Text, default='[]') # Template for bulk setup
     meter_history_page_size = Column(Integer, default=10)
+    address = Column(Text)
 
 class PasswordResetToken(Base):
     __tablename__ = "password_reset_tokens"

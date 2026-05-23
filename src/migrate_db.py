@@ -35,6 +35,7 @@ def migrate():
         "ALTER TABLE owners ADD COLUMN default_recurring_charges TEXT DEFAULT '[]'",
         "ALTER TABLE owners ADD COLUMN meter_history_page_size INTEGER DEFAULT 10",
         "ALTER TABLE owners ADD COLUMN session_token TEXT",
+        "ALTER TABLE owners ADD COLUMN address TEXT",
         
         # Invoices table
         "ALTER TABLE invoices ADD COLUMN late_fee REAL DEFAULT 0.0",

@@ -1354,28 +1354,28 @@
             <!-- Staff User Management (Multi-Role Support) -->
             <div style="margin-top: 30px; border-top: 2px solid var(--border); padding-top: 30px;">
                 <div class="section-header">
-                    <h2><i class="fa-solid fa-users-gear"></i> จัดการพนักงาน & บทบาทผู้ใช้งาน (Staff Management)</h2>
-                    <button class="btn btn-primary" onclick="openStaffModal()"><i class="fa-solid fa-user-plus"></i> เพิ่มพนักงาน</button>
+                    <h2><i class="fa-solid fa-users-gear"></i> {{ get_text('staff_management_title', lang) }}</h2>
+                    <button class="btn btn-primary" onclick="openStaffModal()"><i class="fa-solid fa-user-plus"></i> {{ get_text('add_staff', lang) }}</button>
                 </div>
                 <p style="font-size: 0.85em; color: var(--text-muted); margin-bottom: 15px;">
-                    เพิ่มพนักงานและกําหนดสิทธิ์ในการเข้าถึงระบบ เช่น บัญชี (Accountant), เสมียน/ธุรการ (Clerk), ช่างซ่อมบำรุง (Technician), หรือแม่บ้าน (Housekeeper) เพื่อรองรับการล็อกอินผ่าน Google Sign-In
+                    {{ get_text('staff_management_desc', lang) }}
                 </p>
                 <div class="table-container">
                     <table>
                         <thead>
                             <tr>
-                                <th>ชื่อ-นามสกุล</th>
-                                <th>อีเมล (Gmail)</th>
-                                <th>บทบาท (Role)</th>
-                                <th>สถานะ (Status)</th>
-                                <th>วันที่เพิ่ม</th>
-                                <th>จัดการ</th>
+                                <th>{{ get_text('full_name', lang) }}</th>
+                                <th>{{ get_text('email_gmail', lang) }}</th>
+                                <th>{{ get_text('role', lang) }}</th>
+                                <th>{{ get_text('status', lang) }}</th>
+                                <th>{{ get_text('date_added', lang) }}</th>
+                                <th>{{ get_text('actions', lang) }}</th>
                             </tr>
                         </thead>
                         <tbody id="staffTableBody">
                             <tr>
                                 <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">
-                                    <i class="fa-solid fa-spinner fa-spin"></i> กำลังโหลดข้อมูล...
+                                    <i class="fa-solid fa-spinner fa-spin"></i> {{ get_text('loading', lang) }}...
                                 </td>
                             </tr>
                         </tbody>
@@ -1440,42 +1440,42 @@
         <!-- Staff Management Modal -->
         <div id="staffModal" class="modal">
             <div class="modal-content" style="max-width: 500px;">
-                <h3 id="staffModalTitle">เพิ่มพนักงานใหม่</h3>
+                <h3 id="staffModalTitle">{{ get_text('add_new_staff', lang) }}</h3>
                 <form id="staffForm" onsubmit="saveStaffUser(event)">
                     <input type="hidden" id="staff_user_id">
                     
                     <div class="form-group" id="staff_name_group">
-                        <label>ชื่อ-นามสกุล (Full Name)</label>
-                        <input type="text" id="staff_full_name" placeholder="เช่น สมชาย ใจดี" required>
+                        <label>{{ get_text('full_name', lang) }}</label>
+                        <input type="text" id="staff_full_name" placeholder="{{ get_text('full_name_placeholder_example', lang) }}" required>
                     </div>
                     
                     <div class="form-group" id="staff_email_group">
-                        <label>อีเมล Gmail (Google Account)</label>
-                        <input type="email" id="staff_email" placeholder="เช่น somchai@gmail.com" required>
+                        <label>{{ get_text('gmail_account_label', lang) }}</label>
+                        <input type="email" id="staff_email" placeholder="{{ get_text('email_placeholder_example', lang) }}" required>
                     </div>
                     
                     <div class="form-group">
-                        <label>บทบาทหน้าที่ (Role)</label>
+                        <label>{{ get_text('role_label', lang) }}</label>
                         <select id="staff_role" required>
-                            <option value="Admin">Admin (ผู้ดูแลระบบ)</option>
-                            <option value="Accountant">Accountant (ฝ่ายบัญชี)</option>
-                            <option value="Clerk">Clerk (เสมียน/ธุรการ)</option>
-                            <option value="Technician">Technician (ช่างเทคนิค/ซ่อมบำรุง)</option>
-                            <option value="Housekeeper">Housekeeper (แม่บ้าน)</option>
+                            <option value="Admin">{{ get_text('Admin', lang) }}</option>
+                            <option value="Accountant">{{ get_text('Accountant', lang) }}</option>
+                            <option value="Clerk">{{ get_text('Clerk', lang) }}</option>
+                            <option value="Technician">{{ get_text('Technician', lang) }}</option>
+                            <option value="Housekeeper">{{ get_text('Housekeeper', lang) }}</option>
                         </select>
                     </div>
 
                     <div class="form-group" id="staff_status_group" style="display: none;">
-                        <label>สถานะการใช้งาน (Status)</label>
+                        <label>{{ get_text('status_label', lang) }}</label>
                         <select id="staff_status">
-                            <option value="Active">Active (เปิดใช้งาน)</option>
-                            <option value="Suspended">Suspended (ระงับการใช้งาน)</option>
+                            <option value="Active">{{ get_text('Active', lang) }}</option>
+                            <option value="Suspended">{{ get_text('Suspended', lang) }}</option>
                         </select>
                     </div>
                     
                     <div style="display: flex; gap: 10px; margin-top: 20px;">
-                        <button type="submit" class="btn btn-primary" style="flex: 1;">บันทึก</button>
-                        <button type="button" class="btn btn-outline" style="flex: 1;" onclick="document.getElementById('staffModal').style.display='none'">ยกเลิก</button>
+                        <button type="submit" class="btn btn-primary" style="flex: 1;">{{ get_text('save', lang) }}</button>
+                        <button type="button" class="btn btn-outline" style="flex: 1;" onclick="document.getElementById('staffModal').style.display='none'">{{ get_text('cancel', lang) }}</button>
                     </div>
                 </form>
             </div>
@@ -2123,7 +2123,17 @@
             print_receipt: "{{ get_text('print_receipt', lang) }}",
             status: "{{ get_text('status', lang) }}",
             payment_date: "{{ get_text('payment_date_label', lang) }}",
-            view_details: "{{ get_text('view_details', lang) }}"
+            view_details: "{{ get_text('view_details', lang) }}",
+            add_new_staff: "{{ get_text('add_new_staff', lang) }}",
+            edit_staff: "{{ get_text('edit_staff', lang) }}",
+            edit_staff_title: "{{ get_text('edit_staff_title', lang) }}",
+            delete_staff_confirm: "{{ get_text('delete_staff_confirm', lang) }}",
+            delete_staff_success: "{{ get_text('delete_staff_success', lang) }}",
+            save_staff_success: "{{ get_text('save_staff_success', lang) }}",
+            save_failed: "{{ get_text('save_failed', lang) }}",
+            connection_error_alert: "{{ get_text('connection_error_alert', lang) }}",
+            failed_to_load_users: "{{ get_text('failed_to_load_users', lang) }}",
+            no_staff_data: "{{ get_text('no_staff_data', lang) }}"
         };
 
         function setLanguage(lang) {
@@ -3322,12 +3332,12 @@
             try {
                 const res = await fetch('/admin/users/list');
                 if (!res.ok) {
-                    list.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--danger);">ไม่สามารถโหลดข้อมูลผู้ใช้ได้ (HTTP ${res.status})</td></tr>`;
+                    list.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--danger);">${translations.failed_to_load_users} (HTTP ${res.status})</td></tr>`;
                     return;
                 }
                 const data = await res.json();
                 if (data.length === 0) {
-                    list.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">ไม่มีข้อมูลพนักงานในระบบ</td></tr>`;
+                    list.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">${translations.no_staff_data}</td></tr>`;
                     return;
                 }
                 
@@ -3344,13 +3354,28 @@
                     'Suspended': { text: "{{ get_text('Suspended', lang) }}", bg: '#ffebee', color: '#c62828' }
                 };
 
+                const currentUserId = {{ current_user.id if (current_user and current_user.id) else 'null' }};
+
                 list.innerHTML = data.map(u => {
                     const r = roleLabels[u.role] || { text: u.role, bg: '#eee', color: '#333' };
                     const s = statusLabels[u.status] || { text: u.status, bg: '#eee', color: '#333' };
                     
+                    const isSelf = u.id === currentUserId;
+                    const isSuperAdmin = u.id === 1;
+                    const disableEdit = (isSelf || isSuperAdmin) ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : '';
+                    const disableDelete = (isSelf || isSuperAdmin) ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : '';
+                    
+                    let badgeHtml = '';
+                    if (isSuperAdmin) {
+                        badgeHtml += ` <span style="margin-left: 5px; font-size: 0.75em; padding: 2px 6px; border-radius: 4px; background: #ede7f6; color: #4a148c; font-weight: 500;">{{ get_text('super_admin_label', lang) }}</span>`;
+                    }
+                    if (isSelf) {
+                        badgeHtml += ` <span style="margin-left: 5px; font-size: 0.75em; padding: 2px 6px; border-radius: 4px; background: #e3f2fd; color: #0d47a1; font-weight: 500;">{{ get_text('your_account', lang) }}</span>`;
+                    }
+
                     return `
                         <tr>
-                            <td><strong>${u.full_name || 'Staff User'}</strong></td>
+                            <td><strong>${u.full_name || 'Staff User'}</strong>${badgeHtml}</td>
                             <td style="font-family: monospace;">${u.email}</td>
                             <td>
                                 <span style="display: inline-block; padding: 4px 8px; border-radius: 6px; font-size: 0.8em; font-weight: 600; background: ${r.bg}; color: ${r.color};">
@@ -3365,11 +3390,11 @@
                             <td style="font-size: 0.85em; color: var(--text-muted);">${u.created_at || '-'}</td>
                             <td>
                                 <div style="display: flex; gap: 5px;">
-                                    <button class="btn btn-outline" style="padding: 5px 10px; font-size: 0.8em;" onclick='editStaffUser(${JSON.stringify(u)})'>
-                                        <i class="fa-solid fa-edit"></i> แก้ไข
+                                    <button class="btn btn-outline" style="padding: 5px 10px; font-size: 0.8em;" onclick='editStaffUser(${JSON.stringify(u)})' ${disableEdit}>
+                                        <i class="fa-solid fa-edit"></i> {{ get_text('edit', lang) }}
                                     </button>
-                                    <button class="btn btn-danger" style="padding: 5px 10px; font-size: 0.8em;" onclick="deleteStaffUser(${u.id})">
-                                        <i class="fa-solid fa-trash"></i> ลบ
+                                    <button class="btn btn-danger" style="padding: 5px 10px; font-size: 0.8em;" onclick="deleteStaffUser(${u.id})" ${disableDelete}>
+                                        <i class="fa-solid fa-trash"></i> {{ get_text('delete', lang) }}
                                     </button>
                                 </div>
                             </td>
@@ -3378,12 +3403,12 @@
                 }).join('');
             } catch (e) {
                 console.error("Error loading staff:", e);
-                list.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--danger);">เกิดข้อผิดพลาดในการโหลดข้อมูล</td></tr>`;
+                list.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--danger);">${translations.load_error}</td></tr>`;
             }
         }
 
         function openStaffModal() {
-            document.getElementById('staffModalTitle').innerText = "เพิ่มพนักงานใหม่";
+            document.getElementById('staffModalTitle').innerText = translations.add_new_staff;
             document.getElementById('staff_user_id').value = "";
             
             document.getElementById('staff_name_group').style.display = "block";
@@ -3401,7 +3426,7 @@
         }
 
         function editStaffUser(user) {
-            document.getElementById('staffModalTitle').innerText = "แก้ไขข้อมูลพนักงาน: " + user.email;
+            document.getElementById('staffModalTitle').innerText = translations.edit_staff_title + user.email;
             document.getElementById('staff_user_id').value = user.id;
             
             document.getElementById('staff_name_group').style.display = "none";
@@ -3436,45 +3461,56 @@
             try {
                 const res = await fetch(url, { method: 'POST', body: formData });
                 if (res.ok) {
-                    alert("บันทึกข้อมูลพนักงานสำเร็จ");
+                    alert(translations.save_staff_success);
                     document.getElementById('staffModal').style.display = 'none';
                     loadStaffUsers();
                 } else {
                     const err = await res.json();
-                    alert("ล้มเหลว: " + (err.detail || "เกิดข้อผิดพลาดในการบันทึก"));
+                    alert(translations.save_failed + (err.detail || translations.error));
                 }
             } catch (err) {
-                alert("เกิดข้อผิดพลาดในการเชื่อมต่อ: " + err);
+                alert(translations.connection_error_alert + err);
             }
         }
 
         async function deleteStaffUser(id) {
-            if (!confirm("คุณต้องการลบพนักงานคนนี้ออกจากระบบใช่หรือไม่?")) return;
+            if (!confirm(translations.delete_staff_confirm)) return;
             try {
                 const res = await fetch(`/admin/users/${id}`, { method: 'DELETE' });
                 if (res.ok) {
-                    alert("ลบพนักงานสำเร็จ");
+                    alert(translations.delete_staff_success);
                     loadStaffUsers();
                 } else {
                     const err = await res.json();
-                    alert("ล้มเหลว: " + (err.detail || "ไม่สามารถลบข้อมูลได้"));
+                    alert(translations.save_failed + (err.detail || translations.error));
                 }
             } catch (err) {
-                alert("เกิดข้อผิดพลาดในการเชื่อมต่อ: " + err);
+                alert(translations.connection_error_alert + err);
             }
         }
 
         async function generatePairingCode() { try { const res = await fetch('/admin/generate-pairing-code', { method: 'POST' }); const data = await res.json(); if (data.pairing_code) location.reload(); } catch (e) { alert('Connection error'); } }
-        document.querySelector('a[href="#settingsSection"]').addEventListener('click', () => {
-            loadSystemConfigs();
-            loadStaffUsers();
-        });
+        const settingsLink = document.querySelector('a[href="#settingsSection"]');
+        if (settingsLink) {
+            settingsLink.addEventListener('click', () => {
+                loadSystemConfigs();
+                loadStaffUsers();
+            });
+        }
 
         window.onload = () => {
             const params = new URLSearchParams(window.location.search); const mode = params.get('mode'); const bid = params.get('building_id') || '{{ building_id if building_id else "" }}';
             if (bid && bid !== 'None' && bid !== '') { document.getElementById('meter_building_id').value = bid; document.getElementById('bulk_building_id').value = bid; filterMeterRooms(bid); }
             if (mode === 'bulk') { switchMeterMode('bulk'); document.getElementById('meterSection').scrollIntoView(); }
             else if (mode === 'single') { switchMeterMode('single'); document.getElementById('meterSection').scrollIntoView(); }
+            
+            // Auto-load staff and configs if their containers exist in the DOM (on refresh or direct load)
+            if (document.getElementById('staffTableBody')) {
+                loadStaffUsers();
+            }
+            if (document.getElementById('configTableBody')) {
+                loadSystemConfigs();
+            }
         };
     </script>
 </body>

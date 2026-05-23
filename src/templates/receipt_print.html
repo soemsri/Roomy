@@ -140,8 +140,7 @@
         <div class="receipt-header">
             <div class="company-info">
                 <h1>{{ owner.display_name if owner and owner.display_name else 'SukAnan Apartment' }}</h1>
-                <p>{{ get_text('app_name', lang) }} - Room Management System</p>
-                <p>{{ get_text('address_placeholder', lang) or '' }}</p>
+                <p style="white-space: pre-line; margin-top: 5px; color: #555; font-size: 14px;">{{ owner.address if owner and owner.address else '' }}</p>
             </div>
             <div class="receipt-title">
                 <h2>{{ get_text('receipt_title', lang) }}</h2>
