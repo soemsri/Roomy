@@ -40,6 +40,7 @@
     "repairs": "แจ้งซ่อม",
     "repair_requests": "รายการแจ้งซ่อม",
     "settings": "ตั้งค่าระบบ",
+    "system_settings": "ตั้งค่าระบบ",
     "welcome": "ยินดีต้อนรับ",
     "admin_profile": "แอดมินระบบ",
     "all_rooms": "ห้องทั้งหมด",
@@ -549,5 +550,13 @@
     "initial_payment_type": "ยอดชำระแรกเข้า",
     "account_name": "ชื่อบัญชี",
     "pay_cash_note": "ท่านสามารถชำระเป็นเงินสดได้ที่สำนักงานหอพัก",
-    "invoice_title": "ใบแจ้งค่าเช่า"
+    "invoice_title": "ใบแจ้งค่าเช่า",
+    "no_label": "เลขที่",
+    "Admin": "ผู้ดูแลระบบ",
+    "Accountant": "ฝ่ายบัญชี",
+    "Clerk": "เสมียน/ธุรการ",
+    "Technician": "ช่างซ่อมบำรุง",
+    "Housekeeper": "แม่บ้าน",
+    "Active": "เปิดใช้งาน",
+    "Suspended": "ระงับการใช้งาน"
 }

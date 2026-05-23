@@ -40,6 +40,7 @@
     "repairs": "Repairs",
     "repair_requests": "Repair Requests",
     "settings": "Settings",
+    "system_settings": "System Settings",
     "welcome": "Welcome",
     "admin_profile": "System Admin",
     "all_rooms": "All Rooms",
@@ -546,5 +547,13 @@
     "initial_payment_type": "Initial Move-in Fees",
     "account_name": "Account Name",
     "pay_cash_note": "You can also pay by cash at the office.",
-    "invoice_title": "Rental Invoice"
+    "invoice_title": "Rental Invoice",
+    "no_label": "No.",
+    "Admin": "Admin",
+    "Accountant": "Accountant",
+    "Clerk": "Clerk",
+    "Technician": "Technician",
+    "Housekeeper": "Housekeeper",
+    "Active": "Active",
+    "Suspended": "Suspended"
 }

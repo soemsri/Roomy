@@ -266,7 +266,15 @@
     <main class="main-content">
         <div class="header-top">
             <div class="greeting">
-                <h1>{{ get_text('hello', lang) }}, {{ owner.display_name if owner else 'Admin' }}!</h1>
+                {% set display_name = current_user.full_name if current_user and current_user.full_name else (owner.display_name if owner else 'Admin') %}
+                {% set display_role = get_text(current_user.role, lang) if current_user and current_user.role else get_text('admin_profile', lang) %}
+                <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                    <h1>{{ get_text('hello', lang) }}, {{ display_name }}!</h1>
+                    <div style="display: flex; align-items: center; gap: 6px; background: rgba(59, 130, 246, 0.1); color: var(--primary); padding: 6px 14px; border-radius: 20px; font-size: 0.85em; font-weight: 600;">
+                        <i class="fa-solid fa-circle-user"></i>
+                        <span>{{ display_role }}</span>
+                    </div>
+                </div>
                 <p>{{ get_text('financial_overview', lang) }}</p>
             </div>
             <div style="display: flex; gap: 12px;">

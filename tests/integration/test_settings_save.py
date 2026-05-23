@@ -34,6 +34,7 @@ class TestSettingsSave(unittest.TestCase):
         main.app.dependency_overrides[get_db] = override_get_db
         main.app.dependency_overrides[main.get_db] = override_get_db
         main.app.dependency_overrides[main.get_admin] = lambda: True
+        main.app.dependency_overrides[main.get_super_admin] = lambda: True
 
     @classmethod
     def setUpClass(cls):

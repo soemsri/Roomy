@@ -31,7 +31,7 @@ import controllers.admin as admin
 
 # Expose key callback handlers and dependencies for legacy imports (e.g. tests)
 from controllers.callback import handle_admin_message, handle_tenant_message
-from controllers.admin import get_admin
+from controllers.admin import get_admin, get_super_admin
 
 # Static files mount
 uploads_dir = os.path.join(os.path.dirname(__file__), "uploads")

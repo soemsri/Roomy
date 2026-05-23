@@ -110,6 +110,14 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
 
 def get_admin(current_user: models.User = Depends(get_current_user)):
     """
+    Verifies that the current user has an active staff role (Admin, Accountant, Clerk, Technician, Housekeeper).
+    """
+    if current_user.role not in ["Admin", "Accountant", "Clerk", "Technician", "Housekeeper"]:
+        raise HTTPException(status_code=403, detail="Forbidden: Staff access required")
+    return True
+
+def get_super_admin(current_user: models.User = Depends(get_current_user)):
+    """
     Verifies that the current user has the Admin role.
     """
     if current_user.role != "Admin":
@@ -369,7 +377,7 @@ async def reset_password(token: str = Form(None), new_password: str = Form(...),
     return HTMLResponse(content=f"<h2>{get_text('reset_error', lang)}</h2>", status_code=500)
 
 @router.post("/generate-pairing-code")
-async def generate_pairing_code(db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+async def generate_pairing_code(db: Session = Depends(get_db), admin: bool = Depends(get_super_admin)):
     # Generate 6-digit numeric code
     code = "".join([str(secrets.randbelow(10)) for _ in range(6)])
     owner = db.query(models.Owner).first()
@@ -386,7 +394,7 @@ async def admin_dashboard(
     year: int = None, 
     building_id: str = None,
     db: Session = Depends(get_db), 
-    admin: bool = Depends(get_admin)
+    current_user: models.User = Depends(get_current_user)
 ):
     lang = request.cookies.get("lang", "th")
     stats = {
@@ -417,6 +425,7 @@ async def admin_dashboard(
     
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
+        "current_user": current_user,
         "stats": stats,
         "recent_invoices": recent_invoices,
         "recent_repairs": recent_repairs,
@@ -523,7 +532,12 @@ async def delete_expense(expense_id: int, db: Session = Depends(get_db), admin: 
     return {"status": "Success"}
 
 @router.get("/report", response_class=HTMLResponse)
-async def admin_report(request: Request, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+async def admin_report(
+    request: Request, 
+    db: Session = Depends(get_db), 
+    admin: bool = Depends(get_admin),
+    current_user: models.User = Depends(get_current_user)
+):
     lang = request.cookies.get("lang", "th")
     # Income aggregation
     income_rows = db.query(
@@ -676,6 +690,7 @@ async def admin_report(request: Request, db: Session = Depends(get_db), admin: b
 
     return templates.TemplateResponse("report.html", {
         "request": request,
+        "current_user": current_user,
         "chart_data": json.dumps(chart_data),
         "occupancy_stats": json.dumps(occupancy_stats),
         "occupancy_trend": json.dumps(occupancy_trend),
@@ -1204,14 +1219,14 @@ async def list_buildings(db: Session = Depends(get_db), admin: bool = Depends(ge
     return [{"id": b.id, "name": b.name, "description": b.description} for b in buildings]
 
 @router.post("/buildings/add")
-async def add_building(name: str = Form(...), description: str = Form(None), db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+async def add_building(name: str = Form(...), description: str = Form(None), db: Session = Depends(get_db), admin: bool = Depends(get_super_admin)):
     new_building = models.Building(name=name, description=description)
     db.add(new_building)
     db.commit()
     return {"status": "Success", "id": new_building.id}
 
 @router.post("/buildings/{building_id}/edit")
-async def edit_building(building_id: int, name: str = Form(...), description: str = Form(None), db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+async def edit_building(building_id: int, name: str = Form(...), description: str = Form(None), db: Session = Depends(get_db), admin: bool = Depends(get_super_admin)):
     building = db.query(models.Building).filter(models.Building.id == building_id).first()
     if not building: raise HTTPException(status_code=404, detail="Building not found")
     building.name = name
@@ -1220,7 +1235,7 @@ async def edit_building(building_id: int, name: str = Form(...), description: st
     return {"status": "Success"}
 
 @router.post("/buildings/{building_id}/delete")
-async def delete_building(building_id: int, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+async def delete_building(building_id: int, db: Session = Depends(get_db), admin: bool = Depends(get_super_admin)):
     building = db.query(models.Building).filter(models.Building.id == building_id).first()
     if not building: raise HTTPException(status_code=404, detail="Building not found")
     
@@ -1632,7 +1647,8 @@ async def get_invoice_details(invoice_id: int, db: Session = Depends(get_db), ad
         "total": invoice.total_amount,
         "status": invoice.status,
         "paid_at": invoice.paid_at.strftime("%d/%m/%Y %H:%M") if invoice.paid_at else None,
-        "receipt_img": invoice.payment_receipt_img
+        "receipt_img": invoice.payment_receipt_img,
+        "invoice_type": invoice.invoice_type
     }
 
 @router.post("/invoice/{invoice_id}/approve")
@@ -1865,7 +1881,7 @@ async def update_repair_status(repair_id: int, status: str = Form(...), db: Sess
     return {"status": "Success"}
 
 @router.get("/settings/configs")
-async def get_all_configs(db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+async def get_all_configs(db: Session = Depends(get_db), admin: bool = Depends(get_super_admin)):
     configs = db.query(models.SystemConfig).all()
     return [{
         "key": c.key,
@@ -1879,7 +1895,7 @@ async def save_config(
     value: str = Form(...),
     description: str = Form(None),
     db: Session = Depends(get_db),
-    admin: bool = Depends(get_admin)
+    admin: bool = Depends(get_super_admin)
 ):
     security.set_system_config(db, key, value, description)
     refresh_configs()
@@ -1899,7 +1915,7 @@ async def save_settings(
     magic_link_duration_min: int = Form(5),
     meter_history_page_size: int = Form(10),
     db: Session = Depends(get_db),
-    admin: bool = Depends(get_admin)
+    admin: bool = Depends(get_super_admin)
 ):
     owner = db.query(models.Owner).first()
     if not owner:
@@ -1939,7 +1955,7 @@ async def save_settings(
 @router.post("/settings/upload-bank-qr")
 async def upload_bank_qr(
     image: UploadFile = File(...),
-    admin: bool = Depends(get_admin)
+    admin: bool = Depends(get_super_admin)
 ):
     if not os.path.exists(uploads_dir):
         os.makedirs(uploads_dir)
@@ -2706,7 +2722,7 @@ def create_initial_invoice(db: Session, tenant, room_ids: list, owner, start_dat
         
         for f in config:
             amt = f['value'] * room.base_rent if f.get('is_multiplier') else f['value']
-            applied_fees.append({"name": f['name'], "amount": amt})
+            applied_fees.append({"name": f['name'], "description": f['name'], "amount": amt})
             room_total += amt
             if "ประกัน" in f['name']: security_deposit += amt
             elif "ล่วงหน้า" in f['name']: advance_rent += amt
@@ -3094,3 +3110,98 @@ def setup_personal_rich_menu(tenant, db: Session, force=False):
     except Exception as e:
         logger.error(f"setup_personal_rich_menu Error: {e}")
         return None
+
+# ==========================================
+# STAFF USER MANAGEMENT ENDPOINTS
+# ==========================================
+
+@router.get("/users/list")
+async def list_users(db: Session = Depends(get_db), admin: bool = Depends(get_super_admin)):
+    """
+    Returns the list of all registered staff users.
+    """
+    users = db.query(models.User).order_by(models.User.id.desc()).all()
+    return [
+        {
+            "id": u.id,
+            "email": u.email,
+            "full_name": u.full_name,
+            "role": u.role,
+            "status": u.status,
+            "created_at": u.created_at.strftime("%Y-%m-%d %H:%M") if u.created_at else "-"
+        } for u in users
+    ]
+
+@router.post("/users/add")
+async def add_user(
+    email: str = Form(...),
+    role: str = Form(...),
+    full_name: str = Form(None),
+    db: Session = Depends(get_db),
+    admin: bool = Depends(get_super_admin)
+):
+    """
+    Registers a new staff user (email-based) with a specific role.
+    """
+    email = email.strip().lower()
+    if not email:
+        raise HTTPException(status_code=400, detail="อีเมลห้ามว่างเปล่า")
+    
+    # Check if user already exists
+    existing = db.query(models.User).filter(models.User.email == email).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="อีเมลนี้ได้รับการลงทะเบียนในระบบแล้ว")
+        
+    new_user = models.User(
+        email=email,
+        full_name=full_name.strip() if full_name else "Staff User",
+        role=role,
+        status="Active"
+    )
+    db.add(new_user)
+    db.commit()
+    return {"status": "Success"}
+
+@router.post("/users/{user_id}/update")
+async def update_user(
+    user_id: int,
+    role: str = Form(...),
+    status: str = Form(...),
+    db: Session = Depends(get_db),
+    admin: bool = Depends(get_super_admin)
+):
+    """
+    Updates a staff user's role or active status.
+    """
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="ไม่พบข้อมูลผู้ใช้งาน")
+        
+    # Prevent the superadmin from suspending themselves
+    if user.role == "Admin" and status == "Suspended":
+        admin_count = db.query(models.User).filter(models.User.role == "Admin", models.User.status == "Active").count()
+        if admin_count <= 1:
+            raise HTTPException(status_code=400, detail="ไม่สามารถระงับสิทธิ์ผู้ดูแลระบบเพียงคนเดียวในระบบได้")
+            
+    user.role = role
+    user.status = status
+    db.commit()
+    return {"status": "Success"}
+
+@router.delete("/users/{user_id}")
+async def delete_user(user_id: int, db: Session = Depends(get_db), admin: bool = Depends(get_super_admin)):
+    """
+    Deletes a staff user from the system.
+    """
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="ไม่พบข้อมูลผู้ใช้งาน")
+        
+    if user.role == "Admin":
+        admin_count = db.query(models.User).filter(models.User.role == "Admin", models.User.status == "Active").count()
+        if admin_count <= 1:
+            raise HTTPException(status_code=400, detail="ไม่สามารถลบผู้ดูแลระบบเพียงคนเดียวในระบบได้")
+            
+    db.delete(user)
+    db.commit()
+    return {"status": "Success"}

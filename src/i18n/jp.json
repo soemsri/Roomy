@@ -40,6 +40,7 @@
     "repairs": "修理",
     "repair_requests": "修理依頼",
     "settings": "設定",
+    "system_settings": "システム設定",
     "welcome": "いらっしゃいませ",
     "admin_profile": "システム管理者",
     "all_rooms": "全部屋",
@@ -546,5 +547,13 @@
     "initial_payment_type": "初期費用合計",
     "account_name": "口座名義",
     "pay_cash_note": "管理事務所にて現金でお支払いいただくことも可能です。",
-    "invoice_title": "賃貸借請求書"
+    "invoice_title": "賃貸借請求書",
+    "no_label": "No.",
+    "Admin": "管理者",
+    "Accountant": "会計士",
+    "Clerk": "事務員",
+    "Technician": "技術者",
+    "Housekeeper": "家政婦",
+    "Active": "有効",
+    "Suspended": "一時停止"
 }

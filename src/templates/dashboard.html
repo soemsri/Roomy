@@ -347,47 +347,67 @@
             </div>
         </div>
         
+        {% set user_role = current_user.role if current_user and current_user.role else 'Admin' %}
+
         <div class="menu-section">
             <div class="menu-label">Menu</div>
             <a href="#overview" class="menu-item active"><i class="fa-solid fa-chart-line"></i> <span>{{ get_text('system_overview', lang) }}</span></a>
+            {% if user_role in ['Admin', 'Accountant'] %}
             <a href="/admin/report" class="menu-item"><i class="fa-solid fa-file-invoice-dollar"></i> <span>{{ get_text('analytics', lang) }}</span></a>
+            {% endif %}
+            {% if user_role in ['Admin', 'Clerk'] %}
             <a href="#meterSection" class="menu-item"><i class="fa-solid fa-gauge-high"></i> <span>{{ get_text('meter_reading', lang) }}</span></a>
+            {% endif %}
         </div>
 
         <div class="menu-section">
             <div class="menu-label">Records</div>
+            {% if user_role in ['Admin', 'Clerk'] %}
             <a href="#pendingSection" class="menu-item">
                 <i class="fa-solid fa-user-clock"></i> <span>{{ get_text('pending_registrations', lang) }}</span>
                 {% if pending_registrations|length > 0 %}
                 <span class="nav-badge pulse">NEW</span>
                 {% endif %}
             </a>
+            {% endif %}
             <a href="#roomSection" class="menu-item"><i class="fa-solid fa-door-open"></i> <span>{{ get_text('manage_rooms', lang) }}</span></a>
+            {% if user_role in ['Admin', 'Clerk'] %}
             <a href="#leaseSection" class="menu-item"><i class="fa-solid fa-file-contract"></i> <span>{{ get_text('manage_leases', lang) }}</span></a>
+            {% endif %}
+            {% if user_role in ['Admin', 'Accountant', 'Clerk'] %}
             <a href="#billSection" class="menu-item">
                 <i class="fa-solid fa-file-invoice-dollar"></i> <span>{{ get_text('latest_bills', lang) }}</span>
                 {% if stats.pending_verification > 0 %}
                 <span class="nav-badge pulse">NEW</span>
                 {% endif %}
             </a>
+            {% endif %}
             <a href="#historySection" class="menu-item"><i class="fa-solid fa-clock-rotate-left"></i> <span>{{ get_text('history', lang) }}</span></a>
+            {% if user_role in ['Admin', 'Accountant', 'Clerk'] %}
             <a href="#receiptSection" class="menu-item"><i class="fa-solid fa-receipt"></i> <span>{{ get_text('manage_receipts', lang) }}</span></a>
+            {% endif %}
+            {% if user_role in ['Admin', 'Clerk', 'Technician'] %}
             <a href="#repairSection" class="menu-item">
                 <i class="fa-solid fa-screwdriver-wrench"></i> <span>{{ get_text('repairs', lang) }}</span>
                 {% if stats.pending_repairs > 0 %}
                 <span class="nav-badge pulse">NEW</span>
                 {% endif %}
             </a>
+            {% endif %}
         </div>
 
+        {% if user_role in ['Admin', 'Clerk'] %}
         <div class="menu-section">
             <div class="menu-label">Management</div>
             <a href="#tenantSection" class="menu-item"><i class="fa-solid fa-users"></i> <span>{{ get_text('tenants', lang) }}</span></a>
         </div>
+        {% endif %}
 
         <div class="menu-section" style="margin-top: auto;">
             <div class="menu-label">System</div>
+            {% if user_role == 'Admin' %}
             <a href="#settingsSection" class="menu-item"><i class="fa-solid fa-gears"></i> <span>{{ get_text('settings', lang) }}</span></a>
+            {% endif %}
             <a href="javascript:void(0)" onclick="if(confirm('{{ get_text('confirm_logout', lang) or 'Logout?' }}')) document.getElementById('logout-form').submit();" class="menu-item" style="color: #ef4444;">
                 <i class="fa-solid fa-right-from-bracket"></i> <span>{{ get_text('logout', lang) }}</span>
             </a>
@@ -398,10 +418,12 @@
     <!-- Main Content -->
     <div class="main-wrapper">
         <header>
-            <h1 style="font-size: 1.5em; font-weight: 700;">{{ get_text('welcome', lang) }}, {{ owner.display_name if owner else 'Admin' }}</h1>
+            {% set display_name = current_user.full_name if current_user and current_user.full_name else (owner.display_name if owner else 'Admin') %}
+            {% set display_role = get_text(current_user.role, lang) if current_user and current_user.role else get_text('admin_profile', lang) %}
+            <h1 style="font-size: 1.5em; font-weight: 700;">{{ get_text('welcome', lang) }}, {{ display_name }}</h1>
             <div class="user-profile">
                 <i class="fa-solid fa-circle-user" style="color: var(--primary); font-size: 1.2em;"></i>
-                <span>{{ get_text('admin_profile', lang) }}</span>
+                <span>{{ display_role }}</span>
             </div>
         </header>
 
@@ -1329,6 +1351,38 @@
                 </div>
             </div>
 
+            <!-- Staff User Management (Multi-Role Support) -->
+            <div style="margin-top: 30px; border-top: 2px solid var(--border); padding-top: 30px;">
+                <div class="section-header">
+                    <h2><i class="fa-solid fa-users-gear"></i> จัดการพนักงาน & บทบาทผู้ใช้งาน (Staff Management)</h2>
+                    <button class="btn btn-primary" onclick="openStaffModal()"><i class="fa-solid fa-user-plus"></i> เพิ่มพนักงาน</button>
+                </div>
+                <p style="font-size: 0.85em; color: var(--text-muted); margin-bottom: 15px;">
+                    เพิ่มพนักงานและกําหนดสิทธิ์ในการเข้าถึงระบบ เช่น บัญชี (Accountant), เสมียน/ธุรการ (Clerk), ช่างซ่อมบำรุง (Technician), หรือแม่บ้าน (Housekeeper) เพื่อรองรับการล็อกอินผ่าน Google Sign-In
+                </p>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ชื่อ-นามสกุล</th>
+                                <th>อีเมล (Gmail)</th>
+                                <th>บทบาท (Role)</th>
+                                <th>สถานะ (Status)</th>
+                                <th>วันที่เพิ่ม</th>
+                                <th>จัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="staffTableBody">
+                            <tr>
+                                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">
+                                    <i class="fa-solid fa-spinner fa-spin"></i> กำลังโหลดข้อมูล...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             <!-- Advanced Settings -->
             <div style="margin-top: 30px; border-top: 2px solid var(--border); padding-top: 30px;">
                 <div class="section-header">
@@ -1378,6 +1432,50 @@
                     <div style="display: flex; gap: 10px; margin-top: 20px;">
                         <button type="submit" class="btn btn-primary" style="flex: 1;">{{ get_text('save', lang) }}</button>
                         <button type="button" class="btn btn-outline" style="flex: 1;" onclick="document.getElementById('configModal').style.display='none'">{{ get_text('cancel', lang) }}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Staff Management Modal -->
+        <div id="staffModal" class="modal">
+            <div class="modal-content" style="max-width: 500px;">
+                <h3 id="staffModalTitle">เพิ่มพนักงานใหม่</h3>
+                <form id="staffForm" onsubmit="saveStaffUser(event)">
+                    <input type="hidden" id="staff_user_id">
+                    
+                    <div class="form-group" id="staff_name_group">
+                        <label>ชื่อ-นามสกุล (Full Name)</label>
+                        <input type="text" id="staff_full_name" placeholder="เช่น สมชาย ใจดี" required>
+                    </div>
+                    
+                    <div class="form-group" id="staff_email_group">
+                        <label>อีเมล Gmail (Google Account)</label>
+                        <input type="email" id="staff_email" placeholder="เช่น somchai@gmail.com" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>บทบาทหน้าที่ (Role)</label>
+                        <select id="staff_role" required>
+                            <option value="Admin">Admin (ผู้ดูแลระบบ)</option>
+                            <option value="Accountant">Accountant (ฝ่ายบัญชี)</option>
+                            <option value="Clerk">Clerk (เสมียน/ธุรการ)</option>
+                            <option value="Technician">Technician (ช่างเทคนิค/ซ่อมบำรุง)</option>
+                            <option value="Housekeeper">Housekeeper (แม่บ้าน)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" id="staff_status_group" style="display: none;">
+                        <label>สถานะการใช้งาน (Status)</label>
+                        <select id="staff_status">
+                            <option value="Active">Active (เปิดใช้งาน)</option>
+                            <option value="Suspended">Suspended (ระงับการใช้งาน)</option>
+                        </select>
+                    </div>
+                    
+                    <div style="display: flex; gap: 10px; margin-top: 20px;">
+                        <button type="submit" class="btn btn-primary" style="flex: 1;">บันทึก</button>
+                        <button type="button" class="btn btn-outline" style="flex: 1;" onclick="document.getElementById('staffModal').style.display='none'">ยกเลิก</button>
                     </div>
                 </form>
             </div>
@@ -3067,7 +3165,7 @@
                 if (!res.ok) {
                     throw new Error(d.detail || `Server error: ${res.status}`);
                 }
-                const ocHtml = (d.other_charges || []).map(c => `<div style="display:flex; justify-content:space-between; font-size:0.9em; margin-bottom:5px; color:var(--text-muted);"><span>${c.description}</span><span>${parseFloat(c.amount).toLocaleString()} บาท</span></div>`).join('');
+                const ocHtml = (d.other_charges || []).map(c => `<div style="display:flex; justify-content:space-between; font-size:0.9em; margin-bottom:5px; color:var(--text-muted);"><span>${c.description || c.name || 'ค่าธรรมเนียม'}</span><span>${parseFloat(c.amount).toLocaleString()} บาท</span></div>`).join('');
                 body.innerHTML = `
                     <div style="background:#f8f9fa; padding:20px; border-radius:12px; margin-bottom:20px;">
                         <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-bottom:15px;">
@@ -3078,9 +3176,11 @@
                         </div>
                     </div>
                     <div style="border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:15px;">
-                        <div style="display:flex; justify-content:space-between; margin-bottom:10px;"><span>{{ get_text('rent', lang) }}</span><strong>${d.rent.toLocaleString()} บาท</strong></div>
-                        <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span>{{ get_text('elec', lang) }} (${d.prev_elec_reading} -> ${d.elec_reading})</span><strong>${d.elec_amount.toLocaleString()} บาท</strong></div>
-                        <div style="display:flex; justify-content:space-between; margin-bottom:10px;"><span>{{ get_text('water', lang) }} (${d.prev_water_reading} -> ${d.water_reading})</span><strong>${d.water_amount.toLocaleString()} บาท</strong></div>
+                        ${d.invoice_type !== 'Initial' ? `
+                            <div style="display:flex; justify-content:space-between; margin-bottom:10px;"><span>{{ get_text('rent', lang) }}</span><strong>${d.rent.toLocaleString()} บาท</strong></div>
+                            <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span>{{ get_text('elec', lang) }} (${d.prev_elec_reading} -> ${d.elec_reading})</span><strong>${d.elec_amount.toLocaleString()} บาท</strong></div>
+                            <div style="display:flex; justify-content:space-between; margin-bottom:10px;"><span>{{ get_text('water', lang) }} (${d.prev_water_reading} -> ${d.water_reading})</span><strong>${d.water_amount.toLocaleString()} บาท</strong></div>
+                        ` : ''}
                         ${ocHtml}
                     </div>
                     <div style="display:flex; justify-content:space-between; font-size:1.2em; font-weight:700; color:var(--primary);"><span>{{ get_text('total', lang) }}</span><span>${d.total.toLocaleString()} บาท</span></div>
@@ -3217,8 +3317,158 @@
             if (res.ok) location.reload();
         };
 
+        async function loadStaffUsers() {
+            const list = document.getElementById('staffTableBody'); if (!list) return;
+            try {
+                const res = await fetch('/admin/users/list');
+                if (!res.ok) {
+                    list.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--danger);">ไม่สามารถโหลดข้อมูลผู้ใช้ได้ (HTTP ${res.status})</td></tr>`;
+                    return;
+                }
+                const data = await res.json();
+                if (data.length === 0) {
+                    list.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">ไม่มีข้อมูลพนักงานในระบบ</td></tr>`;
+                    return;
+                }
+                
+                const roleLabels = {
+                    'Admin': { text: "{{ get_text('Admin', lang) }}", bg: '#ede7f6', color: '#5e35b1' },
+                    'Accountant': { text: "{{ get_text('Accountant', lang) }}", bg: '#e3f2fd', color: '#1e88e5' },
+                    'Clerk': { text: "{{ get_text('Clerk', lang) }}", bg: '#e0f2f1', color: '#00897b' },
+                    'Technician': { text: "{{ get_text('Technician', lang) }}", bg: '#fff3e0', color: '#f4511e' },
+                    'Housekeeper': { text: "{{ get_text('Housekeeper', lang) }}", bg: '#f5f5f5', color: '#616161' }
+                };
+
+                const statusLabels = {
+                    'Active': { text: "{{ get_text('Active', lang) }}", bg: '#e8f5e9', color: '#2e7d32' },
+                    'Suspended': { text: "{{ get_text('Suspended', lang) }}", bg: '#ffebee', color: '#c62828' }
+                };
+
+                list.innerHTML = data.map(u => {
+                    const r = roleLabels[u.role] || { text: u.role, bg: '#eee', color: '#333' };
+                    const s = statusLabels[u.status] || { text: u.status, bg: '#eee', color: '#333' };
+                    
+                    return `
+                        <tr>
+                            <td><strong>${u.full_name || 'Staff User'}</strong></td>
+                            <td style="font-family: monospace;">${u.email}</td>
+                            <td>
+                                <span style="display: inline-block; padding: 4px 8px; border-radius: 6px; font-size: 0.8em; font-weight: 600; background: ${r.bg}; color: ${r.color};">
+                                    ${r.text}
+                                </span>
+                            </td>
+                            <td>
+                                <span style="display: inline-block; padding: 4px 8px; border-radius: 6px; font-size: 0.8em; font-weight: 600; background: ${s.bg}; color: ${s.color};">
+                                    ${s.text}
+                                </span>
+                            </td>
+                            <td style="font-size: 0.85em; color: var(--text-muted);">${u.created_at || '-'}</td>
+                            <td>
+                                <div style="display: flex; gap: 5px;">
+                                    <button class="btn btn-outline" style="padding: 5px 10px; font-size: 0.8em;" onclick='editStaffUser(${JSON.stringify(u)})'>
+                                        <i class="fa-solid fa-edit"></i> แก้ไข
+                                    </button>
+                                    <button class="btn btn-danger" style="padding: 5px 10px; font-size: 0.8em;" onclick="deleteStaffUser(${u.id})">
+                                        <i class="fa-solid fa-trash"></i> ลบ
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (e) {
+                console.error("Error loading staff:", e);
+                list.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--danger);">เกิดข้อผิดพลาดในการโหลดข้อมูล</td></tr>`;
+            }
+        }
+
+        function openStaffModal() {
+            document.getElementById('staffModalTitle').innerText = "เพิ่มพนักงานใหม่";
+            document.getElementById('staff_user_id').value = "";
+            
+            document.getElementById('staff_name_group').style.display = "block";
+            document.getElementById('staff_email_group').style.display = "block";
+            document.getElementById('staff_full_name').required = true;
+            document.getElementById('staff_email').required = true;
+            
+            document.getElementById('staff_full_name').value = "";
+            document.getElementById('staff_email').value = "";
+            document.getElementById('staff_role').value = "Admin";
+            
+            document.getElementById('staff_status_group').style.display = "none";
+            
+            document.getElementById('staffModal').style.display = 'block';
+        }
+
+        function editStaffUser(user) {
+            document.getElementById('staffModalTitle').innerText = "แก้ไขข้อมูลพนักงาน: " + user.email;
+            document.getElementById('staff_user_id').value = user.id;
+            
+            document.getElementById('staff_name_group').style.display = "none";
+            document.getElementById('staff_email_group').style.display = "none";
+            document.getElementById('staff_full_name').required = false;
+            document.getElementById('staff_email').required = false;
+            
+            document.getElementById('staff_role').value = user.role;
+            
+            document.getElementById('staff_status_group').style.display = "block";
+            document.getElementById('staff_status').value = user.status;
+            
+            document.getElementById('staffModal').style.display = 'block';
+        }
+
+        async function saveStaffUser(event) {
+            event.preventDefault();
+            const id = document.getElementById('staff_user_id').value;
+            const formData = new FormData();
+            
+            let url = '/admin/users/add';
+            if (id) {
+                url = `/admin/users/${id}/update`;
+                formData.append('role', document.getElementById('staff_role').value);
+                formData.append('status', document.getElementById('staff_status').value);
+            } else {
+                formData.append('email', document.getElementById('staff_email').value);
+                formData.append('full_name', document.getElementById('staff_full_name').value);
+                formData.append('role', document.getElementById('staff_role').value);
+            }
+
+            try {
+                const res = await fetch(url, { method: 'POST', body: formData });
+                if (res.ok) {
+                    alert("บันทึกข้อมูลพนักงานสำเร็จ");
+                    document.getElementById('staffModal').style.display = 'none';
+                    loadStaffUsers();
+                } else {
+                    const err = await res.json();
+                    alert("ล้มเหลว: " + (err.detail || "เกิดข้อผิดพลาดในการบันทึก"));
+                }
+            } catch (err) {
+                alert("เกิดข้อผิดพลาดในการเชื่อมต่อ: " + err);
+            }
+        }
+
+        async function deleteStaffUser(id) {
+            if (!confirm("คุณต้องการลบพนักงานคนนี้ออกจากระบบใช่หรือไม่?")) return;
+            try {
+                const res = await fetch(`/admin/users/${id}`, { method: 'DELETE' });
+                if (res.ok) {
+                    alert("ลบพนักงานสำเร็จ");
+                    loadStaffUsers();
+                } else {
+                    const err = await res.json();
+                    alert("ล้มเหลว: " + (err.detail || "ไม่สามารถลบข้อมูลได้"));
+                }
+            } catch (err) {
+                alert("เกิดข้อผิดพลาดในการเชื่อมต่อ: " + err);
+            }
+        }
+
         async function generatePairingCode() { try { const res = await fetch('/admin/generate-pairing-code', { method: 'POST' }); const data = await res.json(); if (data.pairing_code) location.reload(); } catch (e) { alert('Connection error'); } }
-        document.querySelector('a[href="#settingsSection"]').addEventListener('click', loadSystemConfigs);
+        document.querySelector('a[href="#settingsSection"]').addEventListener('click', () => {
+            loadSystemConfigs();
+            loadStaffUsers();
+        });
 
         window.onload = () => {
             const params = new URLSearchParams(window.location.search); const mode = params.get('mode'); const bid = params.get('building_id') || '{{ building_id if building_id else "" }}';
