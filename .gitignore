@@ -1,8 +1,45 @@
+# Roomy - Comprehensive Git Ignore Rules
+
+# Databases (SQLite) - CRITICAL Security & Performance
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Python Caches & Compiled Files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environments
+venv/
+ENV/
+env/
+.env/
+
+# IDEs & System Files
+.idea/
+.vscode/
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Caches & Test Outputs
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs & Temp Files
+*.log
+app.log
+src/app.log
+
+# Private Configuration & Secrets
 src/.env
 src/LINE_API_INFO.txt
-src/.env
-doc/contract_example.pdf
-src/.env
-
-.gemini/
 gha-creds-*.json
+.gemini/
+
+# Large Documents & Uploads
+doc/contract_example.pdf
+src/uploads/
