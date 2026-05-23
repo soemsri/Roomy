@@ -121,3 +121,26 @@ def set_system_config(db: Session, key: str, value: str, description: str = None
         config = models.SystemConfig(key=key, value=encrypted_val, description=description)
         db.add(config)
     db.commit()
+
+def verify_google_id_token(id_token: str) -> dict:
+    """
+    Verifies a Google OAuth2 JWT ID token by making a secure HTTP request to Google's official tokeninfo endpoint.
+    
+    Args:
+        id_token (str): The Google ID Token (JWT) sent by the browser.
+        
+    Returns:
+        dict: The parsed and verified token claims (e.g., email, name, picture).
+        
+    Raises:
+        ValueError: If token validation fails or Google API returns an error.
+    """
+    import requests
+    url = f"https://oauth2.googleapis.com/tokeninfo?id_token={id_token}"
+    try:
+        response = requests.get(url, timeout=5)
+        if response.status_code == 200:
+            return response.json()
+    except Exception as e:
+        logger.error(f"Error connecting to Google token verification: {e}")
+    raise ValueError("Invalid Google ID Token")

@@ -108,7 +108,12 @@ def migrate():
         "CREATE INDEX IF NOT EXISTS ix_move_out_requests_tenant_id ON move_out_requests (tenant_id)",
         "CREATE INDEX IF NOT EXISTS ix_move_out_requests_room_id ON move_out_requests (room_id)",
         "CREATE INDEX IF NOT EXISTS ix_settlements_tenant_id ON settlements (tenant_id)",
-        "CREATE INDEX IF NOT EXISTS ix_settlements_room_id ON settlements (room_id)"
+        "CREATE INDEX IF NOT EXISTS ix_settlements_room_id ON settlements (room_id)",
+
+        # New: users table for Google OAuth & Multi-role Staff
+        "CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE NOT NULL, full_name TEXT, role TEXT NOT NULL DEFAULT 'Admin', status TEXT DEFAULT 'Active', session_token TEXT UNIQUE, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+        "CREATE INDEX IF NOT EXISTS ix_users_email ON users (email)",
+        "CREATE INDEX IF NOT EXISTS ix_users_session_token ON users (session_token)"
     ]
     
     for cmd in commands:

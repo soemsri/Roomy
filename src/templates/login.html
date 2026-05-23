@@ -3,40 +3,231 @@
 <head>
     <title>{{ get_text('admin_login_title', lang) }} - Roomy</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Modern Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
-        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f0f2f5; }
-        .login-card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; }
-        h2 { color: #1c1e21; margin-bottom: 30px; }
-        input[type="password"] { width: 100%; padding: 12px; margin-bottom: 20px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
-        button { width: 100%; padding: 12px; background: #0078d4; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
-        button:hover { background: #005a9e; }
-        .error-msg { color: #d93025; background: #fff1f0; padding: 10px; border-radius: 6px; margin-bottom: 20px; display: none; font-size: 14px; }
-        .success-msg { color: #00875a; background: #e6fffa; padding: 10px; border-radius: 6px; margin-bottom: 20px; display: none; font-size: 14px; }
-        .forgot { display: block; margin-top: 20px; color: #0078d4; text-decoration: none; font-size: 14px; }
+        :root {
+            --primary: #4F46E5;
+            --primary-hover: #4338CA;
+            --background: #0B0F19;
+            --card-bg: rgba(17, 24, 39, 0.75);
+            --text-main: #F3F4F6;
+            --text-muted: #9CA3AF;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--background);
+            color: var(--text-main);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Ambient Glowing Background Orbs */
+        body::before {
+            content: '';
+            position: absolute;
+            width: 350px;
+            height: 350px;
+            background: radial-gradient(circle, rgba(79, 70, 229, 0.35) 0%, transparent 70%);
+            top: 10%;
+            left: 15%;
+            z-index: 1;
+            filter: blur(60px);
+        }
+
+        body::after {
+            content: '';
+            position: absolute;
+            width: 450px;
+            height: 450px;
+            background: radial-gradient(circle, rgba(16, 185, 129, 0.15) 0%, transparent 70%);
+            bottom: 10%;
+            right: 15%;
+            z-index: 1;
+            filter: blur(60px);
+        }
+
+        .login-card {
+            z-index: 10;
+            background: var(--card-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 40px;
+            border-radius: 24px;
+            box-shadow: 0 20px 45px rgba(0,0,0,0.5);
+            width: 100%;
+            max-width: 380px;
+            text-align: center;
+            box-sizing: border-box;
+        }
+
+        h2 {
+            color: #FFFFFF;
+            font-size: 26px;
+            font-weight: 700;
+            margin-bottom: 25px;
+            letter-spacing: -0.5px;
+        }
+
+        .input-group {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        input[type="password"] {
+            width: 100%;
+            padding: 14px 16px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            background: rgba(255, 255, 255, 0.05);
+            color: #FFFFFF;
+            border-radius: 12px;
+            font-size: 15px;
+            font-family: inherit;
+            box-sizing: border-box;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        input[type="password"]:focus {
+            border-color: var(--primary);
+            background: rgba(255, 255, 255, 0.08);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.25);
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: var(--primary-hover);
+        }
+
+        .error-msg {
+            color: #FCA5A5;
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            padding: 12px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            display: none;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .success-msg {
+            color: #34D399;
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            padding: 12px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            display: none;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            text-align: center;
+            color: var(--text-muted);
+            margin: 25px 0;
+            font-size: 13px;
+        }
+
+        .divider::before, .divider::after {
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .divider:not(:empty)::before { margin-right: 15px; }
+        .divider:not(:empty)::after { margin-left: 15px; }
+
+        .forgot {
+            display: inline-block;
+            margin-top: 20px;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 14px;
+            transition: color 0.2s;
+        }
+
+        .forgot:hover {
+            color: #FFFFFF;
+        }
+
+        .oauth-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+            min-height: 44px;
+        }
     </style>
 </head>
 <body>
     <div class="login-card">
         <h2>{{ get_text('admin_login_title', lang) }}</h2>
         
+        <div id="localErrorBox" class="error-msg"></div>
+
         {% if error == 'locked' %}
         <div id="error-msg" class="error-msg" style="display: block;">
             {{ get_text('login_locked', lang).replace('{wait}', wait|string) }}
         </div>
         {% elif error %}
         <div id="error-msg" class="error-msg" style="display: block;">{{ get_text('login_error', lang) }}</div>
-        {% else %}
-        <div id="error-msg" class="error-msg">{{ get_text('login_error', lang) }}</div>
         {% endif %}
 
         {% if request.query_params.get('reset_success') %}
         <div id="success-msg" class="success-msg" style="display: block;">{{ get_text('reset_success_msg', lang) }}</div>
-        {% else %}
-        <div id="success-msg" class="success-msg">{{ get_text('reset_success_msg', lang) }}</div>
         {% endif %}
         
+        <!-- Google Sign In Area -->
+        {% if google_client_id %}
+        <div class="oauth-container">
+            <div id="g_id_onload"
+                 data-client_id="{{ google_client_id }}"
+                 data-context="signin"
+                 data-ux_mode="popup"
+                 data-callback="handleGoogleSignIn"
+                 data-auto_prompt="false">
+            </div>
+            <div class="g_id_signin"
+                 data-type="standard"
+                 data-shape="pill"
+                 data-theme="filled_blue"
+                 data-text="signin_with"
+                 data-size="large"
+                 data-logo_alignment="left">
+            </div>
+        </div>
+        
+        <div class="divider">OR</div>
+        {% endif %}
+
+        <!-- Legacy Password Form -->
         <form action="/admin/login" method="post">
-            <input type="password" name="password" placeholder="{{ get_text('admin_password_placeholder', lang) }}" required autofocus>
+            <div class="input-group">
+                <input type="password" name="password" placeholder="{{ get_text('admin_password_placeholder', lang) }}" required autofocus>
+            </div>
             <button type="submit">{{ get_text('login_btn', lang) }}</button>
         </form>
         
@@ -44,8 +235,36 @@
     </div>
 
     <script>
-        // Keeping script for backward compatibility or other query params if needed, 
-        // though Jinja handles the main ones now.
+        function handleGoogleSignIn(response) {
+            const idToken = response.credential;
+            const errorBox = document.getElementById("localErrorBox");
+            
+            // Clear prior errors
+            errorBox.style.display = "none";
+            const legacyError = document.getElementById("error-msg");
+            if (legacyError) legacyError.style.display = "none";
+
+            fetch("/admin/auth/google", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ id_token: idToken })
+            })
+            .then(res => {
+                if (!res.ok) {
+                    return res.json().then(err => { throw new Error(err.detail || "Sign-in failed") });
+                }
+                return res.json();
+            })
+            .then(data => {
+                window.location.href = data.redirect;
+            })
+            .catch(err => {
+                errorBox.innerText = err.message;
+                errorBox.style.display = "block";
+            });
+        }
     </script>
 </body>
 </html>

@@ -72,22 +72,158 @@ router = APIRouter(prefix="/admin")
 uploads_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")
 src_dir = os.path.dirname(os.path.dirname(__file__))
 
-def get_admin(request: Request, db: Session = Depends(get_db)):
+def get_current_user(request: Request, db: Session = Depends(get_db)):
+    """
+    FastAPI Dependency to retrieve the currently logged-in user.
+    Supports both Google OAuth2 Users and legacy Owner/Admin sessions for backward compatibility.
+    """
+    user_count = db.query(models.User).count()
+    owner_count = db.query(models.Owner).count()
+    if user_count == 0 and owner_count == 0:
+        # Web Bootstrap Wizard redirect if system has no users at all
+        raise HTTPException(
+            status_code=307,
+            headers={"Location": "/admin/setup/bootstrap"},
+            detail="Initial setup required"
+        )
+
     admin_session = request.cookies.get("admin_session")
     if not admin_session:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
+    # 1. Check in the new multi-role 'users' table
+    user = db.query(models.User).filter(models.User.session_token == admin_session, models.User.status == "Active").first()
+    if user:
+        return user
+
+    # 2. Fallback: Check in the legacy 'owners' table (for backward-compatible tests)
     owner = db.query(models.Owner).filter(models.Owner.session_token == admin_session).first()
-    if not owner:
-        raise HTTPException(status_code=401, detail="Unauthorized")
+    if owner:
+        return models.User(
+            email="legacy_owner@system.local", 
+            full_name=owner.display_name or "Owner", 
+            role="Admin", 
+            status="Active"
+        )
+
+    raise HTTPException(status_code=401, detail="Unauthorized")
+
+def get_admin(current_user: models.User = Depends(get_current_user)):
+    """
+    Verifies that the current user has the Admin role.
+    """
+    if current_user.role != "Admin":
+        raise HTTPException(status_code=403, detail="Forbidden: Admin role required")
     return True
 
+class RoleChecker:
+    """
+    Enforces Role-Based Access Control (RBAC) on specific routes.
+    """
+    def __init__(self, allowed_roles: list):
+        self.allowed_roles = allowed_roles
+
+    def __call__(self, current_user: models.User = Depends(get_current_user)):
+        if current_user.role not in self.allowed_roles:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Forbidden: Access restricted. Requires one of roles: {self.allowed_roles}"
+            )
+        return current_user
+
+@router.get("/setup/bootstrap", response_class=HTMLResponse)
+async def setup_bootstrap_page(request: Request, db: Session = Depends(get_db)):
+    """
+    Renders the onboarding page (Web Bootstrap Wizard) for the first owner to claim ownership using Google.
+    Returns 403 Forbidden if an Admin already exists.
+    """
+    admin_exists = db.query(models.User).filter(models.User.role == "Admin").first()
+    if admin_exists:
+        return HTMLResponse("<h2>Forbidden: Initial setup is already completed.</h2>", status_code=403)
+        
+    google_client_id = security.get_system_config(db, "GOOGLE_CLIENT_ID")
+    lang = request.query_params.get("lang") or "th"
+    return templates.TemplateResponse("bootstrap.html", {
+        "request": request, 
+        "lang": lang,
+        "google_client_id": google_client_id
+    })
+
+@router.post("/auth/google")
+async def auth_google(request: Request, data: dict, db: Session = Depends(get_db)):
+    """
+    Processes Google OAuth ID Token (JWT), verifies it, and logs the user in.
+    If the system has no active Admins, the first signed-in user is automatically registered as Admin.
+    """
+    id_token = data.get("id_token")
+    if not id_token:
+        raise HTTPException(status_code=400, detail="Missing ID Token")
+        
+    try:
+        claims = security.verify_google_id_token(id_token)
+    except Exception as e:
+        logger.error(f"Google OAuth verification failed: {e}")
+        raise HTTPException(status_code=400, detail="Invalid token verification")
+        
+    email = claims.get("email")
+    full_name = claims.get("name")
+    
+    if not email:
+        raise HTTPException(status_code=400, detail="Missing email claim in Google token")
+        
+    # Check if this is the Web Bootstrap Wizard claiming ownership
+    admin_exists = db.query(models.User).filter(models.User.role == "Admin").first()
+    
+    user = db.query(models.User).filter(models.User.email == email).first()
+    if not user:
+        if not admin_exists:
+            # Register the first Google account as Super Admin
+            user = models.User(
+                email=email,
+                full_name=full_name or "Super Admin",
+                role="Admin",
+                status="Active"
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+            logger.info(f"System bootstrapped successfully. First Admin: {email}")
+        else:
+            # Unauthorized access (not registered by Admin)
+            raise HTTPException(status_code=403, detail="Gmail address not registered. Please contact the administrator.")
+            
+    if user.status != "Active":
+        raise HTTPException(status_code=403, detail="Account is suspended.")
+        
+    # Generate secure session token
+    token = secrets.token_hex(32)
+    user.session_token = token
+    db.commit()
+    
+    from fastapi.responses import JSONResponse
+    res = JSONResponse(content={"status": "Success", "redirect": "/admin/dashboard"})
+    res.set_cookie(
+        key="admin_session",
+        value=token,
+        httponly=True,
+        secure=True,
+        samesite="lax"
+    )
+    return res
+
 @router.get("/login", response_class=HTMLResponse)
-async def admin_login_page(request: Request):
+async def admin_login_page(request: Request, db: Session = Depends(get_db)):
+    google_client_id = security.get_system_config(db, "GOOGLE_CLIENT_ID")
     lang = request.cookies.get("lang") or request.query_params.get("lang") or "th"
     error = request.query_params.get("error")
     wait = request.query_params.get("wait")
-    return templates.TemplateResponse("login.html", {"request": request, "lang": lang, "error": error, "wait": wait})
+    return templates.TemplateResponse("login.html", {
+        "request": request, 
+        "lang": lang, 
+        "error": error, 
+        "wait": wait,
+        "google_client_id": google_client_id
+    })
 
 @router.post("/login")
 async def admin_login(request: Request, password: str = Form(...), db: Session = Depends(get_db)):

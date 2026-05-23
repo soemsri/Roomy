@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="{{ lang or 'th' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Roomy - Claim Ownership Onboarding</title>
+    <!-- Modern Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <style>
+        :root {
+            --primary: #4F46E5;
+            --primary-hover: #4338CA;
+            --background: #0B0F19;
+            --card-bg: rgba(17, 24, 39, 0.7);
+            --text-main: #F3F4F6;
+            --text-muted: #9CA3AF;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--background);
+            color: var(--text-main);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Animated Glowing Orbs Background */
+        body::before {
+            content: '';
+            position: absolute;
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, rgba(79, 70, 229, 0.4) 0%, transparent 70%);
+            top: -100px;
+            left: -100px;
+            z-index: 1;
+            filter: blur(50px);
+            animation: moveOrb 15s infinite alternate ease-in-out;
+        }
+
+        body::after {
+            content: '';
+            position: absolute;
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(16, 185, 129, 0.2) 0%, transparent 70%);
+            bottom: -150px;
+            right: -150px;
+            z-index: 1;
+            filter: blur(50px);
+            animation: moveOrb 20s infinite alternate-reverse ease-in-out;
+        }
+
+        @keyframes moveOrb {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(50px, 80px) scale(1.1); }
+        }
+
+        .container {
+            z-index: 10;
+            width: 100%;
+            max-width: 480px;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 24px;
+            padding: 40px;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+            transition: transform 0.3s ease;
+        }
+
+        .logo-area {
+            font-size: 36px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #A5B4FC 0%, #6366F1 50%, #4F46E5 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+            letter-spacing: -0.5px;
+        }
+
+        h2 {
+            font-size: 24px;
+            font-weight: 600;
+            margin: 10px 0 20px;
+            color: #FFFFFF;
+        }
+
+        p {
+            font-size: 15px;
+            color: var(--text-muted);
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+
+        .oauth-area {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 20px 0;
+            min-height: 44px;
+        }
+
+        .alert {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #FCA5A5;
+            padding: 12px;
+            border-radius: 12px;
+            font-size: 14px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .success-box {
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: #34D399;
+            padding: 16px;
+            border-radius: 16px;
+            font-size: 15px;
+            display: none;
+        }
+
+        .footer {
+            font-size: 12px;
+            color: #6B7280;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card" id="bootstrapCard">
+            <div class="logo-area">Roomy</div>
+            <h2>Claim Super Admin Role</h2>
+            <p>
+                Welcome to Roomy! You are booting the system for the first time. 
+                Please sign in with your Google Account below to claim ownership and register as the first **Super Admin**.
+            </p>
+
+            <div id="alertBox" class="alert"></div>
+            
+            <div id="successBox" class="success-box">
+                🎉 Ownership claimed successfully! Redirecting to dashboard...
+            </div>
+
+            <div class="oauth-area" id="oauthBtn">
+                {% if google_client_id %}
+                <div id="g_id_onload"
+                     data-client_id="{{ google_client_id }}"
+                     data-context="signin"
+                     data-ux_mode="popup"
+                     data-callback="handleCredentialResponse"
+                     data-auto_prompt="false">
+                </div>
+                <div class="g_id_signin"
+                     data-type="standard"
+                     data-shape="pill"
+                     data-theme="filled_blue"
+                     data-text="continue_with"
+                     data-size="large"
+                     data-logo_alignment="left">
+                </div>
+                {% else %}
+                <div style="color: #FCA5A5; font-size: 14px;">
+                    ⚠️ Google Sign-In is not configured. Please add <strong>GOOGLE_CLIENT_ID</strong> in the system settings or env config.
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="footer">
+                Secured by Google Identity Services &bull; Powered by Roomy
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function handleCredentialResponse(response) {
+            const idToken = response.credential;
+            const alertBox = document.getElementById("alertBox");
+            const successBox = document.getElementById("successBox");
+            const oauthBtn = document.getElementById("oauthBtn");
+
+            // Hide alert and start fetch
+            alertBox.style.display = "none";
+
+            fetch("/admin/auth/google", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ id_token: idToken })
+            })
+            .then(res => {
+                if (!res.ok) {
+                    return res.json().then(err => { throw new Error(err.detail || "Authentication failed") });
+                }
+                return res.json();
+            })
+            .then(data => {
+                oauthBtn.style.display = "none";
+                successBox.style.display = "block";
+                setTimeout(() => {
+                    window.location.href = data.redirect;
+                }, 1500);
+            })
+            .catch(err => {
+                alertBox.innerText = err.message;
+                alertBox.style.display = "block";
+            });
+        }
+    </script>
+</body>
+</html>

@@ -296,3 +296,17 @@ class LoginAttempt(Base):
     attempts = Column(Integer, default=0)
     last_attempt = Column(DateTime, server_default=func.now(), onupdate=func.now())
     locked_until = Column(DateTime, nullable=True)
+
+class User(Base):
+    """
+    Represents an administrative or operational staff user of Roomy.
+    Roles include: Admin, Accountant, Clerk, Technician, Housekeeper.
+    """
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, unique=True, index=True, nullable=False)
+    full_name = Column(String)
+    role = Column(String, default="Admin") # Admin, Accountant, Clerk, Technician, Housekeeper
+    status = Column(String, default="Active") # Active, Suspended
+    session_token = Column(String, unique=True, index=True)
+    created_at = Column(DateTime, server_default=func.now())
