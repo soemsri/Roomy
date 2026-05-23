@@ -1,4 +1,4 @@
-# Roomy - Advanced Apartment & Staff Role Management System
+# Roomy - Advanced Apartment & Rental Management System
 
 Roomy is an enterprise-grade, comprehensive **Apartment, Property, and Staff Management System** built with **FastAPI** (Python). It features a secure **Multi-Role Role-Based Access Control (RBAC)** authorization scheme, seamless **Google OAuth 2.0 Identity Sign-In**, and dual **LINE Official Account (LINE OA) Bot integrations** for real-time tenant communications, automated meter recordings, maintenance workflows, and dynamic scan-to-pay PromptPay invoicing.
 
