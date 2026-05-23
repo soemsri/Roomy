@@ -59,7 +59,7 @@ Ensure you have the following installed on your system:
 ### 2. Clone the Repository & Configure Directory
 Open your terminal (PowerShell, Bash, or Command Prompt) and set up the repository:
 ```bash
-git clone <repository_url>
+git clone https://github.com/soemsri/Roomy.git
 cd Roomy
 ```
 
