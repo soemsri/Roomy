@@ -75,3 +75,39 @@ To maintain this standard of security as the Roomy project grows, future develop
      ```python
      cursor.execute("SELECT * FROM rooms WHERE status = ?", (status,))
      ```
+
+---
+
+## 🔑 3. Authentication, Authorization & Role-Based Access Control (RBAC)
+
+The Roomy system implements a formal, highly secure **Dual-Role Access Control Model** divided into **Session-Based Administration (RBAC)** and **Capability-Based Tenant Space (CBAC)**. This completely isolates the administrative and resident layers.
+
+### 1. Admin Role (Role-Based Access Control - RBAC)
+* **Access Level**: Full read/write access to dashboards, invoices, expenses, tenant lists, repair logs, and database settings.
+* **Mechanism**: Protected via FastAPI Dependency Injection using the custom `Depends(get_admin)` validator.
+* **Token Validation**:
+  - The admin's browser is issued a secure, cryptographically random 256-bit hexadecimal `session_token` upon successful login.
+  - The token is checked on every administrative request against the database session store.
+* **Cookie Protections**:
+  - `httponly=True`: Prevents client-side scripts (XSS) from accessing or stealing the cookie.
+  - `secure=True`: Enforces transmission strictly over HTTPS, neutralizing man-in-the-middle sniffing.
+  - `samesite="lax"`: Mitigates Cross-Site Request Forgery (CSRF) attack vectors.
+* **Brute-Force Bracing**:
+  - Monitored by the `login_attempts` table.
+  - **Lockout Rule**: Accumulating 3 consecutive failed login attempts locks the originating IP address completely out of the login endpoint for **30 minutes**, preventing dictionary and brute-force cracking.
+
+### 2. Tenant Role (Capability-Based Access Control - CBAC)
+To prevent residents from having to manage complex password databases on LINE, Roomy employs an elegant, highly secure **Capability-Based Access Model**.
+* **Access Level**: Sandboxed read/write access strictly to the tenant's own bills, registration status, repair form submissions, and receipt history.
+* **Mechanism**: Validated using unguessable, high-entropy **UUIDv4 tokens** generated natively upon tenant initialization.
+* **Privilege Separation**:
+  - Endpoints (e.g., `/bill/{invoice_uuid}`, `/repair/{tenant_uuid}`) check for exact resource matches in the database.
+  - Because UUIDv4 is mathematically unguessable ($2^{128}$ combinations), it is computationally impossible for **Tenant A** to guess, access, or manipulate **Tenant B**'s data (completely mitigating horizontal privilege escalation).
+
+### 3. Webhook Callbacks (Signature Authentication)
+* **Mechanism**: The callback routing controllers (`/callback/admin` and `/callback/tenant`) verify the official LINE signature `X-Line-Signature` sent by LINE's servers.
+* **Verification**: Checks the request payload against the channel's secret credentials using the official `linebot.v3.webhooks.WebhookHandler`. Unsigned or fake webhooks are automatically rejected with a `400 Bad Request` code, preventing endpoint spoofing.
+
+---
+
+## 🛡️ Mandatory Coding Guidelines for Developers
