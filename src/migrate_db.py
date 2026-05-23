@@ -7,10 +7,19 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger(__name__)
 
 def migrate():
+    """
+    Executes the database migration commands. If the database file (suk_anan.db) does not exist,
+    it automatically initializes a new SQLite database with the full schema first.
+    """
     db_path = os.path.join(os.path.dirname(__file__), 'suk_anan.db')
     if not os.path.exists(db_path):
-        logger.error(f"Database not found at {db_path}")
-        return
+        logger.info(f"Database not found at {db_path}. Initializing new database...")
+        from models.database import Base
+        from sqlalchemy import create_engine
+        import models
+        engine = create_engine(f"sqlite:///{db_path}", connect_args={"check_same_thread": False})
+        Base.metadata.create_all(bind=engine)
+        logger.info("New database schema created successfully.")
 
     conn = sqlite3.connect(db_path)
     curr = conn.cursor()
