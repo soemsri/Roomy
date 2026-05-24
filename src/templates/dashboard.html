@@ -1407,6 +1407,61 @@
                 </div>
             </div>
 
+            <!-- Database Backup & Recovery -->
+            <div style="margin-top: 30px; border-top: 2px solid var(--border); padding-top: 30px;">
+                <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2><i class="fa-solid fa-database"></i> {{ get_text('db_backup_title', lang) }}</h2>
+                    <button class="btn btn-outline" onclick="triggerManualBackup()"><i class="fa-solid fa-file-export"></i> {{ get_text('create_backup_btn', lang) }}</button>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 20px;">
+                    <!-- Backup History Card -->
+                    <div class="card" style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 12px; border: 1px solid var(--border);">
+                        <h3 style="margin-bottom: 15px; font-size: 1.1em; color: var(--primary);"><i class="fa-solid fa-clock-rotate-left"></i> {{ get_text('backup_history', lang) }}</h3>
+                        <div class="table-container" style="max-height: 300px; overflow-y: auto;">
+                            <table id="backupTable" style="width: 100%;">
+                                <thead>
+                                    <tr>
+                                        <th>{{ get_text('backup_filename', lang) }}</th>
+                                        <th>{{ get_text('backup_size', lang) }}</th>
+                                        <th>{{ get_text('backup_created', lang) }}</th>
+                                        <th>{{ get_text('backup_actions', lang) }}</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="backupTableBody">
+                                    <!-- Dynamic content -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Scheduled Backup Configuration -->
+                    <div class="card" style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 12px; border: 1px solid var(--border);">
+                        <h3 style="margin-bottom: 15px; font-size: 1.1em; color: var(--primary);"><i class="fa-solid fa-calendar-days"></i> {{ get_text('backup_schedule', lang) }}</h3>
+                        <form id="backupScheduleForm" onsubmit="saveBackupSchedule(event)">
+                            <div class="form-group" style="margin-bottom: 15px;">
+                                <label style="display: block; margin-bottom: 5px;">{{ get_text('backup_frequency', lang) }}</label>
+                                <select id="backup_frequency" name="frequency" class="form-control" style="width: 100%; padding: 8px; border-radius: 6px; background: rgba(0,0,0,0.2); border: 1px solid var(--border); color: var(--text);" required>
+                                    <option value="disabled">{{ get_text('backup_frequency_disabled', lang) }}</option>
+                                    <option value="daily">{{ get_text('backup_frequency_daily', lang) }}</option>
+                                    <option value="weekly">{{ get_text('backup_frequency_weekly', lang) }}</option>
+                                    <option value="monthly">{{ get_text('backup_frequency_monthly', lang) }}</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin-bottom: 15px;">
+                                <label style="display: block; margin-bottom: 5px;">{{ get_text('backup_time', lang) }}</label>
+                                <input type="time" id="backup_time" name="time_str" class="form-control" style="width: 100%; padding: 8px; border-radius: 6px; background: rgba(0,0,0,0.2); border: 1px solid var(--border); color: var(--text);" required>
+                            </div>
+                            <div class="form-group" style="margin-bottom: 20px;">
+                                <label style="display: block; margin-bottom: 5px;">{{ get_text('backup_retention', lang) }}</label>
+                                <input type="number" id="backup_max_backups" name="max_backups" min="1" max="100" class="form-control" style="width: 100%; padding: 8px; border-radius: 6px; background: rgba(0,0,0,0.2); border: 1px solid var(--border); color: var(--text);" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="width: 100%; padding: 10px;"><i class="fa-solid fa-save"></i> {{ get_text('save_schedule_btn', lang) }}</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
             </div>
 
         <!-- Config Modal -->
@@ -2155,7 +2210,16 @@
             save_failed: "{{ get_text('save_failed', lang) }}",
             connection_error_alert: "{{ get_text('connection_error_alert', lang) }}",
             failed_to_load_users: "{{ get_text('failed_to_load_users', lang) }}",
-            no_staff_data: "{{ get_text('no_staff_data', lang) }}"
+            no_staff_data: "{{ get_text('no_staff_data', lang) }}",
+            schedule_saved_success: "{{ get_text('schedule_saved_success', lang) }}",
+            backup_created_success: "{{ get_text('backup_created_success', lang) }}",
+            backup_restored_success: "{{ get_text('backup_restored_success', lang) }}",
+            backup_deleted_success: "{{ get_text('backup_deleted_success', lang) }}",
+            confirm_restore_backup: "{{ get_text('confirm_restore_backup', lang) }}",
+            confirm_delete_backup: "{{ get_text('confirm_delete_backup', lang) }}",
+            backup_restoring_msg: "{{ get_text('backup_restoring_msg', lang) }}",
+            none: "{{ get_text('none', lang) }}",
+            restore_btn: "{{ get_text('restore_btn', lang) }}"
         };
 
         function setLanguage(lang) {
@@ -3330,6 +3394,122 @@
             } catch (err) { alert('Fetch Error: ' + err); }
         };
 
+        // --- Database Backup & Recovery Functions ---
+        async function loadBackups() {
+            const tbody = document.getElementById('backupTableBody');
+            if (!tbody) return;
+            try {
+                const res = await fetch('/admin/backup/list');
+                if (!res.ok) throw new Error('Failed to load backups');
+                const backups = await res.json();
+                tbody.innerHTML = '';
+                if (backups.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 20px;">${translations.none}</td></tr>`;
+                    return;
+                }
+                backups.forEach(b => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td style="word-break: break-all; font-weight: 500;">${b.filename}</td>
+                        <td>${b.size_formatted}</td>
+                        <td>${b.created_at}</td>
+                        <td>
+                            <div style="display: flex; gap: 8px;">
+                                <a href="/admin/backup/download/${b.filename}" class="btn btn-outline" style="padding: 5px 10px; font-size: 0.85em;" title="Download"><i class="fa-solid fa-download"></i></a>
+                                <button class="btn btn-primary" style="padding: 5px 10px; font-size: 0.85em; background: var(--secondary);" onclick="triggerRestoreBackup('${b.filename}')"><i class="fa-solid fa-rotate-left"></i> ${translations.restore_btn}</button>
+                                <button class="btn btn-primary" style="padding: 5px 10px; font-size: 0.85em; background: var(--danger); border-color: var(--danger);" onclick="triggerDeleteBackup('${b.filename}')"><i class="fa-solid fa-trash"></i></button>
+                            </div>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (err) {
+                console.error("Error loading backups:", err);
+            }
+        }
+
+        async function loadBackupSchedule() {
+            try {
+                const res = await fetch('/admin/backup/schedule');
+                if (!res.ok) throw new Error('Failed to load backup schedule');
+                const config = await res.json();
+                document.getElementById('backup_frequency').value = config.frequency || 'disabled';
+                document.getElementById('backup_time').value = config.time || '02:00';
+                document.getElementById('backup_max_backups').value = config.max_backups || 10;
+            } catch (err) {
+                console.error("Error loading backup schedule:", err);
+            }
+        }
+
+        async function saveBackupSchedule(e) {
+            if (e) e.preventDefault();
+            const form = document.getElementById('backupScheduleForm');
+            const formData = new FormData(form);
+            try {
+                const res = await fetch('/admin/backup/schedule/save', {
+                    method: 'POST',
+                    body: formData
+                });
+                if (res.ok) {
+                    alert(translations.schedule_saved_success);
+                    loadBackupSchedule();
+                } else {
+                    const data = await res.json();
+                    alert(translations.error + ': ' + (data.detail || 'Unknown error'));
+                }
+            } catch (err) {
+                alert(translations.connection_error_alert + err);
+            }
+        }
+
+        async function triggerManualBackup() {
+            try {
+                const res = await fetch('/admin/backup/create', { method: 'POST' });
+                if (res.ok) {
+                    alert(translations.backup_created_success);
+                    loadBackups();
+                } else {
+                    const data = await res.json();
+                    alert(translations.error + ': ' + (data.detail || 'Unknown error'));
+                }
+            } catch (err) {
+                alert(translations.connection_error_alert + err);
+            }
+        }
+
+        async function triggerRestoreBackup(filename) {
+            if (!confirm(translations.confirm_restore_backup)) return;
+            alert(translations.backup_restoring_msg);
+            try {
+                const res = await fetch(`/admin/backup/restore/${filename}`, { method: 'POST' });
+                if (res.ok) {
+                    alert(translations.backup_restored_success);
+                    location.reload();
+                } else {
+                    const data = await res.json();
+                    alert(translations.error + ': ' + (data.detail || 'Unknown error'));
+                }
+            } catch (err) {
+                alert(translations.connection_error_alert + err);
+            }
+        }
+
+        async function triggerDeleteBackup(filename) {
+            if (!confirm(translations.confirm_delete_backup)) return;
+            try {
+                const res = await fetch(`/admin/backup/delete/${filename}`, { method: 'POST' });
+                if (res.ok) {
+                    alert(translations.backup_deleted_success);
+                    loadBackups();
+                } else {
+                    const data = await res.json();
+                    alert(translations.error + ': ' + (data.detail || 'Unknown error'));
+                }
+            } catch (err) {
+                alert(translations.connection_error_alert + err);
+            }
+        }
+
         async function openBuildingListModal() {
             const modal = document.getElementById('buildingListModal'); const tbody = document.getElementById('buildingListTableBody');
             tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;"><i class="fa-solid fa-spinner fa-spin"></i> ${translations.loading}</td></tr>`; modal.style.display = 'block';
@@ -3527,6 +3707,8 @@
             settingsLink.addEventListener('click', () => {
                 loadSystemConfigs();
                 loadStaffUsers();
+                loadBackups();
+                loadBackupSchedule();
             });
         }
 
@@ -3542,6 +3724,10 @@
             }
             if (document.getElementById('configTableBody')) {
                 loadSystemConfigs();
+            }
+            if (document.getElementById('backupTableBody')) {
+                loadBackups();
+                loadBackupSchedule();
             }
         };
     </script>

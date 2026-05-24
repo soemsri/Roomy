@@ -3227,3 +3227,112 @@ async def delete_user(
     db.delete(user)
     db.commit()
     return {"status": "Success"}
+
+# --- Database Backup & Restore Endpoints ---
+from fastapi.responses import FileResponse
+import services.backup as backup_service
+
+@router.get("/backup/list")
+async def list_backups(admin: bool = Depends(get_super_admin)):
+    try:
+        return backup_service.get_backups_list()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/backup/create")
+async def create_backup_endpoint(db: Session = Depends(get_db), admin: bool = Depends(get_super_admin)):
+    try:
+        filename = backup_service.create_backup(db)
+        # Pruning retention configuration
+        config_str = security.get_system_config(db, "BACKUP_SCHEDULE_CONFIG")
+        if config_str:
+            try:
+                config = json.loads(config_str)
+                max_backups = int(config.get("max_backups", 10))
+                backup_service.prune_backups(max_backups)
+            except Exception:
+                pass
+        return {"status": "Success", "filename": filename}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create backup: {str(e)}")
+
+@router.get("/backup/download/{filename}")
+async def download_backup_endpoint(filename: str, admin: bool = Depends(get_super_admin)):
+    file_path = os.path.join(backup_service.BACKUPS_DIR, filename)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(
+        file_path,
+        media_type="application/octet-stream",
+        filename=filename
+    )
+
+@router.post("/backup/restore/{filename}")
+async def restore_backup_endpoint(filename: str, db: Session = Depends(get_db), admin: bool = Depends(get_super_admin)):
+    try:
+        backup_service.restore_backup(db, filename)
+        # Reset memory/cache configs after restore
+        refresh_configs()
+        return {"status": "Success"}
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Backup file not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Restore failed: {str(e)}")
+
+@router.post("/backup/delete/{filename}")
+async def delete_backup_endpoint(filename: str, admin: bool = Depends(get_super_admin)):
+    if backup_service.delete_backup_file(filename):
+        return {"status": "Success"}
+    raise HTTPException(status_code=404, detail="Backup file not found")
+
+@router.get("/backup/schedule")
+async def get_backup_schedule_endpoint(db: Session = Depends(get_db), admin: bool = Depends(get_super_admin)):
+    config_str = security.get_system_config(db, "BACKUP_SCHEDULE_CONFIG")
+    if not config_str:
+        config = {
+            "frequency": "disabled",
+            "time": "02:00",
+            "max_backups": 10,
+            "last_run": None
+        }
+    else:
+        try:
+            config = json.loads(config_str)
+        except Exception:
+            config = {
+                "frequency": "disabled",
+                "time": "02:00",
+                "max_backups": 10,
+                "last_run": None
+            }
+    return config
+
+@router.post("/backup/schedule/save")
+async def save_backup_schedule_endpoint(
+    frequency: str = Form(...),
+    time_str: str = Form(...),
+    max_backups: int = Form(...),
+    db: Session = Depends(get_db),
+    admin: bool = Depends(get_super_admin)
+):
+    try:
+        # Load existing config to keep last_run
+        config_str = security.get_system_config(db, "BACKUP_SCHEDULE_CONFIG")
+        last_run = None
+        if config_str:
+            try:
+                existing = json.loads(config_str)
+                last_run = existing.get("last_run")
+            except Exception:
+                pass
+                
+        config = {
+            "frequency": frequency,
+            "time": time_str,
+            "max_backups": max_backups,
+            "last_run": last_run
+        }
+        security.set_system_config(db, "BACKUP_SCHEDULE_CONFIG", json.dumps(config), description="Database Backup Schedule Config")
+        return {"status": "Success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

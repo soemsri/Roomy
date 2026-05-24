@@ -44,6 +44,28 @@ app.include_router(callback.router)
 app.include_router(tenant.router)
 app.include_router(admin.router)
 
+import threading
+import time
+
+def start_backup_scheduler():
+    def scheduler_loop():
+        logger.info("Database backup scheduler thread started.")
+        time.sleep(10)  # Wait for application to settle
+        while True:
+            try:
+                import services.backup as backup_service
+                backup_service.run_scheduled_backup()
+            except Exception as e:
+                logger.error(f"Error in backup scheduler loop: {e}")
+            time.sleep(60)
+
+    thread = threading.Thread(target=scheduler_loop, daemon=True, name="BackupScheduler")
+    thread.start()
+
+@app.on_event("startup")
+async def startup_event():
+    start_backup_scheduler()
+
 @app.get("/")
 async def root():
     return {"message": "SukAnan Apartment API is running"}

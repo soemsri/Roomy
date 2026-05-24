@@ -6,6 +6,25 @@ import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+DEFAULT_SYSTEM_CONFIGS = {
+    "LINE_ADMIN_CHANNEL_ACCESS_TOKEN": "Am0h1++54LfstMVl1EXbHMYfaaBj+Hk9OKcgIcW0cfOx3H/MNO8Ijd0w9jIGd0Ym0PJ7ByHrOr+5quQNyIp4DPORBZN/BwgMX/SWaNxt61nW19Z5bwDlEpI4il9vlkWYuP5BC7cpiqTXbUn45Ty/XgdB04t89/1O/w1cDnyilFU=",
+    "LINE_ADMIN_CHANNEL_SECRET": "c365858c050cb6b0a2253ce0e2a49585",
+    "LINE_TENANT_CHANNEL_ACCESS_TOKEN": "hoMaEApJucC37dk8UTqI5qWDTEAZMBUrIxenPVdCUdaz0rXi6piHXQ6Vcp8MyBQPuJx4LUf2GaiSR4wcjT5mLgBA1HgRF8BdN9pGjIMGdLiQscOLR2GMfZglS0Rf9iRPdwtvIT9XqeS7dnDroxOJVwdB04t89/1O/w1cDnyilFU=",
+    "LINE_TENANT_CHANNEL_SECRET": "dc2e2616a566dcccc2d2fe534f978f89",
+    "BASE_URL": "https://splatter-provolone-variety.ngrok-free.dev/",
+    "ADMIN_PASSWORD": "roomy+-*/()[]"
+}
+
+def seed_system_configs(session):
+    from services.security import set_system_config
+    import models
+    logger.info("Checking and seeding default system configs...")
+    for key, value in DEFAULT_SYSTEM_CONFIGS.items():
+        existing = session.query(models.SystemConfig).filter(models.SystemConfig.key == key).first()
+        if not existing:
+            logger.info(f"Seeding default value for {key}")
+            set_system_config(session, key, value, description="Default seed configuration")
+
 def migrate():
     """
     Executes the database migration commands. Supports both SQLite and PostgreSQL.
@@ -37,9 +56,12 @@ def migrate():
                 session.query(models.Room).update({models.Room.building_id: default_building.id})
                 session.commit()
                 logger.info("Default building initialized and rooms linked.")
+            
+            # Seed default system configs
+            seed_system_configs(session)
         except Exception as e:
             session.rollback()
-            logger.error(f"Error during default building initialization: {e}")
+            logger.error(f"Error during default building initialization/seeding: {e}")
         finally:
             session.close()
         
@@ -184,6 +206,20 @@ def migrate():
                 
     conn.commit()
     conn.close()
+    
+    # Open a SQLAlchemy session to seed default system configs for SQLite
+    from models.database import engine as engine_sqlite
+    from sqlalchemy.orm import sessionmaker
+    Session = sessionmaker(bind=engine_sqlite)
+    session = Session()
+    try:
+        seed_system_configs(session)
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Error seeding system configs in SQLite: {e}")
+    finally:
+        session.close()
+
     logger.info("Migration completed.")
 
 if __name__ == "__main__":
