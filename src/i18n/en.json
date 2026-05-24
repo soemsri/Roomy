@@ -608,5 +608,10 @@
     "backup_deleted_success": "Backup deleted successfully.",
     "confirm_restore_backup": "Are you sure you want to restore the database from this backup? ALL current data will be replaced!",
     "confirm_delete_backup": "Are you sure you want to delete this backup file?",
-    "backup_restoring_msg": "Restoring database... Please wait, the system may restart."
+    "backup_restoring_msg": "Restoring database... Please wait, the system may restart.",
+    "setting_tab_general": "General & Staff",
+    "setting_tab_payments": "Payments & Accounts",
+    "setting_tab_fees": "Fees & Rates",
+    "setting_tab_buildings": "Buildings & Leases",
+    "setting_tab_system": "Backup & System"
 }

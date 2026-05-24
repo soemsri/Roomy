@@ -608,5 +608,10 @@
     "backup_deleted_success": "バックアップを削除しました。",
     "confirm_restore_backup": "このバックアップからデータベースを復元してもよろしいですか？ 現在のすべてのデータが上書きされます！",
     "confirm_delete_backup": "このバックアップファイルを削除してもよろしいですか？",
-    "backup_restoring_msg": "データベースを復元しています... しばらくお待ちください。システムが再起動する場合があります。"
+    "backup_restoring_msg": "データベースを復元しています... しばらくお待ちください。システムが再起動する場合があります。",
+    "setting_tab_general": "一般・スタッフ管理",
+    "setting_tab_payments": "お支払い・銀行口座",
+    "setting_tab_fees": "初期費用・延滞金",
+    "setting_tab_buildings": "建物・契約書",
+    "setting_tab_system": "バックアップ・システム"
 }
