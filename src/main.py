@@ -2,7 +2,7 @@ import os
 import sys
 import types
 import logging
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
@@ -43,6 +43,53 @@ app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 app.include_router(callback.router)
 app.include_router(tenant.router)
 app.include_router(admin.router)
+
+from starlette.responses import JSONResponse
+import traceback
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Global exception handler caught: {exc}", exc_info=True)
+    from models.database import SessionLocal
+    from services.activity import log_activity
+    import models
+    
+    db = SessionLocal()
+    try:
+        actor = "System (Error Handler)"
+        try:
+            admin_session = request.cookies.get("admin_session")
+            if admin_session:
+                user = db.query(models.User).filter(models.User.session_token == admin_session, models.User.status == "Active").first()
+                if user:
+                    actor = user.email
+                else:
+                    owner = db.query(models.Owner).filter(models.Owner.session_token == admin_session).first()
+                    if owner:
+                        actor = "legacy_owner@system.local"
+        except Exception:
+            pass
+            
+        tb = traceback.format_exc()
+        details = f"Error Type: {type(exc).__name__}\nMessage: {str(exc)}\nTraceback:\n{tb[:1000]}"
+        
+        log_activity(
+            db=db,
+            actor=actor,
+            action="Application Error",
+            target=request.url.path,
+            details=details
+        )
+    except Exception as log_err:
+        logger.error(f"Failed to log unhandled exception to database: {log_err}")
+    finally:
+        db.close()
+        
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal Server Error"}
+    )
+
 
 import threading
 import time

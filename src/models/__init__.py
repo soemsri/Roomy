@@ -311,3 +311,13 @@ class User(Base):
     status = Column(String, default="Active") # Active, Suspended
     session_token = Column(String, unique=True, index=True)
     created_at = Column(DateTime, server_default=func.now())
+
+class ApplicationLog(Base):
+    __tablename__ = "application_logs"
+    id = Column(Integer, primary_key=True, index=True)
+    timestamp = Column(DateTime, server_default=func.now(), index=True)
+    actor = Column(String, index=True, nullable=False)
+    action = Column(String, index=True, nullable=False)
+    target = Column(String, index=True, nullable=True)
+    details = Column(Text, nullable=True)
+

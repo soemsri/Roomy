@@ -449,6 +449,7 @@
             <div class="menu-label">System</div>
             {% if user_role == 'Admin' %}
             <a href="#settingsSection" class="menu-item"><i class="fa-solid fa-gears"></i> <span>{{ get_text('settings', lang) }}</span></a>
+            <a href="#logsSection" class="menu-item"><i class="fa-solid fa-list-check"></i> <span>{{ get_text('setting_tab_logs', lang) }}</span></a>
             {% endif %}
             <a href="javascript:void(0)" onclick="if(confirm('{{ get_text('confirm_logout', lang) or 'Logout?' }}')) document.getElementById('logout-form').submit();" class="menu-item" style="color: #ef4444;">
                 <i class="fa-solid fa-right-from-bracket"></i> <span>{{ get_text('logout', lang) }}</span>
@@ -1561,8 +1562,68 @@
                     </div>
                 </div>
             </div>
+        </div>
 
+        <!-- Activity Logs Section -->
+        <div class="section-card" id="logsSection" style="display: none;">
+            <div class="section-header">
+                <h2><i class="fa-solid fa-list-check"></i> {{ get_text('setting_tab_logs', lang) }}</h2>
             </div>
+
+            <div class="card" style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 12px; border: 1px solid var(--border);">
+                <!-- Search & Filters / Export & Clear Actions Row -->
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">
+                    <!-- Find Log Controls -->
+                    <div style="display: flex; gap: 10px; align-items: center; min-width: 320px; flex-grow: 0.5;">
+                        <div style="position: relative; flex: 1;">
+                            <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.9em;"></i>
+                            <input type="text" id="activityLogsSearch" placeholder="{{ get_text('log_search_placeholder', lang) }}" oninput="debounceLogsSearch()" style="width: 100%; padding: 10px 12px 10px 35px; border-radius: 6px; background: rgba(0,0,0,0.2); border: 1px solid var(--border); color: var(--text); font-size: 0.9em; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--border)'">
+                        </div>
+                        <button onclick="loadActivityLogs(1)" class="btn btn-primary" style="padding: 10px 20px; border-radius: 6px; font-weight: 600; font-size: 0.9em; white-space: nowrap; display: flex; align-items: center; gap: 8px;">
+                            <i class="fa-solid fa-magnifying-glass"></i> {{ get_text('log_btn_find', lang) }}
+                        </button>
+                    </div>
+                    
+                    <!-- Action Buttons: Export & Clear -->
+                    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                        <!-- Export Button -->
+                        <button onclick="exportLogs()" class="btn" style="background: rgba(46, 204, 113, 0.15); color: #2ecc71; border: 1px solid rgba(46, 204, 113, 0.25); padding: 10px 18px; border-radius: 6px; font-weight: 600; font-size: 0.9em; white-space: nowrap; display: flex; align-items: center; gap: 8px; transition: all 0.2s; cursor: pointer;" onmouseover="this.style.background='rgba(46, 204, 113, 0.25)'" onmouseout="this.style.background='rgba(46, 204, 113, 0.15)'">
+                            <i class="fa-solid fa-file-export"></i> {{ get_text('log_btn_export', lang) }}
+                        </button>
+                        
+                        <!-- Clear Button -->
+                        <button onclick="clearLogs()" class="btn" style="background: rgba(231, 76, 60, 0.15); color: #e74c3c; border: 1px solid rgba(231, 76, 60, 0.25); padding: 10px 18px; border-radius: 6px; font-weight: 600; font-size: 0.9em; white-space: nowrap; display: flex; align-items: center; gap: 8px; transition: all 0.2s; cursor: pointer;" onmouseover="this.style.background='rgba(231, 76, 60, 0.25)'" onmouseout="this.style.background='rgba(231, 76, 60, 0.15)'">
+                            <i class="fa-solid fa-trash-can"></i> {{ get_text('log_btn_clear', lang) }}
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="table-container">
+                    <table style="width: 100%;">
+                        <thead>
+                            <tr>
+                                <th style="width: 18%;">{{ get_text('log_time', lang) }}</th>
+                                <th style="width: 20%;">{{ get_text('log_actor', lang) }}</th>
+                                <th style="width: 17%;">{{ get_text('log_action', lang) }}</th>
+                                <th style="width: 15%;">{{ get_text('log_target', lang) }}</th>
+                                <th style="width: 30%;">{{ get_text('log_details', lang) }}</th>
+                            </tr>
+                        </thead>
+                        <tbody id="activityLogsTableBody">
+                            <!-- Dynamic logs content -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Pagination Controls -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px; flex-wrap: wrap; gap: 10px;">
+                    <div id="activityLogsCount" style="font-size: 0.85em; color: var(--text-muted);"></div>
+                    <div class="pagination" id="activityLogsPagination" style="display: flex; gap: 5px;">
+                        <!-- Pagination buttons will be injected here -->
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- Config Modal -->
         <div id="configModal" class="modal">
@@ -2329,7 +2390,9 @@
             confirm_delete_backup: "{{ get_text('confirm_delete_backup', lang) }}",
             backup_restoring_msg: "{{ get_text('backup_restoring_msg', lang) }}",
             none: "{{ get_text('none', lang) }}",
-            restore_btn: "{{ get_text('restore_btn', lang) }}"
+            restore_btn: "{{ get_text('restore_btn', lang) }}",
+            log_no_data: "{{ get_text('log_no_data', lang) }}",
+            log_error_load: "{{ get_text('log_error_load', lang) }}"
         };
 
         function setLanguage(lang) {
@@ -2406,6 +2469,7 @@
             if (sectionId === 'leaseSection') loadLeases();
             if (sectionId === 'receiptSection') loadReceipts();
             if (sectionId === 'historySection') { loadMeterHistory(); loadTenantHistory(); }
+            if (sectionId === 'logsSection') loadActivityLogs(1);
             document.querySelectorAll('.menu-item').forEach(m => {
                 m.classList.remove('active');
                 if (m.getAttribute('href') === '#' + sectionId || (sectionId === 'overview' && m.getAttribute('href') === '#overview')) {
@@ -3808,6 +3872,156 @@
                 }
             } catch (err) {
                 alert(translations.connection_error_alert + err);
+            }
+        }
+
+        let currentLogsPage = 1;
+        let logsSearchTimeout = null;
+
+        function debounceLogsSearch() {
+            clearTimeout(logsSearchTimeout);
+            logsSearchTimeout = setTimeout(() => {
+                loadActivityLogs(1);
+            }, 300);
+        }
+
+        async function loadActivityLogs(page) {
+            currentLogsPage = page;
+            const search = document.getElementById('activityLogsSearch').value;
+            const tbody = document.getElementById('activityLogsTableBody');
+            if (!tbody) return;
+
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</td></tr>`;
+
+            try {
+                const res = await fetch(`/admin/activity/list?page=${page}&page_size=15&search=${encodeURIComponent(search)}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    tbody.innerHTML = '';
+                    
+                    if (data.logs.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 25px;"><i class="fa-solid fa-circle-info"></i> ${translations.log_no_data}</td></tr>`;
+                        document.getElementById('activityLogsCount').innerText = '';
+                        document.getElementById('activityLogsPagination').innerHTML = '';
+                        return;
+                    }
+
+                    data.logs.forEach(log => {
+                        let actionBadgeColor = 'rgba(255, 255, 255, 0.15)';
+                        let actionTextColor = 'var(--text)';
+                        
+                        const actionLower = log.action.toLowerCase();
+                        if (actionLower.includes('create') || actionLower.includes('add') || actionLower.includes('approve')) {
+                            actionBadgeColor = 'rgba(46, 204, 113, 0.15)';
+                            actionTextColor = '#2ecc71';
+                        } else if (actionLower.includes('delete') || actionLower.includes('reject') || actionLower.includes('cancel')) {
+                            actionBadgeColor = 'rgba(231, 76, 60, 0.15)';
+                            actionTextColor = '#e74c3c';
+                        } else if (actionLower.includes('update') || actionLower.includes('edit') || actionLower.includes('save')) {
+                            actionBadgeColor = 'rgba(241, 196, 15, 0.15)';
+                            actionTextColor = '#f1c40f';
+                        } else if (actionLower.includes('send') || actionLower.includes('broadcast')) {
+                            actionBadgeColor = 'rgba(52, 152, 219, 0.15)';
+                            actionTextColor = '#3498db';
+                        } else if (actionLower.includes('restore')) {
+                            actionBadgeColor = 'rgba(155, 89, 182, 0.15)';
+                            actionTextColor = '#9b59b6';
+                        }
+
+                        tbody.innerHTML += `
+                            <tr>
+                                <td style="font-size: 0.85em; color: var(--text-muted); font-family: monospace;">${log.timestamp}</td>
+                                <td>
+                                    <span style="font-weight: 500; font-size: 0.9em; display: flex; align-items: center; gap: 6px;">
+                                        <i class="fa-solid fa-user-shield" style="font-size: 0.8em; color: var(--primary);"></i> ${log.actor}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span style="padding: 3px 8px; border-radius: 12px; font-size: 0.8em; font-weight: 600; display: inline-block; background: ${actionBadgeColor}; color: ${actionTextColor}; border: 1px solid rgba(255,255,255,0.05);">
+                                        ${log.action}
+                                    </span>
+                                </td>
+                                <td style="font-size: 0.85em; font-weight: 500;">
+                                    <span style="display: inline-flex; align-items: center; gap: 4px; background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.05);">
+                                        <i class="fa-solid fa-cube" style="font-size: 0.75em; color: var(--text-muted);"></i> ${log.target}
+                                    </span>
+                                </td>
+                                <td style="font-size: 0.85em; color: var(--text-muted); white-space: normal; word-break: break-word; line-height: 1.4;">${log.details}</td>
+                            </tr>
+                        `;
+                    });
+
+                    // Update total logs count label
+                    const fromLog = (page - 1) * data.page_size + 1;
+                    const toLog = Math.min(page * data.page_size, data.total);
+                    document.getElementById('activityLogsCount').innerText = `Showing ${fromLog}-${toLog} of ${data.total} operations`;
+
+                    // Handle pagination button generation
+                    let paginationHTML = '';
+                    if (data.pages > 1) {
+                        if (page > 1) {
+                            paginationHTML += `<button class="page-btn" onclick="loadActivityLogs(${page - 1})"><i class="fa-solid fa-chevron-left"></i></button>`;
+                        } else {
+                            paginationHTML += `<button class="page-btn" disabled><i class="fa-solid fa-chevron-left"></i></button>`;
+                        }
+
+                        let startPage = Math.max(1, page - 2);
+                        let endPage = Math.min(data.pages, page + 2);
+
+                        if (startPage > 1) {
+                            paginationHTML += `<button class="page-btn" onclick="loadActivityLogs(1)">1</button>`;
+                            if (startPage > 2) paginationHTML += `<span style="color: var(--text-muted); align-self: center; padding: 0 4px;">...</span>`;
+                        }
+
+                        for (let i = startPage; i <= endPage; i++) {
+                            if (i === page) {
+                                paginationHTML += `<button class="page-btn active" style="background: var(--primary); color: white; border-color: var(--primary);">${i}</button>`;
+                            } else {
+                                paginationHTML += `<button class="page-btn" onclick="loadActivityLogs(${i})">${i}</button>`;
+                            }
+                        }
+
+                        if (endPage < data.pages) {
+                            if (endPage < data.pages - 1) paginationHTML += `<span style="color: var(--text-muted); align-self: center; padding: 0 4px;">...</span>`;
+                            paginationHTML += `<button class="page-btn" onclick="loadActivityLogs(${data.pages})">${data.pages}</button>`;
+                        }
+
+                        if (page < data.pages) {
+                            paginationHTML += `<button class="page-btn" onclick="loadActivityLogs(${page + 1})"><i class="fa-solid fa-chevron-right"></i></button>`;
+                        } else {
+                            paginationHTML += `<button class="page-btn" disabled><i class="fa-solid fa-chevron-right"></i></button>`;
+                        }
+                    }
+                    document.getElementById('activityLogsPagination').innerHTML = paginationHTML;
+
+                } else {
+                    tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: #e74c3c; padding: 25px;"><i class="fa-solid fa-triangle-exclamation"></i> ${translations.log_error_load}</td></tr>`;
+                }
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: #e74c3c; padding: 25px;"><i class="fa-solid fa-triangle-exclamation"></i> ${translations.log_error_load}: ${err}</td></tr>`;
+            }
+        }
+
+        function exportLogs() {
+            const search = document.getElementById('activityLogsSearch').value;
+            window.location.href = `/admin/activity/export?search=${encodeURIComponent(search)}`;
+        }
+
+        async function clearLogs() {
+            if (confirm(translations.log_confirm_clear || "Are you sure you want to clear all activity logs? This action cannot be undone.")) {
+                try {
+                    const res = await fetch('/admin/activity/clear', {
+                        method: 'POST'
+                    });
+                    if (res.ok) {
+                        alert(translations.log_clear_success || "Activity logs cleared successfully.");
+                        loadActivityLogs(1);
+                    } else {
+                        alert("Failed to clear logs.");
+                    }
+                } catch (e) {
+                    alert("Error communicating with server: " + e);
+                }
             }
         }
 

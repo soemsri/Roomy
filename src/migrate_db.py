@@ -208,7 +208,9 @@ def migrate():
     conn.close()
     
     # Open a SQLAlchemy session to seed default system configs for SQLite
-    from models.database import engine as engine_sqlite
+    from models.database import engine as engine_sqlite, Base
+    # Automatically create any new tables (like application_logs) in SQLite
+    Base.metadata.create_all(bind=engine_sqlite)
     from sqlalchemy.orm import sessionmaker
     Session = sessionmaker(bind=engine_sqlite)
     session = Session()

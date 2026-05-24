@@ -18,6 +18,7 @@ import services.security as security
 import services.billing as billing
 import services.promptpay as promptpay
 from models.database import get_db
+from services.activity import log_activity
 from utils import parse_sqlite_datetime
 import config
 from config import templates, get_text, refresh_configs
@@ -89,6 +90,11 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
 
     admin_session = request.cookies.get("admin_session")
     if not admin_session:
+        # Ignore public paths to avoid logging normal logins
+        public_paths = ["/admin/login", "/admin/forgot-password", "/admin/magic-login", "/admin/auth/google", "/admin/reset-password"]
+        path = request.url.path
+        if not any(path.startswith(p) for p in public_paths) and path != "/admin" and not path.startswith("/uploads/"):
+            log_activity(db, f"IP: {request.client.host}", "Access Violation", "System Security", f"Blocked unauthenticated anonymous request to administrative endpoint: {path}")
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     # 1. Check in the new multi-role 'users' table
@@ -106,21 +112,26 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
             status="Active"
         )
 
+    # Invalid session token presented (possible hijacking or fuzzing attempt)
+    path = request.url.path
+    log_activity(db, f"IP: {request.client.host}", "Access Violation", "System Security", f"Blocked request with invalid/expired session token to endpoint: {path}")
     raise HTTPException(status_code=401, detail="Unauthorized")
 
-def get_admin(current_user: models.User = Depends(get_current_user)):
+def get_admin(request: Request, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     """
     Verifies that the current user has an active staff role (Admin, Accountant, Clerk, Technician, Housekeeper).
     """
     if current_user.role not in ["Admin", "Accountant", "Clerk", "Technician", "Housekeeper"]:
+        log_activity(db, current_user.email, "Access Violation", "System Security", f"Blocked role '{current_user.role}' from accessing admin endpoint: {request.url.path}")
         raise HTTPException(status_code=403, detail="Forbidden: Staff access required")
     return True
 
-def get_super_admin(current_user: models.User = Depends(get_current_user)):
+def get_super_admin(request: Request, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     """
     Verifies that the current user has the Admin role.
     """
     if current_user.role != "Admin":
+        log_activity(db, current_user.email, "Access Violation", "System Security", f"Blocked role '{current_user.role}' from accessing super-admin endpoint: {request.url.path}")
         raise HTTPException(status_code=403, detail="Forbidden: Admin role required")
     return True
 
@@ -131,8 +142,9 @@ class RoleChecker:
     def __init__(self, allowed_roles: list):
         self.allowed_roles = allowed_roles
 
-    def __call__(self, current_user: models.User = Depends(get_current_user)):
+    def __call__(self, request: Request, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
         if current_user.role not in self.allowed_roles:
+            log_activity(db, current_user.email, "Access Violation", "System Security", f"Blocked role '{current_user.role}' from accessing restricted endpoint: {request.url.path} (Requires: {self.allowed_roles})")
             raise HTTPException(
                 status_code=403,
                 detail=f"Forbidden: Access restricted. Requires one of roles: {self.allowed_roles}"
@@ -171,12 +183,14 @@ async def auth_google(request: Request, data: dict, db: Session = Depends(get_db
         claims = security.verify_google_id_token(id_token)
     except Exception as e:
         logger.error(f"Google OAuth verification failed: {e}")
+        log_activity(db, f"IP: {request.client.host}", "Failed Google Login", "Admin Authentication", f"Google token verification failed: {str(e)}")
         raise HTTPException(status_code=400, detail="Invalid token verification")
         
     email = claims.get("email")
     full_name = claims.get("name")
     
     if not email:
+        log_activity(db, f"IP: {request.client.host}", "Failed Google Login", "Admin Authentication", "Missing email claim in Google token")
         raise HTTPException(status_code=400, detail="Missing email claim in Google token")
         
     # Check if this is the Web Bootstrap Wizard claiming ownership
@@ -198,9 +212,11 @@ async def auth_google(request: Request, data: dict, db: Session = Depends(get_db
             logger.info(f"System bootstrapped successfully. First Admin: {email}")
         else:
             # Unauthorized access (not registered by Admin)
+            log_activity(db, email, "Failed Google Login", "Admin Authentication", "Google login attempt rejected: Gmail address not registered")
             raise HTTPException(status_code=403, detail="Gmail address not registered. Please contact the administrator.")
             
     if user.status != "Active":
+        log_activity(db, email, "Failed Google Login", "Admin Authentication", "Google login attempt rejected: Account is suspended")
         raise HTTPException(status_code=403, detail="Account is suspended.")
         
     # Generate secure session token
@@ -217,6 +233,7 @@ async def auth_google(request: Request, data: dict, db: Session = Depends(get_db
         secure=True,
         samesite="lax"
     )
+    log_activity(db, user.email, "Google Login", "System Session", f"Logged in successfully via Google OAuth2 (Role: {user.role})")
     return res
 
 @router.get("/login", response_class=HTMLResponse)
@@ -242,6 +259,7 @@ async def admin_login(request: Request, password: str = Form(...), db: Session =
     attempt = db.query(models.LoginAttempt).filter(models.LoginAttempt.ip_address == ip).first()
     if attempt and attempt.locked_until and attempt.locked_until > now:
         remaining = int((attempt.locked_until - now).total_seconds() / 60) + 1
+        log_activity(db, f"IP: {ip}", "Failed Login Attempt", "Admin Authentication", f"Rejected login attempt: IP is locked out (Remaining: {remaining} min)")
         return RedirectResponse(url=f"/admin/login?error=locked&wait={remaining}", status_code=303)
 
     owner = db.query(models.Owner).first()
@@ -255,6 +273,8 @@ async def admin_login(request: Request, password: str = Form(...), db: Session =
         token = secrets.token_hex(32)
         owner.session_token = token
         db.commit()
+        
+        log_activity(db, "legacy_owner@system.local", "Legacy Login", "Admin Authentication", "Logged in successfully via password")
             
         response = RedirectResponse(url="/admin/dashboard", status_code=303)
         response.set_cookie(
@@ -277,6 +297,9 @@ async def admin_login(request: Request, password: str = Form(...), db: Session =
     
     db.commit()
     
+    lockout_msg = " (IP is locked out for 30 minutes)" if attempt.attempts >= 3 else ""
+    log_activity(db, f"IP: {ip}", "Failed Login Attempt", "Admin Authentication", f"Failed admin password attempt (Lockout counter: {attempt.attempts}/3){lockout_msg}")
+    
     if attempt.attempts >= 3:
         return RedirectResponse(url="/admin/login?error=locked&wait=30", status_code=303)
         
@@ -286,10 +309,18 @@ async def admin_login(request: Request, password: str = Form(...), db: Session =
 async def admin_logout(request: Request, db: Session = Depends(get_db)):
     admin_session = request.cookies.get("admin_session")
     if admin_session:
-        owner = db.query(models.Owner).filter(models.Owner.session_token == admin_session).first()
-        if owner:
-            owner.session_token = None
+        # Check User first
+        user = db.query(models.User).filter(models.User.session_token == admin_session).first()
+        if user:
+            log_activity(db, user.email, "Logout", "System Session", "Logged out successfully")
+            user.session_token = None
             db.commit()
+        else:
+            owner = db.query(models.Owner).filter(models.Owner.session_token == admin_session).first()
+            if owner:
+                log_activity(db, "legacy_owner@system.local", "Logout", "System Session", "Logged out successfully")
+                owner.session_token = None
+                db.commit()
             
     response = RedirectResponse(url="/admin/login", status_code=303)
     response.delete_cookie("admin_session")
@@ -701,7 +732,13 @@ async def admin_report(
     })
 
 @router.post("/registration/{tenant_id}/request-payment")
-async def request_initial_payment(tenant_id: int, room_ids: str = Form(...), db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+async def request_initial_payment(
+    tenant_id: int, 
+    room_ids: str = Form(...), 
+    db: Session = Depends(get_db), 
+    admin: bool = Depends(get_admin),
+    current_user: models.User = Depends(get_current_user)
+):
     tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
@@ -731,6 +768,7 @@ async def request_initial_payment(tenant_id: int, room_ids: str = Form(...), db:
         except Exception as e:
             logger.error(f"Failed to notify tenant: {e}")
             
+    log_activity(db, current_user.email, "Approve Move-In Request", tenant.full_name, f"Approved registration and requested initial payment for tenant {tenant.full_name} ({tenant.phone_number}) for room(s): {', '.join(success_rooms)}")
     return {"status": "Success"}
 
 @router.get("/leases/list")
@@ -862,7 +900,12 @@ async def print_receipt(request: Request, invoice_id: int, db: Session = Depends
     })
 
 @router.post("/registration/{tenant_id}/reject")
-async def reject_registration(tenant_id: int, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+async def reject_registration(
+    tenant_id: int, 
+    db: Session = Depends(get_db), 
+    admin: bool = Depends(get_admin),
+    current_user: models.User = Depends(get_current_user)
+):
     tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
     if not tenant: raise HTTPException(status_code=404, detail="Tenant not found")
     
@@ -893,6 +936,7 @@ async def reject_registration(tenant_id: int, db: Session = Depends(get_db), adm
             )
         except Exception: pass
         
+    log_activity(db, current_user.email, "Reject Move-In Request", tenant.full_name, f"Rejected registration for tenant {tenant.full_name} ({tenant.phone_number})")
     return {"status": "Success"}
 
 @router.get("/settlement/preview/{tenant_id}")
@@ -1048,7 +1092,8 @@ async def confirm_settlement(
     notes: str = Form(None),
     receipt: UploadFile = File(None),
     db: Session = Depends(get_db), 
-    admin: bool = Depends(get_admin)
+    admin: bool = Depends(get_admin),
+    current_user: models.User = Depends(get_current_user)
 ):
     tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
     if not tenant: raise HTTPException(status_code=404, detail="Tenant not found")
@@ -1134,10 +1179,16 @@ async def confirm_settlement(
     tenant.current_room_id = None
     
     db.commit()
+    log_activity(db, current_user.email, "Approve Move-Out Request", tenant.full_name, f"Approved move-out and confirmed settlement for tenant {tenant.full_name} (final balance: {final_balance}, refund method: {refund_method})")
     return {"status": "Success"}
 
 @router.post("/unmap/{tenant_id}")
-async def unmap_tenant(tenant_id: int, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+async def unmap_tenant(
+    tenant_id: int, 
+    db: Session = Depends(get_db), 
+    admin: bool = Depends(get_admin),
+    current_user: models.User = Depends(get_current_user)
+):
     tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
@@ -1175,10 +1226,16 @@ async def unmap_tenant(tenant_id: int, db: Session = Depends(get_db), admin: boo
     tenant.current_room_id = None
     tenant.status = "MovedOut"
     db.commit()
+    log_activity(db, current_user.email, "Unmap Tenant", tenant.full_name, f"Immediately unmapped and moved out tenant {tenant.full_name}")
     return {"status": "Success"}
 
 @router.post("/move-out/cancel/{tenant_id}")
-async def cancel_move_out(tenant_id: int, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+async def cancel_move_out(
+    tenant_id: int, 
+    db: Session = Depends(get_db), 
+    admin: bool = Depends(get_admin),
+    current_user: models.User = Depends(get_current_user)
+):
     tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
@@ -1211,6 +1268,7 @@ async def cancel_move_out(tenant_id: int, db: Session = Depends(get_db), admin: 
         except Exception as e:
             logger.error(f"LINE Push Error (Cancel Move-out): {e}")
 
+    log_activity(db, current_user.email, "Cancel Move-Out Request", tenant.full_name, f"Cancelled move-out request for tenant {tenant.full_name}")
     return {"status": "Success"}
 
 @router.get("/buildings/list")
@@ -1570,7 +1628,8 @@ async def confirm_cash_payment(
     invoice_id: int, 
     image: UploadFile = File(...), 
     db: Session = Depends(get_db),
-    admin: bool = Depends(get_admin)
+    admin: bool = Depends(get_admin),
+    current_user: models.User = Depends(get_current_user)
 ):
     invoice = db.query(models.Invoice).filter(models.Invoice.id == invoice_id).first()
     if not invoice: raise HTTPException(status_code=404, detail="Invoice not found")
@@ -1593,18 +1652,28 @@ async def confirm_cash_payment(
     db.commit()
     
     await send_invoice_paid_notification(db, invoice)
+    log_activity(db, current_user.email, "Confirm Cash Payment", f"Invoice #{invoice.id}", f"Confirmed cash payment for room {invoice.room.room_number if invoice.room else 'N/A'} (Month: {invoice.billing_month}/{invoice.billing_year}, Total: {invoice.total_amount})")
     return {"status": "Success", "receipt": invoice.payment_receipt_img}
 
 @router.post("/invoice/{invoice_id}/cancel")
-async def cancel_invoice(invoice_id: int, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+async def cancel_invoice(
+    invoice_id: int, 
+    db: Session = Depends(get_db), 
+    admin: bool = Depends(get_admin),
+    current_user: models.User = Depends(get_current_user)
+):
     invoice = db.query(models.Invoice).filter(models.Invoice.id == invoice_id).first()
     if not invoice: raise HTTPException(status_code=404, detail="Invoice not found")
     
     if invoice.status == "Paid":
         raise HTTPException(status_code=400, detail="ไม่สามารถยกเลิกบิลที่ชำระเงินเรียบร้อยแล้วได้")
         
+    room_number = invoice.room.room_number if invoice.room else "N/A"
+    billing_period = f"{invoice.billing_month}/{invoice.billing_year}"
+    total_amount = invoice.total_amount
     db.delete(invoice)
     db.commit()
+    log_activity(db, current_user.email, "Cancel Invoice", f"Invoice #{invoice_id}", f"Cancelled unpaid invoice for room {room_number} (Month: {billing_period}, Total: {total_amount})")
     return {"status": "Success"}
 
 @router.get("/invoice/{invoice_id}/details")
@@ -1652,7 +1721,12 @@ async def get_invoice_details(invoice_id: int, db: Session = Depends(get_db), ad
     }
 
 @router.post("/invoice/{invoice_id}/approve")
-async def approve_invoice(invoice_id: int, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+async def approve_invoice(
+    invoice_id: int, 
+    db: Session = Depends(get_db), 
+    admin: bool = Depends(get_admin),
+    current_user: models.User = Depends(get_current_user)
+):
     invoice = db.query(models.Invoice).filter(models.Invoice.id == invoice_id).first()
     if not invoice: raise HTTPException(status_code=404, detail="Invoice not found")
     
@@ -1667,10 +1741,16 @@ async def approve_invoice(invoice_id: int, db: Session = Depends(get_db), admin:
     db.commit()
     
     await send_invoice_paid_notification(db, invoice)
+    log_activity(db, current_user.email, "Approve Slip", f"Invoice #{invoice.id}", f"Approved bank transfer slip for room {invoice.room.room_number if invoice.room else 'N/A'} (Month: {invoice.billing_month}/{invoice.billing_year}, Total: {invoice.total_amount})")
     return {"status": "Success"}
 
 @router.post("/invoice/{invoice_id}/reject")
-async def reject_invoice(invoice_id: int, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+async def reject_invoice(
+    invoice_id: int, 
+    db: Session = Depends(get_db), 
+    admin: bool = Depends(get_admin),
+    current_user: models.User = Depends(get_current_user)
+):
     invoice = db.query(models.Invoice).filter(models.Invoice.id == invoice_id).first()
     if not invoice: raise HTTPException(status_code=404, detail="Invoice not found")
     
@@ -1695,10 +1775,16 @@ async def reject_invoice(invoice_id: int, db: Session = Depends(get_db), admin: 
         except Exception as e:
             logger.error(f"Failed to send rejection message: {e}")
         
+    log_activity(db, current_user.email, "Reject Slip", f"Invoice #{invoice.id}", f"Rejected bank transfer slip for room {invoice.room.room_number if invoice.room else 'N/A'} (Month: {invoice.billing_month}/{invoice.billing_year}, Total: {invoice.total_amount})")
     return {"status": "Success"}
 
 @router.post("/invoice/{invoice_id}/send-line")
-async def send_invoice_line(invoice_id: int, db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+async def send_invoice_line(
+    invoice_id: int, 
+    db: Session = Depends(get_db), 
+    admin: bool = Depends(get_admin),
+    current_user: models.User = Depends(get_current_user)
+):
     invoice = db.query(models.Invoice).filter(models.Invoice.id == invoice_id).first()
     if not invoice: raise HTTPException(status_code=404, detail="Invoice not found")
     
@@ -1840,6 +1926,7 @@ async def send_invoice_line(invoice_id: int, db: Session = Depends(get_db), admi
                 messages=[FlexMessage(alt_text="ใบแจ้งค่าเช่า", contents=FlexContainer.from_dict(flex_contents))]
             )
         )
+        log_activity(db, current_user.email, "Send Invoice", f"Invoice #{invoice.id}", f"Sent invoice for room {room_number} to LINE (Month: {invoice.billing_month}/{invoice.billing_year}, Total: {invoice.total_amount})")
         return {"status": "Success"}
     except Exception as e:
         msg = f"📄 ใบแจ้งค่าเช่าเดือน {invoice.billing_month}/{invoice.billing_year}\n"
@@ -1853,12 +1940,19 @@ async def send_invoice_line(invoice_id: int, db: Session = Depends(get_db), admi
                     messages=[TextMessage(text=msg)]
                 )
             )
+            log_activity(db, current_user.email, "Send Invoice", f"Invoice #{invoice.id}", f"Sent invoice for room {room_number} to LINE (Month: {invoice.billing_month}/{invoice.billing_year}, Total: {invoice.total_amount})")
             return {"status": "Success"}
         except Exception as e2:
             raise HTTPException(status_code=500, detail=f"LINE Error: {str(e2)}")
 
 @router.post("/repair/{repair_id}/status")
-async def update_repair_status(repair_id: int, status: str = Form(...), db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+async def update_repair_status(
+    repair_id: int, 
+    status: str = Form(...), 
+    db: Session = Depends(get_db), 
+    admin: bool = Depends(get_admin),
+    current_user: models.User = Depends(get_current_user)
+):
     repair = db.query(models.MaintenanceRequest).filter(models.MaintenanceRequest.id == repair_id).first()
     if not repair: raise HTTPException(status_code=404, detail="Repair request not found")
     
@@ -1878,6 +1972,7 @@ async def update_repair_status(repair_id: int, status: str = Form(...), db: Sess
         except Exception as e:
             logger.error(f"LINE Push Error: {e}")
             
+    log_activity(db, current_user.email, "Update Repair Status", f"Repair #{repair.id}", f"Updated status of repair request '{repair.title}' for room {repair.room.room_number if repair.room else 'N/A'} to '{status}'")
     return {"status": "Success"}
 
 @router.get("/settings/configs")
@@ -1895,10 +1990,12 @@ async def save_config(
     value: str = Form(...),
     description: str = Form(None),
     db: Session = Depends(get_db),
-    admin: bool = Depends(get_super_admin)
+    admin: bool = Depends(get_super_admin),
+    current_user: models.User = Depends(get_current_user)
 ):
     security.set_system_config(db, key, value, description)
     refresh_configs()
+    log_activity(db, current_user.email, "Edit Config", key, f"Updated key '{key}' with description: {description or '-'}")
     return {"status": "Success"}
 
 @router.post("/settings/save")
@@ -1916,7 +2013,8 @@ async def save_settings(
     magic_link_duration_min: int = Form(5),
     meter_history_page_size: int = Form(10),
     db: Session = Depends(get_db),
-    admin: bool = Depends(get_super_admin)
+    admin: bool = Depends(get_super_admin),
+    current_user: models.User = Depends(get_current_user)
 ):
     owner = db.query(models.Owner).first()
     if not owner:
@@ -1954,6 +2052,7 @@ async def save_settings(
     owner.meter_history_page_size = meter_history_page_size
     
     db.commit()
+    log_activity(db, current_user.email, "Update Settings", "System Settings", f"Updated general configurations (Display name: {display_name or '-'})")
     return {"status": "Success"}
 
 @router.post("/settings/upload-bank-qr")
@@ -1980,6 +2079,7 @@ async def magic_login(request: Request, token: str, db: Session = Depends(get_db
     ).first()
     
     if not owner:
+        log_activity(db, f"IP: {request.client.host}", "Failed Magic Login", "Admin Authentication", "Magic login attempt rejected: expired or invalid token")
         return HTMLResponse(content="<h2>ลิงก์หมดอายุหรือไม่ถูกต้อง กรุณากดใหม่จาก LINE Admin</h2>", status_code=400)
     
     params = dict(request.query_params)
@@ -1995,6 +2095,8 @@ async def magic_login(request: Request, token: str, db: Session = Depends(get_db
     owner.session_token = token
     owner.magic_token = None
     db.commit()
+    
+    log_activity(db, "legacy_owner@system.local", "Magic Login", "Admin Authentication", "Logged in successfully via LINE Magic Link")
     
     response = RedirectResponse(url=target_url, status_code=303)
     response.set_cookie(
@@ -2015,7 +2117,7 @@ async def preview_promptpay(pp_id: str, admin: bool = Depends(get_admin)):
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/broadcast")
-async def broadcast_announcement(message: str = Form(...), db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+async def broadcast_announcement(message: str = Form(...), db: Session = Depends(get_db), admin: bool = Depends(get_admin), current_user: models.User = Depends(get_current_user)):
     tenants = db.query(models.Tenant).filter(models.Tenant.line_user_id != None).all()
     count = 0
     if tenant_bot_api:
@@ -2036,10 +2138,11 @@ async def broadcast_announcement(message: str = Form(...), db: Session = Depends
         logger.info(f"MOCK BROADCAST: {message}")
         count = len(tenants)
 
+    log_activity(db, current_user.email, "Broadcast Message", "LINE Broadcast", f"Broadcasted message to {count} tenants: '{message[:100]}'")
     return {"status": "Success", "sent_count": count}
 
 @router.post("/tenants/{tenant_id}/send-line")
-async def send_direct_line(tenant_id: int, message: str = Form(...), db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+async def send_direct_line(tenant_id: int, message: str = Form(...), db: Session = Depends(get_db), admin: bool = Depends(get_admin), current_user: models.User = Depends(get_current_user)):
     tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
@@ -2061,6 +2164,7 @@ async def send_direct_line(tenant_id: int, message: str = Form(...), db: Session
     else:
         logger.info(f"MOCK DIRECT MESSAGE to {tenant.line_user_id}: {message}")
 
+    log_activity(db, current_user.email, "Send Direct Message", tenant.full_name, f"Sent direct LINE message: '{message[:100]}'")
     return {"status": "Success"}
 
 @router.get("/report/export")
@@ -2495,7 +2599,8 @@ async def bulk_record_meters(
     year: int = Form(...),
     issue_bill: bool = Form(False),
     db: Session = Depends(get_db),
-    admin: bool = Depends(get_admin)
+    admin: bool = Depends(get_admin),
+    current_user: models.User = Depends(get_current_user)
 ):
     try:
         readings = json.loads(data)
@@ -2558,6 +2663,7 @@ async def bulk_record_meters(
         inv = billing.calculate_bill(db, room_id, month, year, other_charges=other_charges, save_only=(not issue_bill))
         results.append({"room_id": room_id, "status": "Success", "invoice_uuid": inv.uuid if inv else None})
         
+    log_activity(db, current_user.email, "Bulk Record Meters", f"Period {month}/{year}", f"Bulk recorded utilities meters and generated {'invoices' if issue_bill else 'drafts'} for {len(results)} rooms")
     return {"status": "Complete", "results": results}
 
 @router.get("/meters/bulk-context")
@@ -2614,7 +2720,8 @@ async def record_meter(
     other_charges: str = Form(None), 
     issue_bill: bool = Form(False),
     db: Session = Depends(get_db), 
-    admin: bool = Depends(get_admin)
+    admin: bool = Depends(get_admin),
+    current_user: models.User = Depends(get_current_user)
 ):
     room = db.query(models.Room).filter(models.Room.id == room_id).first()
     if not room:
@@ -2663,6 +2770,7 @@ async def record_meter(
     if not invoice:
         raise HTTPException(status_code=400, detail="ไม่สามารถสร้างบิลได้ (อาจยังไม่มีผู้เช่าในห้องนี้)")
         
+    log_activity(db, current_user.email, "Record Meter", f"Room {room.room_number}", f"Recorded utility meters (Elec: {elec}, Water: {water}) and generated {'invoice' if issue_bill else 'draft'} for room {room.room_number} (Period: {month}/{year})")
     return {"status": "Success", "invoice_uuid": invoice.uuid}
 
 # Helpers from main.py
@@ -3142,7 +3250,8 @@ async def add_user(
     role: str = Form(...),
     full_name: str = Form(None),
     db: Session = Depends(get_db),
-    admin: bool = Depends(get_super_admin)
+    admin: bool = Depends(get_super_admin),
+    current_user: models.User = Depends(get_current_user)
 ):
     """
     Registers a new staff user (email-based) with a specific role.
@@ -3164,6 +3273,7 @@ async def add_user(
     )
     db.add(new_user)
     db.commit()
+    log_activity(db, current_user.email, "Create Staff", email, f"Created staff user: {email} with role: {role} (Name: {full_name or '-'})")
     return {"status": "Success"}
 
 @router.post("/users/{user_id}/update")
@@ -3197,6 +3307,7 @@ async def update_user(
     user.role = role
     user.status = status
     db.commit()
+    log_activity(db, current_user.email, "Update Staff", user.email, f"Updated staff user '{user.email}' (Role: {role}, Status: {status})")
     return {"status": "Success"}
 
 @router.delete("/users/{user_id}")
@@ -3224,8 +3335,10 @@ async def delete_user(
         if admin_count <= 1:
             raise HTTPException(status_code=400, detail="ไม่สามารถลบผู้ดูแลระบบเพียงคนเดียวในระบบได้")
             
+    user_email = user.email
     db.delete(user)
     db.commit()
+    log_activity(db, current_user.email, "Delete Staff", user_email, f"Deleted staff user: {user_email}")
     return {"status": "Success"}
 
 # --- Database Backup & Restore Endpoints ---
@@ -3240,7 +3353,11 @@ async def list_backups(admin: bool = Depends(get_super_admin)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/backup/create")
-async def create_backup_endpoint(db: Session = Depends(get_db), admin: bool = Depends(get_super_admin)):
+async def create_backup_endpoint(
+    db: Session = Depends(get_db),
+    admin: bool = Depends(get_super_admin),
+    current_user: models.User = Depends(get_current_user)
+):
     try:
         filename = backup_service.create_backup(db)
         # Pruning retention configuration
@@ -3252,15 +3369,22 @@ async def create_backup_endpoint(db: Session = Depends(get_db), admin: bool = De
                 backup_service.prune_backups(max_backups)
             except Exception:
                 pass
+        log_activity(db, current_user.email, "Create Backup", filename, f"Manually created database backup: {filename}")
         return {"status": "Success", "filename": filename}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create backup: {str(e)}")
 
 @router.get("/backup/download/{filename}")
-async def download_backup_endpoint(filename: str, admin: bool = Depends(get_super_admin)):
+async def download_backup_endpoint(
+    filename: str,
+    admin: bool = Depends(get_super_admin),
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     file_path = os.path.join(backup_service.BACKUPS_DIR, filename)
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found")
+    log_activity(db, current_user.email, "Download Backup", filename, f"Downloaded database backup file: {filename}")
     return FileResponse(
         file_path,
         media_type="application/octet-stream",
@@ -3268,11 +3392,17 @@ async def download_backup_endpoint(filename: str, admin: bool = Depends(get_supe
     )
 
 @router.post("/backup/restore/{filename}")
-async def restore_backup_endpoint(filename: str, db: Session = Depends(get_db), admin: bool = Depends(get_super_admin)):
+async def restore_backup_endpoint(
+    filename: str,
+    db: Session = Depends(get_db),
+    admin: bool = Depends(get_super_admin),
+    current_user: models.User = Depends(get_current_user)
+):
     try:
         backup_service.restore_backup(db, filename)
         # Reset memory/cache configs after restore
         refresh_configs()
+        log_activity(db, current_user.email, "Restore Backup", filename, f"Restored system from database backup: {filename}")
         return {"status": "Success"}
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Backup file not found")
@@ -3280,8 +3410,14 @@ async def restore_backup_endpoint(filename: str, db: Session = Depends(get_db), 
         raise HTTPException(status_code=500, detail=f"Restore failed: {str(e)}")
 
 @router.post("/backup/delete/{filename}")
-async def delete_backup_endpoint(filename: str, admin: bool = Depends(get_super_admin)):
+async def delete_backup_endpoint(
+    filename: str,
+    admin: bool = Depends(get_super_admin),
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     if backup_service.delete_backup_file(filename):
+        log_activity(db, current_user.email, "Delete Backup", filename, f"Deleted database backup file: {filename}")
         return {"status": "Success"}
     raise HTTPException(status_code=404, detail="Backup file not found")
 
@@ -3313,7 +3449,8 @@ async def save_backup_schedule_endpoint(
     time_str: str = Form(...),
     max_backups: int = Form(...),
     db: Session = Depends(get_db),
-    admin: bool = Depends(get_super_admin)
+    admin: bool = Depends(get_super_admin),
+    current_user: models.User = Depends(get_current_user)
 ):
     try:
         # Load existing config to keep last_run
@@ -3333,6 +3470,133 @@ async def save_backup_schedule_endpoint(
             "last_run": last_run
         }
         security.set_system_config(db, "BACKUP_SCHEDULE_CONFIG", json.dumps(config), description="Database Backup Schedule Config")
+        log_activity(db, current_user.email, "Save Schedule", "BACKUP_SCHEDULE_CONFIG", f"Updated automatic database backup schedule (frequency: {frequency}, time: {time_str}, max historical backups: {max_backups})")
         return {"status": "Success"}
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/activity/list")
+async def list_activity_logs(
+    page: int = 1,
+    page_size: int = 20,
+    search: str = "",
+    db: Session = Depends(get_db),
+    admin: bool = Depends(get_super_admin)
+):
+    """
+    Retrieves activity logs with search filtering and pagination.
+    Restricted to Super Admins for security auditing.
+    """
+    query = db.query(models.ApplicationLog)
+    if search:
+        search_filter = f"%{search}%"
+        query = query.filter(
+            or_(
+                models.ApplicationLog.actor.ilike(search_filter),
+                models.ApplicationLog.action.ilike(search_filter),
+                models.ApplicationLog.target.ilike(search_filter),
+                models.ApplicationLog.details.ilike(search_filter)
+            )
+        )
+    
+    total = query.count()
+    logs = query.order_by(models.ApplicationLog.timestamp.desc()).offset((page - 1) * page_size).limit(page_size).all()
+    
+    import math
+    pages = math.ceil(total / page_size) if total > 0 else 1
+    
+    return {
+        "logs": [
+            {
+                "id": log.id,
+                "timestamp": log.timestamp.strftime("%Y-%m-%d %H:%M:%S") if log.timestamp else "-",
+                "actor": log.actor,
+                "action": log.action,
+                "target": log.target or "-",
+                "details": log.details or "-"
+            } for log in logs
+        ],
+        "total": total,
+        "page": page,
+        "pages": pages,
+        "page_size": page_size
+    }
+
+@router.get("/activity/export")
+async def export_activity_logs(
+    search: str = "",
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+    admin: bool = Depends(get_super_admin)
+):
+    """
+    Exports activity logs matching the search term as a downloadable CSV file.
+    Restricted to Super Admins.
+    """
+    query = db.query(models.ApplicationLog)
+    if search:
+        search_filter = f"%{search}%"
+        query = query.filter(
+            or_(
+                models.ApplicationLog.actor.ilike(search_filter),
+                models.ApplicationLog.action.ilike(search_filter),
+                models.ApplicationLog.target.ilike(search_filter),
+                models.ApplicationLog.details.ilike(search_filter)
+            )
+        )
+    
+    logs = query.order_by(models.ApplicationLog.timestamp.desc()).all()
+    
+    import csv
+    import io
+    from fastapi.responses import StreamingResponse
+    
+    output = io.StringIO()
+    # Add UTF-8 BOM so Excel opens Thai/Japanese characters correctly!
+    output.write('\ufeff')
+    writer = csv.writer(output)
+    
+    # Write CSV Header
+    writer.writerow(["Timestamp", "Actor", "Action", "Target", "Details"])
+    
+    for log in logs:
+        timestamp_str = log.timestamp.strftime("%Y-%m-%d %H:%M:%S") if log.timestamp else "-"
+        writer.writerow([
+            timestamp_str,
+            log.actor,
+            log.action,
+            log.target or "-",
+            log.details or "-"
+        ])
+        
+    output.seek(0)
+    
+    log_activity(db, current_user.email, "Export Logs", "Activity Logs", f"Exported {len(logs)} logs to CSV" + (f" (Search filter: '{search}')" if search else ""))
+    
+    return StreamingResponse(
+        io.BytesIO(output.getvalue().encode('utf-8')),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=activity_logs_export.csv"}
+    )
+
+@router.post("/activity/clear")
+async def clear_activity_logs(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+    admin: bool = Depends(get_super_admin)
+):
+    """
+    Deletes all activity logs in the database.
+    Restricted to Super Admins.
+    Immediately creates a new log indicating the clear operation.
+    """
+    try:
+        db.query(models.ApplicationLog).delete()
+        db.commit()
+        
+        log_activity(db, current_user.email, "Clear Logs", "Activity Logs", "All previous activity logs cleared successfully")
+        
+        return {"status": "Success"}
+    except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))

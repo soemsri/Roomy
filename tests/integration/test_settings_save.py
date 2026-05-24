@@ -31,10 +31,12 @@ def override_get_db():
 class TestSettingsSave(unittest.TestCase):
     def setUp(self):
         # Set overrides before each test
+        from controllers.admin import get_current_user
         main.app.dependency_overrides[get_db] = override_get_db
         main.app.dependency_overrides[main.get_db] = override_get_db
         main.app.dependency_overrides[main.get_admin] = lambda: True
         main.app.dependency_overrides[main.get_super_admin] = lambda: True
+        main.app.dependency_overrides[get_current_user] = lambda: models.User(email="test_admin@system.local", role="Admin", status="Active")
 
     @classmethod
     def setUpClass(cls):
