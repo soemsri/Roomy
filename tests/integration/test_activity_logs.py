@@ -422,5 +422,58 @@ class TestActivityLogs(unittest.TestCase):
         self.assertEqual(dm_logs[0]["target"], "Tenant One")
         self.assertIn("Hello tenant!", dm_logs[0]["details"])
 
+    def test_log_retention_policy_endpoints(self):
+        client = TestClient(main.app)
+
+        # Get initial policy (should be default "forever")
+        response = client.get("/admin/settings/log-policy")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["policy"], "forever")
+
+        # Save invalid policy
+        response = client.post("/admin/settings/log-policy/save", data={"policy": "invalid_policy"})
+        self.assertEqual(response.status_code, 400)
+
+        # Save valid policy
+        response = client.post("/admin/settings/log-policy/save", data={"policy": "1_month"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["status"], "Success")
+
+        # Verify saved policy
+        response = client.get("/admin/settings/log-policy")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["policy"], "1_month")
+
+    def test_log_pruning_cleanup(self):
+        from datetime import datetime, timedelta
+        from services.log_cleanup import prune_logs
+
+        db = TestingSessionLocal()
+        # Seed an old log
+        old_time = datetime.now() - timedelta(days=40)
+        old_log = models.ApplicationLog(
+            actor="old_actor",
+            action="Old Action",
+            target="Old Target",
+            details="Old Details",
+            timestamp=old_time
+        )
+        db.add(old_log)
+        db.commit()
+        db.close()
+
+        # Run pruning with policy "1_month"
+        db = TestingSessionLocal()
+        deleted_count = prune_logs(db, "1_month")
+        db.close()
+
+        # The old log (40 days old) should be pruned
+        self.assertTrue(deleted_count >= 1)
+
+        db = TestingSessionLocal()
+        remaining_old = db.query(models.ApplicationLog).filter(models.ApplicationLog.actor == "old_actor").first()
+        self.assertIsNone(remaining_old)
+        db.close()
+
 if __name__ == "__main__":
     unittest.main()

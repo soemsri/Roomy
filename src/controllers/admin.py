@@ -1998,6 +1998,26 @@ async def save_config(
     log_activity(db, current_user.email, "Edit Config", key, f"Updated key '{key}' with description: {description or '-'}")
     return {"status": "Success"}
 
+# Log Retention Policy Endpoints
+@router.get("/settings/log-policy")
+async def get_log_policy(db: Session = Depends(get_db), admin: bool = Depends(get_super_admin)):
+    policy = security.get_system_config(db, "LOG_RETENTION_POLICY", default="forever")
+    return {"policy": policy}
+
+@router.post("/settings/log-policy/save")
+async def save_log_policy(
+    policy: str = Form(...),
+    db: Session = Depends(get_db),
+    admin: bool = Depends(get_super_admin),
+    current_user: models.User = Depends(get_current_user)
+):
+    allowed = {"forever", "1_day", "1_week", "1_month", "1_year"}
+    if policy not in allowed:
+        raise HTTPException(status_code=400, detail="Invalid log retention policy")
+    security.set_system_config(db, "LOG_RETENTION_POLICY", policy, description="Log Retention Policy")
+    log_activity(db, current_user.email, "Update Log Retention Policy", "System", f"Set policy to {policy}")
+    return {"status": "Success"}
+
 @router.post("/settings/save")
 async def save_settings(
     display_name: str = Form(None),

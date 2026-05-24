@@ -1,11 +1,11 @@
 {
     "project": "Roomy",
-    "last_updated": "2026-05-24T21:30:00Z",
+    "last_updated": "2026-05-24T23:45:00Z",
     "features": {
         "multi_language": {
             "supported_languages": ["th", "en", "jp"],
             "status": "fully_implemented",
-            "coverage": "100% (LINE Bot Interactions, Web Dashboard, Notifications, Errors, Rich Menus, JS Components, and Backup/Settings Tab titles)"
+            "coverage": "100% (LINE Bot Interactions, Web Dashboard, Notifications, Errors, Rich Menus, JS Components, Backup/Settings Tab titles, and Log Retention settings)"
         },
         "line_bot_sdk_v3": {
             "status": "fully_migrated",
@@ -33,6 +33,10 @@
             "status": "fully_implemented",
             "categories": ["General & Staff", "Payments & Accounts", "Fees & Rates", "Buildings & Leases", "Backup & System"],
             "features": ["Glassmorphic sub-tabs", "Fade-in transition micro-animations", "Unified form serialization submits"]
+        },
+        "log_retention_and_cleanup": {
+            "status": "fully_implemented",
+            "features": ["Pruning older than 1 day / 1 week / 1 month / 1 year", "Hourly automated check in daemon background thread", "Activity logs clear & Excel-compatible CSV export", "Audit trail security intrusion checks"]
         }
     },
     "completed_tasks": [
@@ -51,11 +55,16 @@
         "Created self-contained scheduled backup and restore logic handling database dependencies.",
         "Launched scheduled background backup daemon threads on application startup.",
         "Integrated interactive AJAX backup dashboard panel with downloads, deletes, manual backups, and restores.",
-        "Reorganized Settings panel UX into 5 collapsible sub-tabs with micro-animations and smooth layout."
+        "Reorganized Settings panel UX into 5 collapsible sub-tabs with micro-animations and smooth layout.",
+        "Created log pruning cleanup service in services/log_cleanup.py to clear logs matching the retention duration.",
+        "Exposed GET /settings/log-policy and POST /settings/log-policy/save endpoints in admin.py.",
+        "Hooked automated log retention pruning once every hour into the background daemon thread loop.",
+        "Added a beautifully designed Log Retention Policy selection card in dashboard.html under Backup & System sub-tab.",
+        "Created automated integration tests in test_activity_logs.py verifying log policy endpoints and prune date arithmetic."
     ],
     "planned_tasks": [
         "Monitor for any database latency under heavy concurrent PostgreSQL connection pulls.",
         "Explore incremental or transaction-level backup intervals for large scale databases."
     ],
-    "session_notes": "Successfully engineered hybrid PostgreSQL support and deployed standard database backup/recovery services (manual, auto schedules, pruning). Transformed the cluttered System Settings panel into a modern, beautifully sub-tabbed UX layout featuring sleek micro-animations, greatly optimizing the administrative workflow. All 30 project integration/unit tests are passing perfectly."
+    "session_notes": "Successfully engineered log retention policy options (1 day, 1 week, 1 month, 1 year, forever) with automated background hourly cleanups, fully integrated controls in the Backup & System dashboard sub-tab, and updated advanced logging suites (Find, Clear, stream CSV). All 47 integration and unit tests pass flawlessly."
 }

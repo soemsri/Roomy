@@ -1559,6 +1559,24 @@
                                 <button type="submit" class="btn btn-primary" style="width: 100%; padding: 10px;"><i class="fa-solid fa-save"></i> {{ get_text('save_schedule_btn', lang) }}</button>
                             </form>
                         </div>
+
+                        <!-- Log Retention Policy Configuration -->
+                        <div class="card" style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 12px; border: 1px solid var(--border);">
+                            <h3 style="margin-bottom: 15px; font-size: 1.1em; color: var(--primary);"><i class="fa-solid fa-clock-rotate-left"></i> {{ get_text('log_retention_title', lang) }}</h3>
+                            <form id="logPolicyForm" onsubmit="saveLogPolicy(event)">
+                                <div class="form-group" style="margin-bottom: 20px;">
+                                    <label style="display: block; margin-bottom: 5px;">{{ get_text('log_retention_policy', lang) }}</label>
+                                    <select id="log_retention_policy" name="policy" class="form-control" style="width: 100%; padding: 8px; border-radius: 6px; background: rgba(0,0,0,0.2); border: 1px solid var(--border); color: var(--text);" required>
+                                        <option value="forever">{{ get_text('log_retention_forever', lang) }}</option>
+                                        <option value="1_day">{{ get_text('log_retention_1_day', lang) }}</option>
+                                        <option value="1_week">{{ get_text('log_retention_1_week', lang) }}</option>
+                                        <option value="1_month">{{ get_text('log_retention_1_month', lang) }}</option>
+                                        <option value="1_year">{{ get_text('log_retention_1_year', lang) }}</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-primary" style="width: 100%; padding: 10px;"><i class="fa-solid fa-save"></i> {{ get_text('save_log_policy_btn', lang) }}</button>
+                            </form>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -2392,7 +2410,8 @@
             none: "{{ get_text('none', lang) }}",
             restore_btn: "{{ get_text('restore_btn', lang) }}",
             log_no_data: "{{ get_text('log_no_data', lang) }}",
-            log_error_load: "{{ get_text('log_error_load', lang) }}"
+            log_error_load: "{{ get_text('log_error_load', lang) }}",
+            log_policy_save_success: "{{ get_text('log_policy_save_success', lang) }}"
         };
 
         function setLanguage(lang) {
@@ -3636,6 +3655,38 @@
             }
         }
 
+        async function loadLogPolicy() {
+            try {
+                const res = await fetch('/admin/settings/log-policy');
+                if (!res.ok) throw new Error('Failed to load log policy');
+                const data = await res.json();
+                document.getElementById('log_retention_policy').value = data.policy || 'forever';
+            } catch (err) {
+                console.error("Error loading log policy:", err);
+            }
+        }
+
+        async function saveLogPolicy(e) {
+            if (e) e.preventDefault();
+            const form = document.getElementById('logPolicyForm');
+            const formData = new FormData(form);
+            try {
+                const res = await fetch('/admin/settings/log-policy/save', {
+                    method: 'POST',
+                    body: formData
+                });
+                if (res.ok) {
+                    alert(translations.log_policy_save_success);
+                    loadLogPolicy();
+                } else {
+                    const data = await res.json();
+                    alert(translations.error + ': ' + (data.detail || 'Unknown error'));
+                }
+            } catch (err) {
+                alert(translations.connection_error_alert + err);
+            }
+        }
+
         async function triggerManualBackup() {
             try {
                 const res = await fetch('/admin/backup/create', { method: 'POST' });
@@ -4044,6 +4095,7 @@
                 loadStaffUsers();
                 loadBackups();
                 loadBackupSchedule();
+                loadLogPolicy();
             });
         }
 
@@ -4063,6 +4115,7 @@
             if (document.getElementById('backupTableBody')) {
                 loadBackups();
                 loadBackupSchedule();
+                loadLogPolicy();
             }
         };
     </script>

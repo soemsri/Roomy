@@ -102,6 +102,9 @@ def start_backup_scheduler():
             try:
                 import services.backup as backup_service
                 backup_service.run_scheduled_backup()
+                
+                import services.log_cleanup as log_cleanup_service
+                log_cleanup_service.run_scheduled_log_cleanup()
             except Exception as e:
                 logger.error(f"Error in backup scheduler loop: {e}")
             time.sleep(60)
