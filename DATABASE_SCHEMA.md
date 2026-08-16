@@ -65,3 +65,25 @@
    - image_url: TEXT
    - status: TEXT (Pending, In Progress, Completed)
    - created_at: TIMESTAMP
+
+8. **BookingRequests (Room Reservation & Screening)**
+   - id: INT (PK)
+   - uuid: TEXT (Unique, Index)
+   - line_user_id: TEXT (Index)
+   - full_name: TEXT
+   - phone_number: TEXT
+   - workplace_name: TEXT
+   - job_position: TEXT
+   - workplace_phone: TEXT
+   - requested_move_in_date: DATETIME
+   - preferred_building_id: INT (FK)
+   - preferred_room_id: INT (FK)
+   - assigned_room_id: INT (FK)
+   - agreement_accepted: INT (1 = Accepted)
+   - agreement_accepted_at: TIMESTAMP
+   - status: TEXT (Pending, Approved, Rejected, Converted)
+   - admin_notes: TEXT
+   - language: TEXT
+   - created_at: TIMESTAMP
+   - updated_at: TIMESTAMP
+

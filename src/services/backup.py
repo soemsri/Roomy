@@ -18,10 +18,19 @@ def ensure_backups_dir():
         os.makedirs(BACKUPS_DIR)
         logger.info(f"Created backups directory at: {BACKUPS_DIR}")
 
-def get_db_path():
+def get_db_path(db_session=None):
     """Extract SQLite DB file path if using SQLite."""
-    if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
-        db_path = SQLALCHEMY_DATABASE_URL.replace("sqlite:///", "")
+    db_url = SQLALCHEMY_DATABASE_URL
+    if db_session:
+        try:
+            bind = db_session.get_bind()
+            if bind and hasattr(bind, "url"):
+                db_url = str(bind.url)
+        except Exception:
+            pass
+
+    if db_url.startswith("sqlite"):
+        db_path = db_url.replace("sqlite:///", "")
         if not os.path.isabs(db_path) and not db_path.startswith("./") and not db_path.startswith(".\\"):
             # Resolve relative path from src/models/database.py location or project root
             db_path_resolved = os.path.abspath(db_path)
@@ -48,7 +57,7 @@ def create_backup(db_session=None):
     try:
         if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
             # SQLite File Copy Backup
-            db_path = get_db_path()
+            db_path = get_db_path(db_session)
             if not db_path or not os.path.exists(db_path):
                 # Fallback search in src/
                 db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "roomy.db"))
@@ -125,7 +134,7 @@ def restore_backup(db_session, filename):
             if not filename.endswith(".db"):
                 raise ValueError("SQLite restore requires a .db backup file.")
                 
-            db_path = get_db_path()
+            db_path = get_db_path(db_session)
             if not db_path:
                 db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "roomy.db"))
             

@@ -44,18 +44,26 @@ admin_bot_api = BotApiProxy("admin_bot_api")
 line_bot_api = BotApiProxy("line_bot_api")
 
 class BaseUrlProxy:
+    def _get_val(self):
+        val = getattr(config, 'BASE_URL', None) or os.getenv('BASE_URL', '')
+        val = str(val).rstrip("/")
+        if not val or not val.startswith("http"):
+            val = "https://sukanan.kookai.cloud"
+        return val
     def __str__(self):
-        return str(config.BASE_URL)
+        return self._get_val()
     def __repr__(self):
-        return repr(config.BASE_URL)
+        return repr(self._get_val())
+    def __format__(self, format_spec):
+        return self._get_val().__format__(format_spec)
     def __getattr__(self, item):
-        return getattr(config.BASE_URL, item)
+        return getattr(self._get_val(), item)
     def rstrip(self, chars=None):
-        return config.BASE_URL.rstrip(chars)
+        return self._get_val().rstrip(chars)
     def __add__(self, other):
-        return config.BASE_URL + other
+        return self._get_val() + str(other)
     def __radd__(self, other):
-        return other + config.BASE_URL
+        return str(other) + self._get_val()
 
 BASE_URL = BaseUrlProxy()
 from linebot.v3.messaging import (
@@ -446,6 +454,9 @@ async def admin_dashboard(
     pending_registrations = db.query(models.Tenant).filter(models.Tenant.status == "Pending").all()
     awaiting_payment_tenants = db.query(models.Tenant).filter(models.Tenant.status == "Awaiting Payment").all()
     move_out_requests = db.query(models.MoveOutRequest).filter(models.MoveOutRequest.status == "Pending").all()
+    bookings = db.query(models.BookingRequest).options(joinedload(models.BookingRequest.preferred_building), joinedload(models.BookingRequest.assigned_room)).order_by(models.BookingRequest.id.desc()).all()
+    pending_bookings = [b for b in bookings if b.status == "Pending"]
+    stats["pending_bookings"] = len(pending_bookings)
     
     all_rooms = db.query(models.Room).options(joinedload(models.Room.tenant)).all()
     all_buildings = db.query(models.Building).all()
@@ -464,6 +475,8 @@ async def admin_dashboard(
         "pending_registrations": pending_registrations,
         "awaiting_payment_tenants": awaiting_payment_tenants,
         "move_out_requests": move_out_requests,
+        "bookings": bookings,
+        "pending_bookings": pending_bookings,
         "all_rooms": all_rooms,
         "all_buildings": all_buildings,
         "owner": owner,
@@ -3620,3 +3633,158 @@ async def clear_activity_logs(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+
+# ==========================================
+# Room Booking & Candidate Screening Routes
+# ==========================================
+
+@router.get("/bookings/list")
+async def list_bookings(
+    db: Session = Depends(get_db),
+    admin: bool = Depends(get_admin)
+):
+    bookings = db.query(models.BookingRequest).order_by(models.BookingRequest.id.desc()).all()
+    return [
+        {
+            "id": b.id,
+            "uuid": b.uuid,
+            "line_user_id": b.line_user_id,
+            "full_name": b.full_name,
+            "phone_number": b.phone_number,
+            "workplace_name": b.workplace_name,
+            "job_position": b.job_position,
+            "workplace_phone": b.workplace_phone,
+            "requested_move_in_date": b.requested_move_in_date.strftime("%Y-%m-%d") if b.requested_move_in_date else None,
+            "preferred_building_id": b.preferred_building_id,
+            "preferred_building_name": b.preferred_building.name if b.preferred_building else "-",
+            "assigned_room_id": b.assigned_room_id,
+            "assigned_room_number": b.assigned_room.room_number if b.assigned_room else "-",
+            "status": b.status,
+            "admin_notes": b.admin_notes,
+            "created_at": b.created_at.strftime("%Y-%m-%d %H:%M:%S") if b.created_at else None
+        }
+        for b in bookings
+    ]
+
+@router.post("/booking/{booking_id}/approve")
+async def approve_booking_endpoint(
+    booking_id: int,
+    data: dict = None,
+    db: Session = Depends(get_db),
+    admin: bool = Depends(get_admin),
+    current_user: models.User = Depends(get_current_user)
+):
+    booking = db.query(models.BookingRequest).filter(models.BookingRequest.id == booking_id).first()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking request not found")
+
+    data = data or {}
+    assigned_room_id = data.get("assigned_room_id")
+    admin_notes = data.get("admin_notes")
+
+    room = None
+    room_number = "N/A"
+    building_name = "อาคารหลัก"
+
+    if assigned_room_id:
+        room = db.query(models.Room).filter(models.Room.id == int(assigned_room_id)).first()
+        if room:
+            booking.assigned_room_id = room.id
+            room_number = room.room_number
+            if room.building:
+                building_name = room.building.name
+    elif booking.preferred_building:
+        building_name = booking.preferred_building.name
+
+    booking.status = "Approved"
+    if admin_notes:
+        booking.admin_notes = admin_notes
+    db.commit()
+
+    owner = db.query(models.Owner).first()
+    
+    # Send LINE Notification to Candidate
+    import services.line_bot as line_bot_service
+    line_bot_service.send_booking_approved_flex(
+        booking=booking,
+        room_number=room_number,
+        building_name=building_name,
+        owner=owner,
+        bot_api=tenant_bot_api
+    )
+
+    log_activity(
+        db,
+        current_user.email,
+        "Approve Booking",
+        f"Booking #{booking.id} - {booking.full_name}",
+        f"Approved candidate. Assigned Room: {room_number} ({building_name}). Notes: {admin_notes or '-'}"
+    )
+
+    return {"status": "Success", "message": "Candidate approved and LINE notification sent."}
+
+@router.post("/booking/{booking_id}/reject")
+async def reject_booking_endpoint(
+    booking_id: int,
+    data: dict = None,
+    db: Session = Depends(get_db),
+    admin: bool = Depends(get_admin),
+    current_user: models.User = Depends(get_current_user)
+):
+    booking = db.query(models.BookingRequest).filter(models.BookingRequest.id == booking_id).first()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking request not found")
+
+    data = data or {}
+    reason = data.get("reason") or data.get("admin_notes") or ""
+
+    booking.status = "Rejected"
+    if reason:
+        booking.admin_notes = reason
+    db.commit()
+
+    owner = db.query(models.Owner).first()
+
+    # Send LINE Notification to Candidate
+    import services.line_bot as line_bot_service
+    line_bot_service.send_booking_rejected_flex(
+        booking=booking,
+        owner=owner,
+        bot_api=tenant_bot_api
+    )
+
+    log_activity(
+        db,
+        current_user.email,
+        "Reject Booking",
+        f"Booking #{booking.id} - {booking.full_name}",
+        f"Rejected booking request. Reason: {reason or '-'}"
+    )
+
+    return {"status": "Success", "message": "Candidate rejected and LINE notification sent."}
+
+@router.post("/booking/{booking_id}/delete")
+async def delete_booking_endpoint(
+    booking_id: int,
+    db: Session = Depends(get_db),
+    admin: bool = Depends(get_admin),
+    current_user: models.User = Depends(get_current_user)
+):
+    booking = db.query(models.BookingRequest).filter(models.BookingRequest.id == booking_id).first()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking request not found")
+
+    name = booking.full_name
+    db.delete(booking)
+    db.commit()
+
+    log_activity(
+        db,
+        current_user.email,
+        "Delete Booking",
+        f"Booking #{booking_id} - {name}",
+        f"Deleted booking record #{booking_id}"
+    )
+
+    return {"status": "Success"}
+

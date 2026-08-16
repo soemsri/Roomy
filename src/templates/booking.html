@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="{{ lang or 'th' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ get_text('book_room_title', lang) }} - {{ owner_name or 'Roomy' }}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <style>
+        :root {
+            --primary: #0284c7;
+            --primary-dark: #0369a1;
+            --primary-light: #e0f2fe;
+            --accent: #0ea5e9;
+            --bg: #f1f5f9;
+            --card-bg: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border: #cbd5e1;
+            --border-focus: #0284c7;
+            --success: #16a34a;
+            --success-light: #dcfce7;
+            --warning: #f59e0b;
+            --warning-light: #fef3c7;
+            --radius: 16px;
+            --shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 24px 16px;
+            line-height: 1.5;
+        }
+
+        .booking-container {
+            width: 100%;
+            max-width: 640px;
+            background: var(--card-bg);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            margin-bottom: 40px;
+        }
+
+        .booking-header {
+            background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+            color: #ffffff;
+            padding: 32px 24px;
+            text-align: center;
+            position: relative;
+        }
+
+        .booking-header .apt-badge {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(8px);
+            padding: 4px 14px;
+            border-radius: 9999px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+        }
+
+        .booking-header h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            margin-bottom: 8px;
+        }
+
+        .booking-header p {
+            font-size: 0.92rem;
+            color: var(--primary-light);
+            max-width: 480px;
+            margin: 0 auto;
+        }
+
+        .content-body {
+            padding: 28px 24px;
+        }
+
+        /* Step Card Styling */
+        .step-section {
+            margin-bottom: 28px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .step-section:last-of-type {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        .step-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .step-badge {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--primary-light);
+            color: var(--primary-dark);
+            font-weight: 700;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .step-title {
+            font-size: 1.12rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        /* Agreement Box */
+        .agreement-box {
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            max-height: 220px;
+            overflow-y: auto;
+            font-size: 0.88rem;
+            color: #334155;
+            line-height: 1.6;
+            margin-bottom: 16px;
+            white-space: pre-line;
+        }
+
+        .agreement-box h4 {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-main);
+            margin-bottom: 8px;
+        }
+
+        .accept-checkbox-wrapper {
+            background: var(--primary-light);
+            border: 1px solid #bae6fd;
+            border-radius: 10px;
+            padding: 14px 16px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .accept-checkbox-wrapper:hover {
+            background: #dbeafe;
+        }
+
+        .accept-checkbox-wrapper input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            margin-top: 2px;
+            cursor: pointer;
+            accent-color: var(--primary);
+        }
+
+        .accept-checkbox-wrapper label {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #0369a1;
+            cursor: pointer;
+            user-select: none;
+            line-height: 1.4;
+        }
+
+        /* Form Controls */
+        .form-section-locked {
+            opacity: 0.45;
+            pointer-events: none;
+            filter: grayscale(80%);
+            transition: all 0.3s ease;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 16px;
+        }
+
+        @media (min-width: 520px) {
+            .form-grid-2 {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .form-group label {
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: #334155;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .form-group label .required-star {
+            color: #ef4444;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            font-size: 0.95rem;
+            color: var(--text-main);
+            background: #ffffff;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--border-focus);
+            box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+        }
+
+        .form-control::placeholder {
+            color: #94a3b8;
+            font-size: 0.9rem;
+        }
+
+        .info-pill {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            color: #475569;
+            margin-top: 12px;
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+            color: #ffffff;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.05rem;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(2, 132, 199, 0.25);
+            transition: all 0.2s ease;
+            margin-top: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-submit:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(2, 132, 199, 0.35);
+        }
+
+        .btn-submit:disabled {
+            background: #94a3b8;
+            cursor: not-allowed;
+            box-shadow: none;
+            opacity: 0.7;
+        }
+
+        /* Success View */
+        .success-view {
+            display: none;
+            text-align: center;
+            padding: 48px 24px;
+        }
+
+        .success-icon-wrap {
+            width: 84px;
+            height: 84px;
+            border-radius: 50%;
+            background: var(--success-light);
+            color: var(--success);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.75rem;
+            margin: 0 auto 24px;
+        }
+
+        .success-view h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 12px;
+        }
+
+        .success-view p {
+            font-size: 0.95rem;
+            color: #475569;
+            max-width: 440px;
+            margin: 0 auto 24px;
+            line-height: 1.6;
+        }
+
+        .success-detail-box {
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: left;
+            margin-bottom: 24px;
+        }
+
+        .success-detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            font-size: 0.88rem;
+            border-bottom: 1px dashed #e2e8f0;
+        }
+
+        .success-detail-row:last-child {
+            border-bottom: none;
+        }
+
+        .success-detail-row .label {
+            color: var(--text-muted);
+        }
+
+        .success-detail-row .val {
+            font-weight: 600;
+            color: var(--text-main);
+        }
+    </style>
+</head>
+<body>
+    <div class="booking-container">
+        <!-- Header -->
+        <div class="booking-header">
+            <div class="apt-badge"><i class="fa-solid fa-building"></i> {{ owner_name or 'SukAnan Apartment' }}</div>
+            <h1>{{ get_text('book_room_title', lang) }}</h1>
+            <p>{{ get_text('book_room_subtitle', lang) }}</p>
+        </div>
+
+        <!-- Form View -->
+        <div class="content-body" id="bookingFormContainer">
+            <form id="bookingForm">
+                <!-- STEP 1: Agreement -->
+                <div class="step-section">
+                    <div class="step-header">
+                        <div class="step-badge">1</div>
+                        <div class="step-title"><i class="fa-solid fa-file-signature" style="color: var(--primary);"></i> {{ get_text('booking_agreement_title', lang) }}</div>
+                    </div>
+
+                    <div class="agreement-box" id="agreementBox">
+{{ lease_content or get_text('default_lease_agreement_text', lang) }}
+                    </div>
+
+                    <div class="accept-checkbox-wrapper" onclick="toggleAgreement(event)">
+                        <input type="checkbox" id="acceptAgreement" required>
+                        <label for="acceptAgreement">
+                            {{ get_text('booking_agreement_accept', lang) }}
+                        </label>
+                    </div>
+                </div>
+
+                <!-- STEP 2: Applicant Information -->
+                <div class="step-section form-section-locked" id="applicantFormSection">
+                    <div class="step-header">
+                        <div class="step-badge">2</div>
+                        <div class="step-title"><i class="fa-solid fa-user" style="color: var(--primary);"></i> ข้อมูลผู้สมัครเข้าพัก</div>
+                    </div>
+
+                    <div class="form-grid">
+                        <div class="form-grid form-grid-2">
+                            <div class="form-group">
+                                <label for="full_name"><i class="fa-solid fa-id-card"></i> {{ get_text('full_name', lang) }} <span class="required-star">*</span></label>
+                                <input type="text" id="full_name" class="form-control" placeholder="{{ get_text('full_name_placeholder', lang) }}" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="phone_number"><i class="fa-solid fa-phone"></i> {{ get_text('phone', lang) }} <span class="required-star">*</span></label>
+                                <input type="tel" id="phone_number" class="form-control" placeholder="08x-xxx-xxxx" pattern="[0-9]{9,10}" required>
+                            </div>
+                        </div>
+
+                        <!-- Workplace Info -->
+                        <div class="form-group">
+                            <label for="workplace_name"><i class="fa-solid fa-briefcase"></i> {{ get_text('workplace_name', lang) }} <span class="required-star">*</span></label>
+                            <input type="text" id="workplace_name" class="form-control" placeholder="{{ get_text('workplace_name_placeholder', lang) }}" required>
+                        </div>
+
+                        <div class="form-grid form-grid-2">
+                            <div class="form-group">
+                                <label for="job_position"><i class="fa-solid fa-user-tie"></i> {{ get_text('job_position', lang) }} <span class="required-star">*</span></label>
+                                <input type="text" id="job_position" class="form-control" placeholder="{{ get_text('job_position_placeholder', lang) }}" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="workplace_phone"><i class="fa-solid fa-phone-office fa-phone-flip"></i> {{ get_text('workplace_phone', lang) }} <span class="required-star">*</span></label>
+                                <input type="tel" id="workplace_phone" class="form-control" placeholder="{{ get_text('workplace_phone_placeholder', lang) }}" required>
+                            </div>
+                        </div>
+
+                        <!-- Move-in Date -->
+                        <div class="form-group">
+                            <label for="requested_move_in_date"><i class="fa-solid fa-calendar-day"></i> {{ get_text('move_in_date', lang) }} <span class="required-star">*</span></label>
+                            <input type="text" id="requested_move_in_date" class="form-control" style="background: #ffffff; cursor: pointer;" required readonly>
+                        </div>
+
+                        <div class="info-pill">
+                            <i class="fa-solid fa-circle-info" style="color: var(--primary);"></i>
+                            <span>การคัดเลือกเข้าพักจะดำเนินการโดยผู้ดูแลหอพัก และจะแจ้งผลผ่านทาง LINE ทันที</span>
+                        </div>
+                    </div>
+
+                    <button type="submit" id="btnSubmitBooking" class="btn-submit" disabled>
+                        <i class="fa-solid fa-paper-plane"></i> {{ get_text('submit_booking', lang) }}
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Success View -->
+        <div class="success-view" id="bookingSuccessView">
+            <div class="success-icon-wrap">
+                <i class="fa-solid fa-check"></i>
+            </div>
+            <h2>{{ get_text('booking_success_title', lang) }}</h2>
+            <p>{{ get_text('booking_success_desc', lang) }}</p>
+
+            <div class="success-detail-box" id="successDetails">
+                <div class="success-detail-row">
+                    <span class="label">{{ get_text('full_name', lang) }}:</span>
+                    <span class="val" id="resFullName">-</span>
+                </div>
+                <div class="success-detail-row">
+                    <span class="label">{{ get_text('phone', lang) }}:</span>
+                    <span class="val" id="resPhone">-</span>
+                </div>
+                <div class="success-detail-row">
+                    <span class="label">{{ get_text('workplace_name', lang) }}:</span>
+                    <span class="val" id="resWorkplace">-</span>
+                </div>
+                <div class="success-detail-row">
+                    <span class="label">{{ get_text('move_in_date', lang) }}:</span>
+                    <span class="val" id="resDate">-</span>
+                </div>
+                <div class="success-detail-row">
+                    <span class="label">{{ get_text('status', lang) }}:</span>
+                    <span class="val" style="color: var(--warning); font-weight: 700;">{{ get_text('pending_bookings', lang) }}</span>
+                </div>
+            </div>
+
+            <div style="font-size: 0.85rem; color: #64748b;">
+                <i class="fa-brands fa-line" style="color: #06c755; font-size: 1.1rem;"></i> คุณสามารถปิดหน้านี้และรอรับการแจ้งเตือนในห้องแชท LINE ได้ทันที
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    {% if lang == 'th' %}<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/th.js"></script>{% endif %}
+    {% if lang == 'jp' %}<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ja.js"></script>{% endif %}
+    <script>
+        const booking_uuid = "{{ booking_uuid }}";
+        const line_uid = "{{ line_user_id }}";
+        const lang = "{{ lang or 'th' }}";
+
+        // Initialize Flatpickr
+        flatpickr("#requested_move_in_date", {
+            dateFormat: "Y-m-d",
+            defaultDate: new Date(),
+            minDate: "today",
+            locale: lang === 'th' ? 'th' : (lang === 'jp' ? 'ja' : 'default'),
+            disableMobile: "true"
+        });
+
+        // Agreement Acceptance logic
+        const acceptCheckbox = document.getElementById('acceptAgreement');
+        const formSection = document.getElementById('applicantFormSection');
+        const submitBtn = document.getElementById('btnSubmitBooking');
+
+        function toggleAgreement(e) {
+            if (e.target !== acceptCheckbox) {
+                acceptCheckbox.checked = !acceptCheckbox.checked;
+            }
+            updateFormState();
+        }
+
+        acceptCheckbox.addEventListener('change', updateFormState);
+
+        function updateFormState() {
+            if (acceptCheckbox.checked) {
+                formSection.classList.remove('form-section-locked');
+                submitBtn.disabled = false;
+            } else {
+                formSection.classList.add('form-section-locked');
+                submitBtn.disabled = true;
+            }
+        }
+
+        // Form Submit
+        document.getElementById('bookingForm').onsubmit = async (e) => {
+            e.preventDefault();
+            if (!acceptCheckbox.checked) {
+                alert('กรุณากดยอมรับสัญญาและกฎระเบียบของหอพักก่อนส่งใบสมัคร');
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> {{ get_text("sending_data", lang) }}';
+
+            const payload = {
+                full_name: document.getElementById('full_name').value.trim(),
+                phone_number: document.getElementById('phone_number').value.trim(),
+                workplace_name: document.getElementById('workplace_name').value.trim(),
+                job_position: document.getElementById('job_position').value.trim(),
+                workplace_phone: document.getElementById('workplace_phone').value.trim(),
+                requested_move_in_date: document.getElementById('requested_move_in_date').value,
+                line_user_id: line_uid,
+                agreement_accepted: true,
+                language: lang
+            };
+
+            try {
+                const res = await fetch(`/booking/${booking_uuid}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (res.ok) {
+                    const result = await res.json();
+                    document.getElementById('resFullName').innerText = payload.full_name;
+                    document.getElementById('resPhone').innerText = payload.phone_number;
+                    document.getElementById('resWorkplace').innerText = `${payload.workplace_name} (${payload.job_position})`;
+                    document.getElementById('resDate').innerText = payload.requested_move_in_date;
+
+                    document.getElementById('bookingFormContainer').style.display = 'none';
+                    document.getElementById('bookingSuccessView').style.display = 'block';
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                } else {
+                    const err = await res.json();
+                    alert(err.detail || '{{ get_text("error_occurred", lang) }}');
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> {{ get_text("submit_booking", lang) }}';
+                }
+            } catch (err) {
+                alert('{{ get_text("connection_error", lang) }}');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> {{ get_text("submit_booking", lang) }}';
+            }
+        };
+    </script>
+</body>
+</html>

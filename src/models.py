@@ -296,6 +296,20 @@ class LoginAttempt(Base):
     last_attempt = Column(DateTime, server_default=func.now(), onupdate=func.now())
     locked_until = Column(DateTime, nullable=True)
 
+class User(Base):
+    """
+    Represents an administrative or operational staff user of Roomy.
+    Roles include: Admin, Accountant, Clerk, Technician, Housekeeper.
+    """
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, unique=True, index=True, nullable=False)
+    full_name = Column(String)
+    role = Column(String, default="Admin") # Admin, Accountant, Clerk, Technician, Housekeeper
+    status = Column(String, default="Active") # Active, Suspended
+    session_token = Column(String, unique=True, index=True)
+    created_at = Column(DateTime, server_default=func.now())
+
 class ApplicationLog(Base):
     __tablename__ = "application_logs"
     id = Column(Integer, primary_key=True, index=True)
@@ -304,3 +318,29 @@ class ApplicationLog(Base):
     action = Column(String, index=True, nullable=False)
     target = Column(String, index=True, nullable=True)
     details = Column(Text, nullable=True)
+
+class BookingRequest(Base):
+    __tablename__ = "booking_requests"
+    id = Column(Integer, primary_key=True, index=True)
+    uuid = Column(String, unique=True, index=True, default=lambda: str(uuid.uuid4()))
+    line_user_id = Column(String, index=True, nullable=False)
+    full_name = Column(String, nullable=False)
+    phone_number = Column(String, nullable=False)
+    workplace_name = Column(String, nullable=False)
+    job_position = Column(String, nullable=False)
+    workplace_phone = Column(String, nullable=False)
+    requested_move_in_date = Column(DateTime, nullable=False)
+    preferred_building_id = Column(Integer, ForeignKey("buildings.id"), index=True, nullable=True)
+    preferred_room_id = Column(Integer, ForeignKey("rooms.id"), index=True, nullable=True)
+    assigned_room_id = Column(Integer, ForeignKey("rooms.id"), index=True, nullable=True)
+    agreement_accepted = Column(Integer, default=1) # 1 = Yes, 0 = No
+    agreement_accepted_at = Column(DateTime, server_default=func.now())
+    status = Column(String, default="Pending") # Pending, Approved, Rejected, Converted
+    admin_notes = Column(Text, nullable=True)
+    language = Column(String, default="th")
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    preferred_building = relationship("Building", foreign_keys=[preferred_building_id])
+    preferred_room = relationship("Room", foreign_keys=[preferred_room_id])
+    assigned_room = relationship("Room", foreign_keys=[assigned_room_id])

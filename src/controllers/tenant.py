@@ -35,18 +35,26 @@ tenant_bot_api = BotApiProxy("tenant_bot_api")
 admin_bot_api = BotApiProxy("admin_bot_api")
 
 class BaseUrlProxy:
+    def _get_val(self):
+        val = getattr(config, 'BASE_URL', None) or os.getenv('BASE_URL', '')
+        val = str(val).rstrip("/")
+        if not val or not val.startswith("http"):
+            val = "https://sukanan.kookai.cloud"
+        return val
     def __str__(self):
-        return str(config.BASE_URL)
+        return self._get_val()
     def __repr__(self):
-        return repr(config.BASE_URL)
+        return repr(self._get_val())
+    def __format__(self, format_spec):
+        return self._get_val().__format__(format_spec)
     def __getattr__(self, item):
-        return getattr(config.BASE_URL, item)
+        return getattr(self._get_val(), item)
     def rstrip(self, chars=None):
-        return config.BASE_URL.rstrip(chars)
+        return self._get_val().rstrip(chars)
     def __add__(self, other):
-        return config.BASE_URL + other
+        return self._get_val() + str(other)
     def __radd__(self, other):
-        return other + config.BASE_URL
+        return str(other) + self._get_val()
 
 BASE_URL = BaseUrlProxy()
 from linebot.v3.messaging import (
@@ -60,6 +68,115 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 uploads_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")
+
+from fastapi.responses import RedirectResponse
+
+@router.get("/booking")
+async def start_booking(request: Request, uid: str = None, lang: str = "th", db: Session = Depends(get_db)):
+    line_user_id = uid or request.query_params.get("uid") or f"guest_{uuid.uuid4().hex[:12]}"
+    booking_uuid = str(uuid.uuid4())
+    return RedirectResponse(url=f"/booking/{booking_uuid}?uid={line_user_id}&lang={lang}")
+
+@router.get("/booking/{booking_uuid}", response_class=HTMLResponse)
+async def view_booking_form(request: Request, booking_uuid: str, db: Session = Depends(get_db)):
+    uid = request.query_params.get("uid") or ""
+    lang = request.query_params.get("lang") or "th"
+    
+    owner = db.query(models.Owner).first()
+    owner_name = owner.display_name if owner and owner.display_name else "SukAnan Apartment"
+    lease_content = owner.lease_template if owner and owner.lease_template else ""
+    buildings = db.query(models.Building).all()
+
+    return templates.TemplateResponse("booking.html", {
+        "request": request,
+        "booking_uuid": booking_uuid,
+        "line_user_id": uid,
+        "owner_name": owner_name,
+        "lease_content": lease_content,
+        "buildings": buildings,
+        "lang": lang
+    })
+
+@router.post("/booking/{booking_uuid}")
+async def submit_booking_form(booking_uuid: str, data: dict, db: Session = Depends(get_db)):
+    full_name = data.get("full_name")
+    phone_number = data.get("phone_number")
+    workplace_name = data.get("workplace_name")
+    job_position = data.get("job_position")
+    workplace_phone = data.get("workplace_phone")
+    requested_move_in_date_str = data.get("requested_move_in_date")
+    line_user_id = data.get("line_user_id") or "guest"
+    preferred_building_id = data.get("preferred_building_id")
+    agreement_accepted = data.get("agreement_accepted", False)
+    language = data.get("language", "th")
+
+    if not agreement_accepted:
+        raise HTTPException(status_code=400, detail="คุณต้องยอมรับสัญญาและกฎระเบียบหอพักก่อนทำการจอง")
+
+    if not all([full_name, phone_number, workplace_name, job_position, workplace_phone, requested_move_in_date_str]):
+        raise HTTPException(status_code=400, detail=get_text('error_missing_fields', language))
+
+    try:
+        requested_move_in_date = datetime.strptime(requested_move_in_date_str, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="รูปแบบวันที่ไม่ถูกต้อง")
+
+    # Check if booking with this uuid already exists or create new
+    booking = db.query(models.BookingRequest).filter(models.BookingRequest.uuid == booking_uuid).first()
+    if not booking:
+        booking = models.BookingRequest(
+            uuid=booking_uuid,
+            line_user_id=line_user_id,
+            full_name=full_name,
+            phone_number=phone_number,
+            workplace_name=workplace_name,
+            job_position=job_position,
+            workplace_phone=workplace_phone,
+            requested_move_in_date=requested_move_in_date,
+            preferred_building_id=int(preferred_building_id) if preferred_building_id else None,
+            agreement_accepted=1,
+            language=language,
+            status="Pending"
+        )
+        db.add(booking)
+    else:
+        booking.full_name = full_name
+        booking.phone_number = phone_number
+        booking.workplace_name = workplace_name
+        booking.job_position = job_position
+        booking.workplace_phone = workplace_phone
+        booking.requested_move_in_date = requested_move_in_date
+        booking.preferred_building_id = int(preferred_building_id) if preferred_building_id else None
+        booking.agreement_accepted = 1
+        booking.language = language
+        booking.status = "Pending"
+
+    db.commit()
+    db.refresh(booking)
+
+    # Notify Owner/Admin via LINE
+    owner = db.query(models.Owner).first()
+    if owner and owner.line_user_id and admin_bot_api:
+        lang = owner.language or "th"
+        msg = get_text('notify_new_booking', lang).format(
+            name=full_name,
+            phone=phone_number,
+            workplace=workplace_name,
+            position=job_position,
+            work_phone=workplace_phone,
+            date=requested_move_in_date_str
+        )
+        try:
+            admin_bot_api.push_message(
+                PushMessageRequest(
+                    to=owner.line_user_id,
+                    messages=[TextMessage(text=msg)]
+                )
+            )
+        except Exception as e:
+            logger.error(f"Failed to notify admin of new booking: {e}")
+
+    return {"status": "Success", "booking_id": booking.id, "uuid": booking.uuid}
 
 @router.get("/register/{tenant_uuid}", response_class=HTMLResponse)
 async def view_registration(request: Request, tenant_uuid: str, db: Session = Depends(get_db)):

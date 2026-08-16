@@ -405,6 +405,12 @@
         <div class="menu-section">
             <div class="menu-label">Records</div>
             {% if user_role in ['Admin', 'Clerk'] %}
+            <a href="#bookingSection" class="menu-item">
+                <i class="fa-solid fa-calendar-check"></i> <span>{{ get_text('booking_screening', lang) }}</span>
+                {% if pending_bookings|length > 0 %}
+                <span class="nav-badge pulse">{{ pending_bookings|length }}</span>
+                {% endif %}
+            </a>
             <a href="#pendingSection" class="menu-item">
                 <i class="fa-solid fa-user-clock"></i> <span>{{ get_text('pending_registrations', lang) }}</span>
                 {% if pending_registrations|length > 0 %}
@@ -544,6 +550,125 @@
                     </button>
                 </form>
             </div>
+        </div>
+
+        <!-- Room Booking Screening Section -->
+        <div class="section-card" id="bookingSection" style="border-top: 4px solid var(--primary);">
+            <div class="section-header" style="flex-wrap: wrap; gap: 12px; margin-bottom: 20px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <h2><i class="fa-solid fa-calendar-check" style="color: var(--primary);"></i> {{ get_text('booking_screening', lang) }}</h2>
+                    <span class="badge" style="background: var(--primary-light, #e0f2fe); color: var(--primary, #0284c7); font-weight: 700;">
+                        {{ pending_bookings|length }} {{ get_text('pending_bookings', lang) }}
+                    </span>
+                </div>
+                <!-- Filters & Search -->
+                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                    <div class="filter-group" style="display: flex; gap: 6px;">
+                        <button type="button" class="btn btn-sm btn-primary active" id="filter_booking_all" onclick="filterBookingsTable('all')">ทั้งหมด ({{ bookings|length }})</button>
+                        <button type="button" class="btn btn-sm btn-secondary" id="filter_booking_pending" onclick="filterBookingsTable('Pending')">{{ get_text('pending_bookings', lang) }} ({{ pending_bookings|length }})</button>
+                        <button type="button" class="btn btn-sm btn-secondary" id="filter_booking_approved" onclick="filterBookingsTable('Approved')">{{ get_text('approved_bookings', lang) }}</button>
+                        <button type="button" class="btn btn-sm btn-secondary" id="filter_booking_rejected" onclick="filterBookingsTable('Rejected')">{{ get_text('rejected_bookings', lang) }}</button>
+                    </div>
+                </div>
+            </div>
+
+            {% if bookings|length == 0 %}
+            <div style="text-align: center; padding: 50px 20px;">
+                <i class="fa-solid fa-calendar-xmark" style="font-size: 3.5em; color: #cbd5e1; margin-bottom: 16px; display: block;"></i>
+                <h3 style="color: var(--text-main); margin-bottom: 8px;">ยังไม่มีรายการจองห้องพัก</h3>
+                <p style="color: var(--text-muted); font-size: 0.9em; max-width: 420px; margin: 0 auto;">
+                    เมื่อมีผู้สนใจจองห้องพักผ่าน LINE และส่งแบบฟอร์ม รายชื่อจะปรากฏที่นี่เพื่อให้คุณพิจารณาคัดเลือก
+                </p>
+            </div>
+            {% else %}
+            <div class="table-container">
+                <table id="bookingApplicationsTable">
+                    <thead>
+                        <tr>
+                            <th>{{ get_text('date', lang) }}</th>
+                            <th>{{ get_text('full_name', lang) }}</th>
+                            <th>{{ get_text('phone', lang) }}</th>
+                            <th>{{ get_text('workplace_name', lang) }} / {{ get_text('job_position', lang) }}</th>
+                            <th>{{ get_text('workplace_phone', lang) }}</th>
+                            <th>{{ get_text('move_in_date', lang) }}</th>
+                            <th>{{ get_text('building', lang) }} / {{ get_text('room', lang) }}</th>
+                            <th>{{ get_text('status', lang) }}</th>
+                            <th>{{ get_text('actions', lang) }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for b in bookings %}
+                        <tr class="booking-row" data-status="{{ b.status }}">
+                            <td style="font-size: 0.85rem; color: #64748b;">
+                                {{ b.created_at.strftime('%d/%m/%Y %H:%M') if b.created_at else '-' }}
+                            </td>
+                            <td style="font-weight: 700; color: var(--text-main);">
+                                {{ b.full_name }}
+                            </td>
+                            <td>
+                                <a href="tel:{{ b.phone_number }}" style="color: var(--primary); text-decoration: none;">
+                                    <i class="fa-solid fa-phone" style="font-size: 0.8rem;"></i> {{ b.phone_number }}
+                                </a>
+                            </td>
+                            <td>
+                                <div style="font-weight: 600;">{{ b.workplace_name }}</div>
+                                <div style="font-size: 0.82rem; color: #64748b;"><i class="fa-solid fa-user-tie" style="font-size: 0.75rem;"></i> {{ b.job_position }}</div>
+                            </td>
+                            <td>
+                                <a href="tel:{{ b.workplace_phone }}" style="color: #475569; text-decoration: none;">
+                                    {{ b.workplace_phone }}
+                                </a>
+                            </td>
+                            <td>
+                                <span style="font-weight: 600; color: #0f172a;">
+                                    {{ b.requested_move_in_date.strftime('%d/%m/%Y') if b.requested_move_in_date else '-' }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if b.assigned_room %}
+                                    <span class="badge badge-success"><i class="fa-solid fa-door-open"></i> {{ b.assigned_room.room_number }}</span>
+                                {% elif b.preferred_building %}
+                                    <span style="font-size: 0.85rem; color: #64748b;">{{ b.preferred_building.name }}</span>
+                                {% else %}
+                                    <span style="color: #94a3b8;">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if b.status == 'Pending' %}
+                                    <span class="badge badge-warning" style="background: #fef3c7; color: #d97706;">{{ get_text('pending_bookings', lang) }}</span>
+                                {% elif b.status == 'Approved' %}
+                                    <span class="badge badge-success" style="background: #dcfce7; color: #16a34a;"><i class="fa-solid fa-check"></i> {{ get_text('approved_bookings', lang) }}</span>
+                                {% elif b.status == 'Rejected' %}
+                                    <span class="badge badge-danger" style="background: #fee2e2; color: #dc2626;">{{ get_text('rejected_bookings', lang) }}</span>
+                                {% else %}
+                                    <span class="badge badge-secondary">{{ b.status }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div style="display: flex; gap: 6px; align-items: center;">
+                                    {% if b.status == 'Pending' %}
+                                    <button class="btn btn-sm btn-primary" style="background: #16a34a; border-color: #16a34a;" onclick="openQualifyBookingModal({{ b.id }}, '{{ b.full_name|replace("'", "\\'") }}', '{{ b.phone_number }}', '{{ b.workplace_name|replace("'", "\\'") }}', '{{ b.job_position|replace("'", "\\'") }}', '{{ b.workplace_phone }}', '{{ b.requested_move_in_date.strftime("%d/%m/%Y") if b.requested_move_in_date else "-" }}', '{{ b.preferred_building_id or "" }}')">
+                                        <i class="fa-solid fa-user-check"></i> {{ get_text('qualify_candidate', lang) }}
+                                    </button>
+                                    <button class="btn btn-sm btn-danger" onclick="rejectBooking({{ b.id }}, '{{ b.full_name|replace("'", "\\'") }}')">
+                                        <i class="fa-solid fa-user-xmark"></i> {{ get_text('disqualify_candidate', lang) }}
+                                    </button>
+                                    {% else %}
+                                    <button class="btn btn-sm btn-secondary" onclick="openBookingDetailModal({{ b.id }}, '{{ b.full_name|replace("'", "\\'") }}', '{{ b.phone_number }}', '{{ b.workplace_name|replace("'", "\\'") }}', '{{ b.job_position|replace("'", "\\'") }}', '{{ b.workplace_phone }}', '{{ b.requested_move_in_date.strftime("%d/%m/%Y") if b.requested_move_in_date else "-" }}', '{{ b.status }}', '{{ b.admin_notes or "" }}', '{{ b.assigned_room.room_number if b.assigned_room else "-" }}')">
+                                        <i class="fa-solid fa-eye"></i> {{ get_text('details', lang) }}
+                                    </button>
+                                    {% endif %}
+                                    <button class="btn btn-sm btn-danger" style="background: transparent; color: #ef4444; border: 1px solid #fecaca; padding: 4px 8px;" title="ลบรายการ" onclick="deleteBooking({{ b.id }}, '{{ b.full_name|replace("'", "\\'") }}')">
+                                        <i class="fa-solid fa-trash-can"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
         </div>
 
         <!-- Pending Registrations -->
@@ -1949,6 +2074,80 @@
                         </tbody>
                     </table>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Booking Qualify Modal -->
+    <div id="bookingQualifyModal" class="modal">
+        <div class="modal-content" style="max-width: 540px; border-radius: 16px; overflow: hidden;">
+            <div class="modal-header" style="background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); color: white;">
+                <h3 style="margin: 0; color: white;"><i class="fa-solid fa-user-check"></i> คัดเลือกผู้สมัครเข้าพัก</h3>
+                <button type="button" style="background: transparent; border: none; color: white; font-size: 1.2rem; cursor: pointer;" onclick="document.getElementById('bookingQualifyModal').style.display='none'">&times;</button>
+            </div>
+            <form id="qualifyBookingForm" onsubmit="submitQualifyBooking(event)">
+                <div class="modal-body" style="padding: 24px;">
+                    <input type="hidden" id="qualify_booking_id">
+
+                    <!-- Candidate Summary Card -->
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+                        <h4 id="qualify_applicant_name" style="font-size: 1.1rem; color: #0f172a; margin-bottom: 6px;">-</h4>
+                        <div style="font-size: 0.88rem; color: #475569; display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+                            <div><i class="fa-solid fa-phone"></i> <span id="qualify_applicant_phone">-</span></div>
+                            <div><i class="fa-solid fa-calendar"></i> วันเข้าพัก: <span id="qualify_applicant_date">-</span></div>
+                            <div style="grid-column: 1 / -1;"><i class="fa-solid fa-briefcase"></i> <span id="qualify_applicant_work">-</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Room Assignment -->
+                    <div class="form-group" style="margin-bottom: 16px;">
+                        <label style="font-weight: 600; margin-bottom: 6px; display: block;">🏢 เลือกอาคารที่จัดสรร</label>
+                        <select id="qualify_building_select" class="form-control" onchange="filterRoomsForQualify(this.value)">
+                            <option value="">-- เลือกอาคาร --</option>
+                            {% for b in all_buildings %}
+                            <option value="{{ b.id }}">{{ b.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 16px;">
+                        <label style="font-weight: 600; margin-bottom: 6px; display: block;">🚪 เลือกห้องพักที่จัดสรร</label>
+                        <select id="qualify_room_select" class="form-control">
+                            <option value="">-- กรุณาเลือกอาคารก่อน --</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 16px;">
+                        <label style="font-weight: 600; margin-bottom: 6px; display: block;">📝 บันทึกเพิ่มเติมสำหรับ Admin (ถ้ามี)</label>
+                        <textarea id="qualify_admin_notes" class="form-control" placeholder="ระบุหมายเหตุ เช่น นัดดูห้องวันเสาร์..." style="height: 70px;"></textarea>
+                    </div>
+
+                    <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px; font-size: 0.85rem; color: #166534;">
+                        <i class="fa-brands fa-line" style="font-size: 1.1rem; color: #06c755;"></i> เมื่อกดยืนยัน ระบบจะส่งข้อความ Flex Message แจ้งผลการคัดเลือกไปยัง LINE ของผู้สมัครทันที
+                    </div>
+                </div>
+                <div class="modal-footer" style="padding: 16px 24px; background: #f8fafc; display: flex; justify-content: flex-end; gap: 10px;">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('bookingQualifyModal').style.display='none'">ยกเลิก</button>
+                    <button type="submit" id="btnConfirmQualify" class="btn btn-primary" style="background: #16a34a; border-color: #16a34a;">
+                        <i class="fa-solid fa-paper-plane"></i> ยืนยันการคัดเลือกและส่ง LINE
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Booking Details Modal -->
+    <div id="bookingDetailModal" class="modal">
+        <div class="modal-content" style="max-width: 500px; border-radius: 16px; overflow: hidden;">
+            <div class="modal-header">
+                <h3 id="bookingDetailTitle"><i class="fa-solid fa-circle-info"></i> รายละเอียดการจองห้องพัก</h3>
+                <button type="button" style="background: transparent; border: none; font-size: 1.2rem; cursor: pointer;" onclick="document.getElementById('bookingDetailModal').style.display='none'">&times;</button>
+            </div>
+            <div class="modal-body" id="bookingDetailBody" style="padding: 24px;">
+                <!-- Populated by JS -->
+            </div>
+            <div class="modal-footer" style="padding: 12px 24px; background: #f8fafc; text-align: right;">
+                <button type="button" class="btn btn-primary" onclick="document.getElementById('bookingDetailModal').style.display='none'">ปิด</button>
             </div>
         </div>
     </div>
@@ -4074,6 +4273,189 @@
                     alert("Error communicating with server: " + e);
                 }
             }
+        }
+
+        // ==========================================
+        // Booking Applications & Screening JS
+        // ==========================================
+        function filterBookingsTable(status) {
+            document.querySelectorAll('#filter_booking_all, #filter_booking_pending, #filter_booking_approved, #filter_booking_rejected').forEach(btn => {
+                btn.classList.remove('btn-primary', 'active');
+                btn.classList.add('btn-secondary');
+            });
+            const activeBtn = document.getElementById(`filter_booking_${status.toLowerCase()}`);
+            if (activeBtn) {
+                activeBtn.classList.remove('btn-secondary');
+                activeBtn.classList.add('btn-primary', 'active');
+            }
+
+            const rows = document.querySelectorAll('.booking-row');
+            rows.forEach(row => {
+                const rowStatus = row.getAttribute('data-status');
+                if (status === 'all' || rowStatus === status) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
+        function filterRoomsForQualify(buildingId) {
+            const select = document.getElementById('qualify_room_select');
+            select.innerHTML = '<option value="">-- เลือกห้องพักที่จัดสรร (ถ้ามี) --</option>';
+            let vacantRooms = [];
+            try {
+                vacantRooms = JSON.parse(document.getElementById('vacant_rooms_data').textContent);
+            } catch(e) {}
+
+            const filtered = buildingId ? vacantRooms.filter(r => String(r.building_id) === String(buildingId)) : vacantRooms;
+            if (filtered.length === 0) {
+                select.innerHTML = '<option value="">-- ไม่มีห้องว่างในอาคารนี้ --</option>';
+                return;
+            }
+            filtered.forEach(r => {
+                select.innerHTML += `<option value="${r.id}">ห้อง ${r.room_number} (ชั้น ${r.floor || '-'})</option>`;
+            });
+        }
+
+        function openQualifyBookingModal(bookingId, fullName, phone, workplace, position, workPhone, date, preferredBuildingId) {
+            document.getElementById('qualify_booking_id').value = bookingId;
+            document.getElementById('qualify_applicant_name').innerText = fullName;
+            document.getElementById('qualify_applicant_phone').innerText = phone;
+            document.getElementById('qualify_applicant_work').innerText = `${workplace} (${position}) • โทร ${workPhone}`;
+            document.getElementById('qualify_applicant_date').innerText = date;
+            document.getElementById('qualify_admin_notes').value = '';
+
+            const bSelect = document.getElementById('qualify_building_select');
+            if (preferredBuildingId && preferredBuildingId !== 'None' && preferredBuildingId !== '') {
+                bSelect.value = preferredBuildingId;
+            } else if (bSelect.options.length > 1) {
+                bSelect.selectedIndex = 1;
+            }
+            filterRoomsForQualify(bSelect.value);
+
+            document.getElementById('bookingQualifyModal').style.display = 'block';
+        }
+
+        async function submitQualifyBooking(e) {
+            e.preventDefault();
+            const bookingId = document.getElementById('qualify_booking_id').value;
+            const roomId = document.getElementById('qualify_room_select').value;
+            const notes = document.getElementById('qualify_admin_notes').value.trim();
+            const btn = document.getElementById('btnConfirmQualify');
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังส่งผลทาง LINE...';
+
+            try {
+                const res = await fetch(`/admin/booking/${bookingId}/approve`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        assigned_room_id: roomId || null,
+                        admin_notes: notes
+                    })
+                });
+
+                if (res.ok) {
+                    alert('คัดเลือกผู้สมัครเรียบร้อย และระบบได้ส่งข้อความแจ้งผลผ่าน LINE แล้ว');
+                    location.reload();
+                } else {
+                    const err = await res.json();
+                    alert(err.detail || 'เกิดข้อผิดพลาดในการดำเนินการ');
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> ยืนยันการคัดเลือกและส่ง LINE';
+                }
+            } catch (err) {
+                alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> ยืนยันการคัดเลือกและส่ง LINE';
+            }
+        }
+
+        async function rejectBooking(bookingId, name) {
+            const reason = prompt(`กรุณาระบุเหตุผลในการปฏิเสธการจองของคุณ ${name} (ถ้ามี):\nระบบจะส่งข้อความแจ้งผลอย่างสุภาพไปยัง LINE ของผู้สมัคร`, '');
+            if (reason === null) return;
+
+            try {
+                const res = await fetch(`/admin/booking/${bookingId}/reject`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reason: reason.trim() })
+                });
+
+                if (res.ok) {
+                    alert('บันทึกการปฏิเสธและส่งข้อความแจ้งผลทาง LINE เรียบร้อยแล้ว');
+                    location.reload();
+                } else {
+                    const err = await res.json();
+                    alert(err.detail || 'เกิดข้อผิดพลาดในการดำเนินการ');
+                }
+            } catch (err) {
+                alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+            }
+        }
+
+        async function deleteBooking(bookingId, name) {
+            if (!confirm(`คุณต้องการลบรายการจองของ ${name} ใช่หรือไม่?`)) return;
+
+            try {
+                const res = await fetch(`/admin/booking/${bookingId}/delete`, {
+                    method: 'POST'
+                });
+
+                if (res.ok) {
+                    location.reload();
+                } else {
+                    const err = await res.json();
+                    alert(err.detail || 'เกิดข้อผิดพลาดในการลบ');
+                }
+            } catch (err) {
+                alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+            }
+        }
+
+        function openBookingDetailModal(bookingId, fullName, phone, workplace, position, workPhone, date, status, notes, roomNumber) {
+            const body = document.getElementById('bookingDetailBody');
+            body.innerHTML = `
+                <div style="display: flex; flex-direction: column; gap: 12px; font-size: 0.95rem;">
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px;">
+                        <span style="color: #64748b;">ชื่อ-นามสกุล:</span>
+                        <span style="font-weight: 700; color: #0f172a;">${fullName}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px;">
+                        <span style="color: #64748b;">เบอร์โทรศัพท์:</span>
+                        <span><a href="tel:${phone}" style="color: #0284c7; text-decoration: none;">${phone}</a></span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px;">
+                        <span style="color: #64748b;">สถานที่ทำงาน:</span>
+                        <span style="font-weight: 600;">${workplace} (${position})</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px;">
+                        <span style="color: #64748b;">เบอร์โทรที่ทำงาน:</span>
+                        <span>${workPhone}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px;">
+                        <span style="color: #64748b;">วันที่ต้องการเข้าพัก:</span>
+                        <span style="font-weight: 600;">${date}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px;">
+                        <span style="color: #64748b;">ห้องที่จัดสรร:</span>
+                        <span style="font-weight: 700; color: #0284c7;">${roomNumber || '-'}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px;">
+                        <span style="color: #64748b;">สถานะ:</span>
+                        <span style="font-weight: 700;">${status}</span>
+                    </div>
+                    ${notes ? `
+                    <div style="background: #f8fafc; padding: 10px 14px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                        <span style="color: #64748b; font-size: 0.85rem; display: block; margin-bottom: 4px;">บันทึกจากผู้ดูแล:</span>
+                        <p style="margin: 0; color: #334155;">${notes}</p>
+                    </div>
+                    ` : ''}
+                </div>
+            `;
+            document.getElementById('bookingDetailModal').style.display = 'block';
         }
 
         function switchSettingsTab(tabId) {

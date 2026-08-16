@@ -43,3 +43,4 @@ gha-creds-*.json
 # Large Documents & Uploads
 doc/contract_example.pdf
 src/uploads/
+.env

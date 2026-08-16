@@ -49,7 +49,7 @@ def load_db_configs():
             "LINE_TENANT_CHANNEL_ACCESS_TOKEN": os.getenv("LINE_TENANT_CHANNEL_ACCESS_TOKEN"),
             "LINE_TENANT_CHANNEL_SECRET": os.getenv("LINE_TENANT_CHANNEL_SECRET"),
             "LINE_NOTIFY_TOKEN": os.getenv("LINE_NOTIFY_TOKEN", ""),
-            "BASE_URL": (os.getenv("BASE_URL") or "http://localhost:8000").rstrip("/"),
+            "BASE_URL": (os.getenv("BASE_URL") or "http://localhost:5555").rstrip("/"),
             "ADMIN_PASSWORD": os.getenv("ADMIN_PASSWORD", "roomy+-*/()[]")
         }
 
@@ -59,14 +59,15 @@ def load_db_configs():
     db = SessionLocal()
     try:
         # These will try DB first, then .env via security.get_system_config
+        base_url = (get_system_config(db, "BASE_URL") or os.getenv("BASE_URL") or "http://localhost:5555").rstrip("/")
         return {
             "LINE_ADMIN_CHANNEL_ACCESS_TOKEN": get_system_config(db, "LINE_ADMIN_CHANNEL_ACCESS_TOKEN"),
             "LINE_ADMIN_CHANNEL_SECRET": get_system_config(db, "LINE_ADMIN_CHANNEL_SECRET"),
             "LINE_TENANT_CHANNEL_ACCESS_TOKEN": get_system_config(db, "LINE_TENANT_CHANNEL_ACCESS_TOKEN"),
             "LINE_TENANT_CHANNEL_SECRET": get_system_config(db, "LINE_TENANT_CHANNEL_SECRET"),
             "LINE_NOTIFY_TOKEN": get_system_config(db, "LINE_NOTIFY_TOKEN", ""),
-            "BASE_URL": get_system_config(db, "BASE_URL", "http://localhost:8000").rstrip("/"),
-            "ADMIN_PASSWORD": get_system_config(db, "ADMIN_PASSWORD", "roomy+-*/()[]")
+            "BASE_URL": base_url,
+            "ADMIN_PASSWORD": get_system_config(db, "ADMIN_PASSWORD") or os.getenv("ADMIN_PASSWORD", "roomy+-*/()[]")
         }
     except Exception as e:
         # Fallback to env if DB is not ready or table missing
@@ -76,7 +77,7 @@ def load_db_configs():
             "LINE_TENANT_CHANNEL_ACCESS_TOKEN": os.getenv("LINE_TENANT_CHANNEL_ACCESS_TOKEN"),
             "LINE_TENANT_CHANNEL_SECRET": os.getenv("LINE_TENANT_CHANNEL_SECRET"),
             "LINE_NOTIFY_TOKEN": os.getenv("LINE_NOTIFY_TOKEN", ""),
-            "BASE_URL": (os.getenv("BASE_URL") or "http://localhost:8000").rstrip("/"),
+            "BASE_URL": (os.getenv("BASE_URL") or "http://localhost:5555").rstrip("/"),
             "ADMIN_PASSWORD": os.getenv("ADMIN_PASSWORD", "roomy+-*/()[]")
         }
     finally:

@@ -82,23 +82,20 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 def get_system_config(db: Session, key: str, default=None) -> str:
     """
     Retrieves a system configuration setting from the database and decrypts it.
-    If not found in the database, falls back to retrieving from environment variables.
-    
-    Args:
-        db (Session): The active SQLAlchemy database session.
-        key (str): The configuration key name (e.g., 'LINE_NOTIFY_TOKEN').
-        default (any, optional): The default value to return if the key is not found anywhere.
-        
-    Returns:
-        str: The decrypted configuration value, or the default/env value.
+    If not found in the database or decryption fails/is empty, falls back to retrieving from environment variables or default.
     """
     import models
     config = db.query(models.SystemConfig).filter(models.SystemConfig.key == key).first()
-    if config:
-        return decrypt_value(config.value)
+    if config and config.value:
+        dec = decrypt_value(config.value)
+        if dec:
+            return dec
     
-    # Optional: Fallback to environment variable during transition
-    return os.getenv(key, default)
+    # Fallback to environment variable or default
+    val = os.getenv(key)
+    if val:
+        return val
+    return default
 
 def set_system_config(db: Session, key: str, value: str, description: str = None):
     """

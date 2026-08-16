@@ -8,7 +8,6 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_SYSTEM_CONFIGS = {
     "LOG_RETENTION_POLICY": "forever",
-    "LOG_RETENTION_POLICY": "forever",
     "LINE_ADMIN_CHANNEL_ACCESS_TOKEN": "Am0h1++54LfstMVl1EXbHMYfaaBj+Hk9OKcgIcW0cfOx3H/MNO8Ijd0w9jIGd0Ym0PJ7ByHrOr+5quQNyIp4DPORBZN/BwgMX/SWaNxt61nW19Z5bwDlEpI4il9vlkWYuP5BC7cpiqTXbUn45Ty/XgdB04t89/1O/w1cDnyilFU=",
     "LINE_ADMIN_CHANNEL_SECRET": "c365858c050cb6b0a2253ce0e2a49585",
     "LINE_TENANT_CHANNEL_ACCESS_TOKEN": "hoMaEApJucC37dk8UTqI5qWDTEAZMBUrIxenPVdCUdaz0rXi6piHXQ6Vcp8MyBQPuJx4LUf2GaiSR4wcjT5mLgBA1HgRF8BdN9pGjIMGdLiQscOLR2GMfZglS0Rf9iRPdwtvIT9XqeS7dnDroxOJVwdB04t89/1O/w1cDnyilFU=",
@@ -73,22 +72,23 @@ def migrate():
     # SQLite Migration Flow (Backward Compatible)
     if "sqlite:///" in SQLALCHEMY_DATABASE_URL:
         db_path = SQLALCHEMY_DATABASE_URL.replace("sqlite:///", "")
-        # Resolve path relative to current file if it's relative
-        if not os.path.isabs(db_path) and not db_path.startswith("./") and not db_path.startswith(".\\"):
-            db_path_resolved = os.path.abspath(db_path)
-            if not os.path.exists(db_path_resolved):
-                db_path_resolved = os.path.join(os.path.dirname(__file__), os.path.basename(db_path))
+        db_path_resolved = os.path.abspath(db_path)
+        if not os.path.exists(db_path_resolved):
+            db_path_src = os.path.join(os.path.dirname(__file__), os.path.basename(db_path))
+            if os.path.exists(db_path_src):
+                db_path = db_path_src
+            else:
+                db_path = db_path_resolved
+        else:
             db_path = db_path_resolved
     else:
         db_path = os.path.join(os.path.dirname(__file__), 'roomy.db')
 
     logger.info(f"Using SQLite database path: {db_path}")
-    if not os.path.exists(db_path):
-        logger.info(f"Database not found at {db_path}. Initializing new SQLite database...")
-        from sqlalchemy import create_engine
-        engine_sqlite = create_engine(f"sqlite:///{db_path}", connect_args={"check_same_thread": False})
-        Base.metadata.create_all(bind=engine_sqlite)
-        logger.info("New SQLite database schema created successfully.")
+    from sqlalchemy import create_engine
+    engine_sqlite = create_engine(f"sqlite:///{db_path}", connect_args={"check_same_thread": False})
+    Base.metadata.create_all(bind=engine_sqlite)
+    logger.info("SQLite database schema initialized/verified.")
 
     conn = sqlite3.connect(db_path)
     curr = conn.cursor()
@@ -183,7 +183,15 @@ def migrate():
         # New: users table for Google OAuth & Multi-role Staff
         "CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE NOT NULL, full_name TEXT, role TEXT NOT NULL DEFAULT 'Admin', status TEXT DEFAULT 'Active', session_token TEXT UNIQUE, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
         "CREATE INDEX IF NOT EXISTS ix_users_email ON users (email)",
-        "CREATE INDEX IF NOT EXISTS ix_users_session_token ON users (session_token)"
+        "CREATE INDEX IF NOT EXISTS ix_users_session_token ON users (session_token)",
+
+        # New: booking_requests table for Room Booking & Candidate Screening
+        "CREATE TABLE IF NOT EXISTS booking_requests (id INTEGER PRIMARY KEY AUTOINCREMENT, uuid TEXT UNIQUE NOT NULL, line_user_id TEXT NOT NULL, full_name TEXT NOT NULL, phone_number TEXT NOT NULL, workplace_name TEXT NOT NULL, job_position TEXT NOT NULL, workplace_phone TEXT NOT NULL, requested_move_in_date DATETIME NOT NULL, preferred_building_id INTEGER REFERENCES buildings(id), preferred_room_id INTEGER REFERENCES rooms(id), assigned_room_id INTEGER REFERENCES rooms(id), agreement_accepted INTEGER DEFAULT 1, agreement_accepted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, status TEXT DEFAULT 'Pending', admin_notes TEXT, language TEXT DEFAULT 'th', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+        "CREATE INDEX IF NOT EXISTS ix_booking_requests_uuid ON booking_requests (uuid)",
+        "CREATE INDEX IF NOT EXISTS ix_booking_requests_line_user_id ON booking_requests (line_user_id)",
+        "CREATE INDEX IF NOT EXISTS ix_booking_requests_status ON booking_requests (status)",
+        "CREATE INDEX IF NOT EXISTS ix_booking_requests_preferred_building_id ON booking_requests (preferred_building_id)",
+        "CREATE INDEX IF NOT EXISTS ix_booking_requests_assigned_room_id ON booking_requests (assigned_room_id)"
     ]
     
     for cmd in commands:

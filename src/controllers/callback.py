@@ -1,11 +1,20 @@
 import logging
 import traceback
+import re
 from fastapi import APIRouter, Request, HTTPException, Depends
 from sqlalchemy.orm import Session
 from models.database import get_db, SessionLocal
 import models
 import config
 from config import get_text, get_magic_url
+
+def clean_html_to_text(raw_html: str) -> str:
+    if not raw_html:
+        return ""
+    text = re.sub(r'<(br|/p|/li|/div|tr|/h[1-6])>', '\n', raw_html, flags=re.IGNORECASE)
+    text = re.sub(r'<[^>]+>', '', text)
+    lines = [line.strip() for line in text.split('\n') if line.strip()]
+    return '\n'.join(lines)
 
 class HandlerProxy:
     def __init__(self, name):
@@ -24,18 +33,26 @@ admin_bot_api = HandlerProxy("admin_bot_api")
 tenant_bot_api = HandlerProxy("tenant_bot_api")
 
 class BaseUrlProxy:
+    def _get_val(self):
+        val = getattr(config, 'BASE_URL', None) or os.getenv('BASE_URL', '')
+        val = str(val).rstrip("/")
+        if not val or not val.startswith("http"):
+            val = "https://sukanan.kookai.cloud"
+        return val
     def __str__(self):
-        return str(config.BASE_URL)
+        return self._get_val()
     def __repr__(self):
-        return repr(config.BASE_URL)
+        return repr(self._get_val())
+    def __format__(self, format_spec):
+        return self._get_val().__format__(format_spec)
     def __getattr__(self, item):
-        return getattr(config.BASE_URL, item)
+        return getattr(self._get_val(), item)
     def rstrip(self, chars=None):
-        return config.BASE_URL.rstrip(chars)
+        return self._get_val().rstrip(chars)
     def __add__(self, other):
-        return config.BASE_URL + other
+        return self._get_val() + str(other)
     def __radd__(self, other):
-        return other + config.BASE_URL
+        return str(other) + self._get_val()
 
 BASE_URL = BaseUrlProxy()
 from services.billing import create_initial_invoice
@@ -56,8 +73,27 @@ from linebot.v3.webhooks import (
 
 logger = logging.getLogger(__name__)
 
+def safe_reply_or_push(bot_api, reply_token: str, user_id: str, messages: list):
+    """
+    Safely attempts to reply to a LINE event using reply_token.
+    If reply_message fails (e.g. invalid/expired reply_token due to LINE auto-response),
+    it automatically falls back to pushing the messages directly to the user_id.
+    """
+    if not bot_api or not messages:
+        return
+    try:
+        bot_api.reply_message(ReplyMessageRequest(reply_token=reply_token, messages=messages))
+    except Exception as e:
+        logger.warning(f"reply_message failed ({e}), falling back to push_message for {user_id}")
+        if user_id:
+            try:
+                bot_api.push_message(PushMessageRequest(to=user_id, messages=messages))
+            except Exception as push_err:
+                logger.error(f"push_message fallback also failed: {push_err}")
+
 router = APIRouter()
 
+@router.post("/callback")
 @router.post("/callback/admin")
 async def callback_admin(request: Request):
     signature = request.headers.get("X-Line-Signature")
@@ -251,11 +287,11 @@ if admin_handler:
                         }
                     }
                     if admin_bot_api:
-                        admin_bot_api.reply_message(
-                            ReplyMessageRequest(
-                                reply_token=event.reply_token,
-                                messages=[FlexMessage(alt_text=get_text('meter_reading', lang), contents=FlexContainer.from_dict(flex_contents))]
-                            )
+                        safe_reply_or_push(
+                            admin_bot_api,
+                            event.reply_token,
+                            user_id,
+                            [FlexMessage(alt_text=get_text('meter_reading', lang), contents=FlexContainer.from_dict(flex_contents))]
                         )
                     return
                 elif text == "สรุปรายรับ" or text == get_text('analytics', lang):
@@ -264,24 +300,99 @@ if admin_handler:
                 elif text == "จัดการสัญญา" or text == get_text('manage_leases', lang):
                     url = get_magic_url(owner, db)
                     reply_text = f"📜 {get_text('manage_leases', lang)}:\n{url}#leaseSection"
-                elif text == "ตั้งค่า" or text == get_text('settings', lang):
-                    url = get_magic_url(owner, db)
-                    reply_text = f"⚙️ {get_text('settings', lang)}:\n{url}#settingsSection"
-                elif text == "รายการแจ้งซ่อม" or text == get_text('repairs', lang):
-                    url = get_magic_url(owner, db)
-                    reply_text = f"🛠️ {get_text('repair_requests', lang)}:\n{url}#repairSection"
+                elif text in ["สรุป", "ภาพรวม", "แดชบอร์ด"]:
+                    total_rooms = db.query(models.Room).count()
+                    occupied_rooms = db.query(models.Room).filter(models.Room.status == "Occupied").count()
+                    vacant_rooms = db.query(models.Room).filter(models.Room.status == "Vacant").count()
+                    
+                    unpaid_invs = db.query(models.Invoice).filter(models.Invoice.status.in_(["Unpaid", "Pending Verification"])).all()
+                    unpaid_count = len(unpaid_invs)
+                    unpaid_total = sum([inv.total_amount for inv in unpaid_invs])
+                    
+                    pending_repairs = db.query(models.MaintenanceRequest).filter(models.MaintenanceRequest.status == "Pending").count()
+                    pending_regs = db.query(models.Tenant).filter(models.Tenant.status == "Pending").count()
+                    pending_bookings = db.query(models.BookingRequest).filter(models.BookingRequest.status == "Pending").count()
+                    
+                    flex_contents = {
+                        "type": "bubble",
+                        "header": {
+                            "type": "box",
+                            "layout": "vertical",
+                            "contents": [
+                                {"type": "text", "text": "📊 สรุปภาพรวมหอพัก", "weight": "bold", "size": "lg", "color": "#FFFFFF"}
+                            ],
+                            "backgroundColor": "#1E3A8A",
+                            "paddingAll": "15px"
+                        },
+                        "body": {
+                            "type": "box",
+                            "layout": "vertical",
+                            "contents": [
+                                {
+                                    "type": "box",
+                                    "layout": "horizontal",
+                                    "contents": [
+                                        {"type": "text", "text": "ห้องพักทั้งหมด", "size": "sm", "color": "#555555"},
+                                        {"type": "text", "text": f"{total_rooms} ห้อง", "size": "sm", "color": "#111111", "align": "end", "weight": "bold"}
+                                    ]
+                                },
+                                {
+                                    "type": "box",
+                                    "layout": "horizontal",
+                                    "margin": "md",
+                                    "contents": [
+                                        {"type": "text", "text": "มีผู้เช่า / ว่าง", "size": "sm", "color": "#555555"},
+                                        {"type": "text", "text": f"{occupied_rooms} / {vacant_rooms} ห้อง", "size": "sm", "color": "#111111", "align": "end"}
+                                    ]
+                                },
+                                {"type": "separator", "margin": "lg"},
+                                {
+                                    "type": "box",
+                                    "layout": "horizontal",
+                                    "margin": "lg",
+                                    "contents": [
+                                        {"type": "text", "text": "บิลรอชำระ/ตรวจสอบ", "size": "sm", "color": "#E11D48"},
+                                        {"type": "text", "text": f"{unpaid_count} บิล (฿{unpaid_total:,.2f})", "size": "sm", "color": "#E11D48", "align": "end", "weight": "bold"}
+                                    ]
+                                },
+                                {
+                                    "type": "box",
+                                    "layout": "horizontal",
+                                    "margin": "md",
+                                    "contents": [
+                                        {"type": "text", "text": "แจ้งซ่อมรอดำเนินการ", "size": "sm", "color": "#D97706"},
+                                        {"type": "text", "text": f"{pending_repairs} รายการ", "size": "sm", "color": "#D97706", "align": "end", "weight": "bold"}
+                                    ]
+                                },
+                                {
+                                    "type": "box",
+                                    "layout": "horizontal",
+                                    "margin": "md",
+                                    "contents": [
+                                        {"type": "text", "text": "รอคัดเลือกจองห้อง", "size": "sm", "color": "#0284C7"},
+                                        {"type": "text", "text": f"{pending_bookings} คน", "size": "sm", "color": "#0284C7", "align": "end", "weight": "bold"}
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                    if admin_bot_api:
+                        safe_reply_or_push(
+                            admin_bot_api,
+                            event.reply_token,
+                            user_id,
+                            [FlexMessage(alt_text="📊 สรุปภาพรวมหอพัก", contents=FlexContainer.from_dict(flex_contents))]
+                        )
+                        return
+                    reply_text = f"📊 สรุปภาพรวม:\n- ห้องพัก: {occupied_rooms}/{total_rooms} (ว่าง {vacant_rooms})\n- บิลรอชำระ: {unpaid_count} รายการ (฿{unpaid_total:,.2f})\n- แจ้งซ่อมค้าง: {pending_repairs} รายการ"
                 else:
-                    reply_text = get_text('admin_menu_greeting', lang)
-            
-            if admin_bot_api and reply_text:
-                admin_bot_api.reply_message(ReplyMessageRequest(reply_token=event.reply_token, messages=[TextMessage(text=reply_text)]))
+                    reply_text = f"สวัสดีครับผู้ดูแลระบบ\nคุณสามารถพิมพ์:\n- 'สรุป' เพื่อดูภาพรวมหอพัก\n- 'ห้อง [เลขห้อง]' เช่น 'ห้อง 101' เพื่อดูสถานะห้อง\n- หรือจัดการผ่านเว็บแอดมิน: {BASE_URL}/admin"
+                
+                if admin_bot_api:
+                    safe_reply_or_push(admin_bot_api, event.reply_token, user_id, [TextMessage(text=reply_text)])
         finally:
             if close_db:
                 db.close()
-
-    @admin_handler.add(PostbackEvent)
-    def handle_admin_postback(event, *args, **kwargs):
-        pass
 
 if tenant_handler:
     @tenant_handler.add(MessageEvent, message=TextMessageContent)
@@ -301,14 +412,16 @@ if tenant_handler:
             db = SessionLocal()
             close_db = True
             
-        reply_text = ""
         try:
             tenants = db.query(models.Tenant).filter(models.Tenant.line_user_id == user_id).all()
             active_tenants = [t for t in tenants if t.status == "Active"]
             lang = active_tenants[0].language if active_tenants else (tenants[0].language if tenants else "th")
 
+            # 1. Language Switching
             if text.lower() in ["language", "lang", "ภาษา", "เปลี่ยนภาษา"]:
-                reply_text = get_text('tenant_language_choose', lang)
+                safe_reply_or_push(tenant_bot_api, event.reply_token, user_id, [TextMessage(text=get_text('tenant_language_choose', lang))])
+                return
+
             elif text.upper() in ["TH", "EN", "JP"]:
                 new_lang = text.lower()
                 for t in tenants:
@@ -319,48 +432,133 @@ if tenant_handler:
                 if active_tenants:
                     setup_personal_rich_menu(active_tenants[0], db, force=True)
                 
-                reply_text = get_text('language_changed', lang)
+                safe_reply_or_push(tenant_bot_api, event.reply_token, user_id, [TextMessage(text=get_text('language_changed', lang))])
+                return
 
-            elif text == "ย้ายเข้า" or text == get_text('move_in', lang) or not active_tenants:
-                tenant = next((t for t in tenants if t.status != "Active"), None)
-                
-                if not tenant:
-                    tenant = models.Tenant(line_user_id=user_id, status="AwaitingRegistration", language=lang)
-                    db.add(tenant)
-                    db.commit()
-                    db.refresh(tenant)
-                
-                reg_url = f"{BASE_URL}/register/{tenant.uuid}?lang={lang}"
-                
-                if tenant_bot_api:
-                    from linebot.v3.messaging import (
-                        TemplateMessage,
-                        ButtonsTemplate,
-                        URIAction
-                    )
-                    buttons_template = ButtonsTemplate(
-                        title=get_text('register_title', lang),
-                        text=get_text('register_welcome_msg', lang),
-                        actions=[
-                            URIAction(label=get_text('register_btn_label', lang), uri=reg_url)
+            # 2. Room Booking keywords (Available to everyone)
+            elif text in ["จองห้องพัก", "จองห้อง", "จอง", "booking", "book"] or text == get_text('book_room', lang):
+                booking_url = f"{BASE_URL}/booking?uid={user_id}&lang={lang}"
+                flex_contents = {
+                    "type": "bubble",
+                    "header": {
+                        "type": "box",
+                        "layout": "vertical",
+                        "contents": [
+                            {"type": "text", "text": "🏠 SukAnan Apartment", "weight": "bold", "size": "sm", "color": "#0284c7"}
                         ]
-                    )
-                    try:
-                        tenant_bot_api.reply_message(
-                            ReplyMessageRequest(
-                                reply_token=event.reply_token,
-                                messages=[TemplateMessage(alt_text=get_text('register_alt_text', lang), template=buttons_template)]
-                            )
-                        )
-                        return
-                    except Exception: pass
-                
-                reply_text = f"{get_text('hello', lang)}! {get_text('register_welcome_msg', lang)}:\n{reg_url}"
+                    },
+                    "body": {
+                        "type": "box",
+                        "layout": "vertical",
+                        "contents": [
+                            {"type": "text", "text": get_text('book_room', lang), "weight": "bold", "size": "lg", "color": "#0f172a"},
+                            {"type": "text", "text": get_text('book_room_subtitle', lang), "size": "sm", "color": "#64748b", "wrap": True, "margin": "md"}
+                        ]
+                    },
+                    "footer": {
+                        "type": "box",
+                        "layout": "vertical",
+                        "contents": [
+                            {
+                                "type": "button",
+                                "style": "primary",
+                                "height": "sm",
+                                "color": "#0284c7",
+                                "action": {
+                                    "type": "uri",
+                                    "label": f"📝 {get_text('book_room', lang)}",
+                                    "uri": booking_url
+                                }
+                            }
+                        ]
+                    }
+                }
+                safe_reply_or_push(
+                    tenant_bot_api,
+                    event.reply_token,
+                    user_id,
+                    [FlexMessage(alt_text=get_text('book_room', lang), contents=FlexContainer.from_dict(flex_contents))]
+                )
+                return
 
-            elif active_tenants:
+            # 3. Dorm Rules / Policy keywords (Available to everyone)
+            elif text in ["กฎระเบียบ", "ระเบียบ", "กฎหอพัก", "ข้อปฏิบัติ", "สัญญา", "rules", "rule", "policy"] or text == get_text('dorm_rules', lang):
+                owner = db.query(models.Owner).first()
+                raw_rules = (owner.lease_template if owner and owner.lease_template else "").strip()
+                rules_text = clean_html_to_text(raw_rules) if raw_rules else get_text('default_lease_agreement_text', lang)
+                
+                rule_lines = [l.strip() for l in rules_text.split('\n') if l.strip()][:12]
+                rule_contents = []
+                for line in rule_lines:
+                    rule_contents.append({
+                        "type": "text",
+                        "text": line,
+                        "size": "sm",
+                        "color": "#334155",
+                        "wrap": True
+                    })
+
+                owner_name = owner.display_name if owner and owner.display_name else "สุขอนันต์ อพาร์ทเม้นท์"
+                booking_url = f"{BASE_URL}/booking?uid={user_id}&lang={lang}"
+
+                flex_contents = {
+                    "type": "bubble",
+                    "header": {
+                        "type": "box",
+                        "layout": "vertical",
+                        "contents": [
+                            {"type": "text", "text": "📜 สัญญาและกฎระเบียบหอพัก", "weight": "bold", "size": "lg", "color": "#FFFFFF"}
+                        ],
+                        "backgroundColor": "#0284C7",
+                        "paddingAll": "18px"
+                    },
+                    "body": {
+                        "type": "box",
+                        "layout": "vertical",
+                        "contents": [
+                            {"type": "text", "text": owner_name, "weight": "bold", "size": "md", "color": "#0f172a"},
+                            {"type": "separator", "margin": "md"},
+                            {
+                                "type": "box",
+                                "layout": "vertical",
+                                "margin": "md",
+                                "spacing": "sm",
+                                "contents": rule_contents
+                            }
+                        ]
+                    },
+                    "footer": {
+                        "type": "box",
+                        "layout": "vertical",
+                        "spacing": "sm",
+                        "contents": [
+                            {
+                                "type": "button",
+                                "style": "primary",
+                                "height": "sm",
+                                "color": "#0284C7",
+                                "action": {
+                                    "type": "uri",
+                                    "label": "📝 จองห้องพักออนไลน์",
+                                    "uri": booking_url
+                                }
+                            }
+                        ]
+                    }
+                }
+                safe_reply_or_push(
+                    tenant_bot_api,
+                    event.reply_token,
+                    user_id,
+                    [FlexMessage(alt_text="📜 สัญญาและกฎระเบียบหอพัก", contents=FlexContainer.from_dict(flex_contents))]
+                )
+                return
+
+            # 4. Active Tenant Actions
+            if active_tenants:
                 setup_personal_rich_menu(active_tenants[0], db)
                 
-                if text == "ดูค่าเช่า" or text == get_text('view_bill', lang):
+                if text == "ดูค่าเช่า" or text == get_text('view_bill', lang) or text in ["บิล", "ใบแจ้งหนี้", "ค่าเช่า"]:
                     messages = []
                     owner = db.query(models.Owner).first()
                     
@@ -372,20 +570,11 @@ if tenant_handler:
                         
                         room_no = tenant.room.room_number if tenant.room else "N/A"
                         if invoice:
-                            status_map = {
-                                "Unpaid": (get_text('status_unpaid', lang), "#e74c3c"),
-                                "Pending Verification": (get_text('status_pending', lang), "#f39c12"),
-                                "Draft": (get_text('status_draft', lang), "#95a5a6"),
-                                "Paid": (get_text('status_paid', lang), "#3498db")
-                            }
-                            status_text, status_color = status_map.get(invoice.status, (invoice.status, "#3498db"))
-                            
                             if not invoice.uuid:
                                 invoice.uuid = str(uuid.uuid4())
                                 db.commit()
                                 
                             bill_url = f"{BASE_URL}/bill/{invoice.uuid}?lang={lang}"
-                            total_fmt = "{:,.2f}".format(invoice.total_amount)
                             
                             flex_contents = {
                                 "type": "bubble",
@@ -425,22 +614,6 @@ if tenant_handler:
                                                         {"type": "text", "text": get_text('bill_cycle', lang), "size": "sm", "color": "#555555", "flex": 0},
                                                         {"type": "text", "text": f"{invoice.billing_month}/{invoice.billing_year}", "size": "sm", "color": "#111111", "align": "end"}
                                                     ]
-                                                },
-                                                {
-                                                    "type": "box",
-                                                    "layout": "horizontal",
-                                                    "contents": [
-                                                        {"type": "text", "text": get_text('rent_amount', lang), "size": "sm", "color": "#555555", "flex": 0},
-                                                        {"type": "text", "text": f"฿{invoice.rent_amount:,.2f}", "size": "sm", "color": "#111111", "align": "end"}
-                                                    ]
-                                                },
-                                                {
-                                                    "type": "box",
-                                                    "layout": "horizontal",
-                                                    "contents": [
-                                                        {"type": "text", "text": get_text('status', lang), "size": "sm", "color": "#555555", "flex": 0},
-                                                        {"type": "text", "text": status_text, "size": "sm", "color": status_color, "align": "end", "weight": "bold"}
-                                                    ]
                                                 }
                                             ]
                                         },
@@ -450,23 +623,23 @@ if tenant_handler:
                                             "layout": "horizontal",
                                             "margin": "lg",
                                             "contents": [
-                                                {"type": "text", "text": get_text('total_sum_label', lang), "size": "md", "color": "#555555", "flex": 0, "weight": "bold"},
-                                                {"type": "text", "text": f"฿{total_fmt}", "size": "xl", "color": "#111111", "align": "end", "weight": "bold"}
+                                                {"type": "text", "text": get_text('total_payment', lang), "size": "md", "weight": "bold", "color": "#111111"},
+                                                {"type": "text", "text": f"฿{invoice.total_amount:,.2f}", "size": "lg", "weight": "bold", "color": "#1DB446", "align": "end"}
                                             ]
                                         }
-                                    ],
-                                    "paddingAll": "20px"
+                                    ]
                                 },
                                 "footer": {
                                     "type": "box",
                                     "layout": "vertical",
+                                    "spacing": "sm",
                                     "contents": [
                                         {
                                             "type": "button",
                                             "style": "primary",
-                                            "color": "#1DB446",
                                             "height": "sm",
-                                            "action": {"type": "uri", "label": get_text('view_details', lang), "uri": bill_url}
+                                            "action": {"type": "uri", "label": get_text('view_bill_btn', lang), "uri": bill_url},
+                                            "color": "#1DB446"
                                         }
                                     ]
                                 }
@@ -475,9 +648,8 @@ if tenant_handler:
                         else:
                             messages.append(TextMessage(text=get_text('room_label_with_no', lang).format(no=room_no) + ": " + get_text('bill_not_issued', lang)))
 
-                    if tenant_bot_api:
-                        tenant_bot_api.reply_message(ReplyMessageRequest(reply_token=event.reply_token, messages=messages[:5]))
-                        return
+                    safe_reply_or_push(tenant_bot_api, event.reply_token, user_id, messages[:5])
+                    return
                 
                 elif text in ["แจ้งซ่อม", "ประวัติ", "ย้ายออก"] or text in [get_text('repairs', lang), get_text('history', lang), get_text('move_out', lang)]:
                     cmd = text
@@ -494,6 +666,8 @@ if tenant_handler:
                             reply_text = f"{get_text('history', lang)} {get_text('room_label_with_no', lang).format(no=room_no)}:\n{BASE_URL}/history/{t.uuid}?lang={lang}"
                         else:
                             reply_text = f"{get_text('move_out', lang)} {get_text('room_label_with_no', lang).format(no=room_no)}:\n{BASE_URL}/move-out/{t.uuid}?lang={lang}"
+                        safe_reply_or_push(tenant_bot_api, event.reply_token, user_id, [TextMessage(text=reply_text)])
+                        return
                     else:
                         bubble_contents = []
                         for t in active_tenants:
@@ -521,14 +695,13 @@ if tenant_handler:
                                 ]
                             }
                         }
-                        if tenant_bot_api:
-                            tenant_bot_api.reply_message(
-                                ReplyMessageRequest(
-                                    reply_token=event.reply_token,
-                                    messages=[FlexMessage(alt_text=get_text('select_room_action', lang).format(action=text), contents=FlexContainer.from_dict(flex_contents))]
-                                )
-                            )
-                            return
+                        safe_reply_or_push(
+                            tenant_bot_api,
+                            event.reply_token,
+                            user_id,
+                            [FlexMessage(alt_text=get_text('select_room_action', lang).format(action=text), contents=FlexContainer.from_dict(flex_contents))]
+                        )
+                        return
 
                 elif text == "สนทนา" or text == get_text('chat_label', lang):
                     reply_text = get_text('tenant_chat_greeting', lang)
@@ -536,8 +709,72 @@ if tenant_handler:
                     rooms_str = ", ".join([t.room.room_number for t in active_tenants if t.room])
                     reply_text = get_text('tenant_greeting', lang).format(rooms=rooms_str)
                 
-            if tenant_bot_api:
-                tenant_bot_api.reply_message(ReplyMessageRequest(reply_token=event.reply_token, messages=[TextMessage(text=reply_text)]))
+                safe_reply_or_push(tenant_bot_api, event.reply_token, user_id, [TextMessage(text=reply_text)])
+                return
+
+            # 4. User is NOT an active tenant yet (New user / Applicant / Pending tenant)
+            else:
+                tenant = next((t for t in tenants if t.status != "Active"), None)
+                if not tenant:
+                    tenant = models.Tenant(line_user_id=user_id, status="AwaitingRegistration", language=lang)
+                    db.add(tenant)
+                    db.commit()
+                    db.refresh(tenant)
+
+                booking_url = f"{BASE_URL}/booking?uid={user_id}&lang={lang}"
+                
+                if text in ["ประวัติ", "ดูค่าเช่า", "แจ้งซ่อม", "ย้ายออก"] or text in [get_text('history', lang), get_text('view_bill', lang), get_text('repairs', lang), get_text('move_out', lang)]:
+                    title_text = "ยังไม่มีห้องพักในระบบ"
+                    desc_text = "ไม่พบห้องพักที่เปิดใช้งานของคุณในระบบ หากคุณสนใจเข้าพัก สามารถกดจองห้องพักออนไลน์ได้ที่ปุ่มด้านล่างครับ"
+                else:
+                    title_text = "ยินดีต้อนรับสู่ สุขอนันต์ อพาร์ทเม้นท์"
+                    desc_text = "สวัสดีครับ คุณสามารถกดจองห้องพักออนไลน์ หรือแตะเมนูด้านล่างเพื่อดูข้อมูลกฎระเบียบและสอบถามเพิ่มเติมได้เลยครับ"
+
+                flex_contents = {
+                    "type": "bubble",
+                    "header": {
+                        "type": "box",
+                        "layout": "vertical",
+                        "contents": [
+                            {"type": "text", "text": "🏠 SukAnan Apartment", "weight": "bold", "size": "sm", "color": "#0284c7"}
+                        ]
+                    },
+                    "body": {
+                        "type": "box",
+                        "layout": "vertical",
+                        "contents": [
+                            {"type": "text", "text": title_text, "weight": "bold", "size": "lg", "color": "#0f172a"},
+                            {"type": "text", "text": desc_text, "size": "sm", "color": "#64748b", "wrap": True, "margin": "md"}
+                        ]
+                    },
+                    "footer": {
+                        "type": "box",
+                        "layout": "vertical",
+                        "spacing": "sm",
+                        "contents": [
+                            {
+                                "type": "button",
+                                "style": "primary",
+                                "height": "sm",
+                                "color": "#0284c7",
+                                "action": {
+                                    "type": "uri",
+                                    "label": f"📝 {get_text('book_room', lang)}",
+                                    "uri": booking_url
+                                }
+                            }
+                        ]
+                    }
+                }
+                
+                safe_reply_or_push(
+                    tenant_bot_api,
+                    event.reply_token,
+                    user_id,
+                    [FlexMessage(alt_text=title_text, contents=FlexContainer.from_dict(flex_contents))]
+                )
+                return
+
         finally:
             if close_db:
                 db.close()
@@ -545,15 +782,10 @@ if tenant_handler:
     @tenant_handler.add(PostbackEvent)
     def handle_tenant_postback(event, *args, **kwargs):
         data = event.postback.data
+        user_id = event.source.user_id if hasattr(event, 'source') else None
         if data == "action=chat":
             reply_text = "คุณสามารถพิมพ์ข้อความที่ต้องการสอบถามทิ้งไว้ได้เลยครับ เจ้าหน้าที่จะรีบมาตอบกลับโดยเร็วที่สุด"
-            if tenant_bot_api:
-                tenant_bot_api.reply_message(
-                    ReplyMessageRequest(
-                        reply_token=event.reply_token,
-                        messages=[TextMessage(text=reply_text)]
-                    )
-                )
+            safe_reply_or_push(tenant_bot_api, event.reply_token, user_id, [TextMessage(text=reply_text)])
 
 # Fallback stubs for tests or environments where handlers are not initialized
 if not admin_handler:

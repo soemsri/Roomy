@@ -34,23 +34,36 @@ HEADERS = {
 }
 
 def create_tenant_rich_menu():
-    # 1. Define the Rich Menu Structure
+    # 1. Define the Rich Menu Structure (3 Buttons Compact Layout)
     rich_menu_data = {
-        "size": {"width": 2500, "height": 1686},
+        "size": {"width": 2500, "height": 843},
         "selected": True, # Make it default
-        "name": "Tenant Professional Menu",
-        "chatBarText": "เมนูผู้เช่า",
+        "name": "Tenant 3-Button Menu",
+        "chatBarText": "เมนู",
         "areas": [
-            {"bounds": {"x": 0, "y": 0, "width": 833, "height": 843}, "action": {"type": "message", "text": "ดูค่าเช่า"}},
-            {"bounds": {"x": 833, "y": 0, "width": 834, "height": 843}, "action": {"type": "message", "text": "แจ้งซ่อม"}},
-            {"bounds": {"x": 1667, "y": 0, "width": 833, "height": 843}, "action": {"type": "message", "text": "ประวัติ"}},
-            {"bounds": {"x": 0, "y": 843, "width": 833, "height": 843}, "action": {
-                "type": "postback",
-                "data": "action=chat",
-                "inputOption": "openKeyboard"
-            }},
-            {"bounds": {"x": 833, "y": 843, "width": 834, "height": 843}, "action": {"type": "message", "text": "ย้ายเข้า"}},
-            {"bounds": {"x": 1667, "y": 843, "width": 833, "height": 843}, "action": {"type": "message", "text": "ย้ายออก"}}
+            {
+                "bounds": {"x": 0, "y": 0, "width": 833, "height": 843},
+                "action": {
+                    "type": "postback",
+                    "data": "action=chat",
+                    "inputOption": "openKeyboard",
+                    "displayText": "สนทนา"
+                }
+            },
+            {
+                "bounds": {"x": 833, "y": 0, "width": 834, "height": 843},
+                "action": {
+                    "type": "message",
+                    "text": "กฎระเบียบ"
+                }
+            },
+            {
+                "bounds": {"x": 1667, "y": 0, "width": 833, "height": 843},
+                "action": {
+                    "type": "message",
+                    "text": "จองห้องพัก"
+                }
+            }
         ]
     }
 
@@ -64,7 +77,9 @@ def create_tenant_rich_menu():
     logger.info(f"Successfully created Rich Menu ID: {rich_menu_id}")
 
     # 3. Upload Image
-    image_path = "tenant_richmenu.jpg"
+    image_path = os.path.join(os.path.dirname(__file__), "tenant_richmenu.jpg")
+    if not os.path.exists(image_path):
+        image_path = "tenant_richmenu.jpg"
     with open(image_path, "rb") as f:
         img_res = requests.post(
             f"https://api-data.line.me/v2/bot/richmenu/{rich_menu_id}/content",

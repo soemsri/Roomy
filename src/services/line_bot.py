@@ -278,21 +278,34 @@ def setup_personal_rich_menu(tenant, db: Session, force=False):
         menu_name = f"Tenant Menu {lang.upper()} Multi - {tenant.line_user_id[:10]}"
     
     rich_menu_data = {
-        "size": {"width": 2500, "height": 1686},
+        "size": {"width": 2500, "height": 843},
         "selected": False,
         "name": menu_name,
         "chatBarText": chat_bar_text,
         "areas": [
-            {"bounds": {"x": 0, "y": 0, "width": 833, "height": 843}, "action": {"type": "message", "text": bill_label}},
-            {"bounds": {"x": 833, "y": 0, "width": 834, "height": 843}, "action": repair_action},
-            {"bounds": {"x": 1667, "y": 0, "width": 833, "height": 843}, "action": history_action},
-            {"bounds": {"x": 0, "y": 843, "width": 833, "height": 843}, "action": {
-                "type": "postback",
-                "data": "action=chat",
-                "inputOption": "openKeyboard"
-            }},
-            {"bounds": {"x": 833, "y": 843, "width": 834, "height": 843}, "action": {"type": "message", "text": move_in_label}},
-            {"bounds": {"x": 1667, "y": 843, "width": 833, "height": 843}, "action": move_out_action}
+            {
+                "bounds": {"x": 0, "y": 0, "width": 833, "height": 843},
+                "action": {
+                    "type": "postback",
+                    "data": "action=chat",
+                    "inputOption": "openKeyboard",
+                    "displayText": "สนทนา"
+                }
+            },
+            {
+                "bounds": {"x": 833, "y": 0, "width": 834, "height": 843},
+                "action": {
+                    "type": "message",
+                    "text": "กฎระเบียบ"
+                }
+            },
+            {
+                "bounds": {"x": 1667, "y": 0, "width": 833, "height": 843},
+                "action": {
+                    "type": "message",
+                    "text": "จองห้องพัก"
+                }
+            }
         ]
     }
 
@@ -343,3 +356,155 @@ def setup_personal_rich_menu(tenant, db: Session, force=False):
     except Exception as e:
         logger.error(f"setup_personal_rich_menu Error: {e}")
         return None
+
+def send_booking_invitation(user_id: str, lang: str = "th", bot_api = None):
+    """Sends a welcoming Flex Message with a button to open the room booking web form."""
+    if not bot_api:
+        return
+    
+    booking_url = f"{BASE_URL}/booking?uid={user_id}&lang={lang}"
+    
+    flex_contents = {
+        "type": "bubble",
+        "header": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {"type": "text", "text": f"🏢 {get_text('book_room', lang)}", "weight": "bold", "size": "xl", "color": "#FFFFFF", "align": "center"}
+            ],
+            "backgroundColor": "#0078d4",
+            "paddingAll": "20px"
+        },
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {"type": "text", "text": get_text('book_room_subtitle', lang), "size": "sm", "color": "#555555", "wrap": True, "align": "center"},
+                {
+                    "type": "box",
+                    "layout": "vertical",
+                    "margin": "lg",
+                    "contents": [
+                        {
+                            "type": "button",
+                            "style": "primary",
+                            "color": "#0078d4",
+                            "height": "sm",
+                            "action": {
+                                "type": "uri",
+                                "label": f"📝 {get_text('book_room', lang)}",
+                                "uri": booking_url
+                            }
+                        }
+                    ]
+                }
+            ],
+            "paddingAll": "20px"
+        }
+    }
+    
+    try:
+        bot_api.push_message(
+            PushMessageRequest(
+                to=user_id,
+                messages=[FlexMessage(alt_text=get_text('book_room', lang), contents=FlexContainer.from_dict(flex_contents))]
+            )
+        )
+    except Exception as e:
+        logger.error(f"Failed to send booking invitation: {e}")
+
+def send_booking_approved_flex(booking, room_number: str = "N/A", building_name: str = "อาคารหลัก", owner = None, bot_api = None):
+    """Sends a celebratory approval Flex Message to the candidate's LINE."""
+    if not bot_api or not booking or not booking.line_user_id:
+        return
+    
+    lang = booking.language or "th"
+    move_in_date_str = booking.requested_move_in_date.strftime("%d/%m/%Y") if booking.requested_move_in_date else "-"
+    apt_name = "SukAnan Apartment"
+    if owner and owner.display_name:
+        apt_name = owner.display_name
+        
+    flex_contents = {
+        "type": "bubble",
+        "header": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {"type": "text", "text": "🎉 " + ("Approval Confirmed!" if lang == "en" else "合格通知" if lang == "jp" else "ผ่านการคัดเลือกเข้าพัก!"), "weight": "bold", "size": "lg", "color": "#FFFFFF", "align": "center"}
+            ],
+            "backgroundColor": "#22c55e",
+            "paddingAll": "20px"
+        },
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {"type": "text", "text": f"สวัสดีคุณ {booking.full_name}", "weight": "bold", "size": "md", "color": "#1e293b"},
+                {"type": "text", "text": f"ยินดีด้วยครับ! คุณได้รับการคัดเลือกให้เข้าพักที่ {apt_name}", "size": "sm", "color": "#475569", "wrap": True, "margin": "sm"},
+                {"type": "separator", "margin": "lg"},
+                {
+                    "type": "box",
+                    "layout": "vertical",
+                    "margin": "lg",
+                    "spacing": "sm",
+                    "contents": [
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "contents": [
+                                {"type": "text", "text": "🏢 " + get_text('building', lang), "size": "xs", "color": "#888888", "flex": 2},
+                                {"type": "text", "text": building_name, "size": "xs", "color": "#1e293b", "weight": "bold", "flex": 3, "align": "end"}
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "contents": [
+                                {"type": "text", "text": "🚪 " + get_text('room', lang), "size": "xs", "color": "#888888", "flex": 2},
+                                {"type": "text", "text": room_number, "size": "xs", "color": "#0078d4", "weight": "bold", "flex": 3, "align": "end"}
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "contents": [
+                                {"type": "text", "text": "📅 " + get_text('move_in_date', lang), "size": "xs", "color": "#888888", "flex": 2},
+                                {"type": "text", "text": move_in_date_str, "size": "xs", "color": "#1e293b", "flex": 3, "align": "end"}
+                            ]
+                        }
+                    ]
+                },
+                {"type": "separator", "margin": "lg"},
+                {"type": "text", "text": "📌 เจ้าหน้าที่จะติดต่อกลับเพื่อประสานงานการทำสัญญาและการชำระเงินแรกเข้าต่อไปครับ", "size": "xs", "color": "#64748b", "wrap": True, "margin": "lg"}
+            ],
+            "paddingAll": "20px"
+        }
+    }
+    
+    try:
+        bot_api.push_message(
+            PushMessageRequest(
+                to=booking.line_user_id,
+                messages=[FlexMessage(alt_text="ผลการคัดเลือกเข้าพักหอพัก", contents=FlexContainer.from_dict(flex_contents))]
+            )
+        )
+    except Exception as e:
+        logger.error(f"Failed to send booking approved flex: {e}")
+
+def send_booking_rejected_flex(booking, owner = None, bot_api = None):
+    """Sends a polite rejection notification message."""
+    if not bot_api or not booking or not booking.line_user_id:
+        return
+    lang = booking.language or "th"
+    apt_name = (owner.display_name if owner and owner.display_name else "SukAnan Apartment")
+    msg = get_text('booking_rejected_msg', lang).format(name=booking.full_name, apartment=apt_name)
+    try:
+        bot_api.push_message(
+            PushMessageRequest(
+                to=booking.line_user_id,
+                messages=[TextMessage(text=msg)]
+            )
+        )
+    except Exception as e:
+        logger.error(f"Failed to send booking rejected message: {e}")
+
