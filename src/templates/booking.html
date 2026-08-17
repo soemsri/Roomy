@@ -249,6 +249,93 @@
             font-size: 0.9rem;
         }
 
+        /* Furniture Options Grid */
+        .furniture-options-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+
+        @media (min-width: 520px) {
+            .furniture-options-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        .furniture-option-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px;
+            background: #ffffff;
+            border: 1.5px solid var(--border);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+
+        .furniture-option-card:hover {
+            border-color: #93c5fd;
+            background: #f8fafc;
+        }
+
+        .furniture-option-card:has(input:checked) {
+            border-color: var(--primary);
+            background: #f0f9ff;
+            box-shadow: 0 0 0 1px var(--primary);
+        }
+
+        .furniture-option-card input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            accent-color: var(--primary);
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .furniture-option-card .option-content {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+        }
+
+        .furniture-option-card .option-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            background: var(--primary-light);
+            color: var(--primary-dark);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.15rem;
+            flex-shrink: 0;
+            transition: all 0.2s ease;
+        }
+
+        .furniture-option-card:has(input:checked) .option-icon {
+            background: var(--primary);
+            color: #ffffff;
+        }
+
+        .furniture-option-card .option-text {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .furniture-option-card .option-title {
+            font-weight: 700;
+            font-size: 0.95rem;
+            color: var(--text-main);
+        }
+
+        .furniture-option-card .option-desc {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
         .info-pill {
             display: flex;
             align-items: center;
@@ -434,6 +521,34 @@
                             <input type="text" id="requested_move_in_date" class="form-control" style="background: #ffffff; cursor: pointer;" required readonly>
                         </div>
 
+                        <!-- Bed & Mattress Options -->
+                        <div class="form-group" style="margin-top: 4px;">
+                            <label><i class="fa-solid fa-couch" style="color: var(--primary);"></i> {{ get_text('furniture_options', lang) }}</label>
+                            <div class="furniture-options-grid">
+                                <label class="furniture-option-card" for="needs_bed">
+                                    <input type="checkbox" id="needs_bed" name="needs_bed">
+                                    <div class="option-content">
+                                        <div class="option-icon"><i class="fa-solid fa-bed"></i></div>
+                                        <div class="option-text">
+                                            <span class="option-title">{{ get_text('request_bed', lang) }}</span>
+                                            <span class="option-desc">{{ get_text('request_bed_desc', lang) }}</span>
+                                        </div>
+                                    </div>
+                                </label>
+
+                                <label class="furniture-option-card" for="needs_mattress">
+                                    <input type="checkbox" id="needs_mattress" name="needs_mattress">
+                                    <div class="option-content">
+                                        <div class="option-icon"><i class="fa-solid fa-mattress-pillow fa-rug"></i></div>
+                                        <div class="option-text">
+                                            <span class="option-title">{{ get_text('request_mattress', lang) }}</span>
+                                            <span class="option-desc">{{ get_text('request_mattress_desc', lang) }}</span>
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
                         <div class="info-pill">
                             <i class="fa-solid fa-circle-info" style="color: var(--primary);"></i>
                             <span>การคัดเลือกเข้าพักจะดำเนินการโดยผู้ดูแลหอพัก และจะแจ้งผลผ่านทาง LINE ทันที</span>
@@ -471,6 +586,14 @@
                 <div class="success-detail-row">
                     <span class="label">{{ get_text('move_in_date', lang) }}:</span>
                     <span class="val" id="resDate">-</span>
+                </div>
+                <div class="success-detail-row">
+                    <span class="label">{{ get_text('bed', lang) }}:</span>
+                    <span class="val" id="resBed">-</span>
+                </div>
+                <div class="success-detail-row">
+                    <span class="label">{{ get_text('mattress', lang) }}:</span>
+                    <span class="val" id="resMattress">-</span>
                 </div>
                 <div class="success-detail-row">
                     <span class="label">{{ get_text('status', lang) }}:</span>
@@ -537,6 +660,9 @@
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> {{ get_text("sending_data", lang) }}';
 
+            const needsBed = document.getElementById('needs_bed').checked;
+            const needsMattress = document.getElementById('needs_mattress').checked;
+
             const payload = {
                 full_name: document.getElementById('full_name').value.trim(),
                 phone_number: document.getElementById('phone_number').value.trim(),
@@ -544,6 +670,8 @@
                 job_position: document.getElementById('job_position').value.trim(),
                 workplace_phone: document.getElementById('workplace_phone').value.trim(),
                 requested_move_in_date: document.getElementById('requested_move_in_date').value,
+                needs_bed: needsBed,
+                needs_mattress: needsMattress,
                 line_user_id: line_uid,
                 agreement_accepted: true,
                 language: lang
@@ -562,6 +690,8 @@
                     document.getElementById('resPhone').innerText = payload.phone_number;
                     document.getElementById('resWorkplace').innerText = `${payload.workplace_name} (${payload.job_position})`;
                     document.getElementById('resDate').innerText = payload.requested_move_in_date;
+                    document.getElementById('resBed').innerText = needsBed ? '{{ get_text("request_yes", lang) }}' : '{{ get_text("request_no", lang) }}';
+                    document.getElementById('resMattress').innerText = needsMattress ? '{{ get_text("request_yes", lang) }}' : '{{ get_text("request_no", lang) }}';
 
                     document.getElementById('bookingFormContainer').style.display = 'none';
                     document.getElementById('bookingSuccessView').style.display = 'block';

@@ -156,6 +156,8 @@ def test_booking_workflow():
         "job_position": "วิศวกรระบบ",
         "workplace_phone": "028765432",
         "requested_move_in_date": "2026-09-01",
+        "needs_bed": True,
+        "needs_mattress": False,
         "line_user_id": "U_APPLICANT_123",
         "agreement_accepted": True,
         "language": "th"
@@ -173,6 +175,8 @@ def test_booking_workflow():
     assert saved_booking.full_name == "สมชาย ใจดี"
     assert saved_booking.workplace_name == "บริษัท สุขสวัสดิ์ วิศวกรรม จำกัด"
     assert saved_booking.job_position == "วิศวกรระบบ"
+    assert saved_booking.needs_bed == 1
+    assert saved_booking.needs_mattress == 0
     assert saved_booking.status == "Pending"
     assert saved_booking.agreement_accepted == 1
     db.close()
@@ -182,7 +186,10 @@ def test_booking_workflow():
     assert resp_list.status_code == 200
     bookings_list = resp_list.json()
     assert len(bookings_list) >= 1
-    assert any(b["full_name"] == "สมชาย ใจดี" for b in bookings_list)
+    target_b = next((b for b in bookings_list if b["full_name"] == "สมชาย ใจดี"), None)
+    assert target_b is not None
+    assert target_b["needs_bed"] is True
+    assert target_b["needs_mattress"] is False
 
     # 8. Test Admin Approving Candidate
     db = TestingSessionLocal()
@@ -202,6 +209,8 @@ def test_booking_workflow():
     approved_booking = db.query(models.BookingRequest).filter(models.BookingRequest.id == booking_id).first()
     assert approved_booking.status == "Approved"
     assert approved_booking.assigned_room_id == room.id
+    assert approved_booking.needs_bed == 1
+    assert approved_booking.needs_mattress == 0
     db.close()
 
     # Verify LINE notification was pushed
@@ -217,6 +226,8 @@ def test_booking_workflow():
         "job_position": "ธุรการ",
         "workplace_phone": "029999999",
         "requested_move_in_date": "2026-09-05",
+        "needs_bed": False,
+        "needs_mattress": True,
         "line_user_id": "U_APPLICANT_456",
         "agreement_accepted": True,
         "language": "th"
@@ -231,6 +242,8 @@ def test_booking_workflow():
     db = TestingSessionLocal()
     rejected_booking = db.query(models.BookingRequest).filter(models.BookingRequest.id == booking_id2).first()
     assert rejected_booking.status == "Rejected"
+    assert rejected_booking.needs_bed == 0
+    assert rejected_booking.needs_mattress == 1
     db.close()
 
     # 10. Test Admin Deleting Booking

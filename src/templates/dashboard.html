@@ -591,6 +591,7 @@
                             <th>{{ get_text('workplace_name', lang) }} / {{ get_text('job_position', lang) }}</th>
                             <th>{{ get_text('workplace_phone', lang) }}</th>
                             <th>{{ get_text('move_in_date', lang) }}</th>
+                            <th>{{ get_text('bed', lang) }} / {{ get_text('mattress', lang) }}</th>
                             <th>{{ get_text('building', lang) }} / {{ get_text('room', lang) }}</th>
                             <th>{{ get_text('status', lang) }}</th>
                             <th>{{ get_text('actions', lang) }}</th>
@@ -625,6 +626,16 @@
                                 </span>
                             </td>
                             <td>
+                                <div style="display: flex; flex-direction: column; gap: 4px;">
+                                    <span class="badge" style="background: {{ '#e0f2fe' if b.needs_bed else '#f1f5f9' }}; color: {{ '#0284c7' if b.needs_bed else '#94a3b8' }}; font-size: 0.75rem; white-space: nowrap;">
+                                        <i class="fa-solid fa-bed"></i> {{ get_text('bed', lang) }}: {{ get_text('request_yes_short', lang) if b.needs_bed else get_text('request_no_short', lang) }}
+                                    </span>
+                                    <span class="badge" style="background: {{ '#f3e8ff' if b.needs_mattress else '#f1f5f9' }}; color: {{ '#7e22ce' if b.needs_mattress else '#94a3b8' }}; font-size: 0.75rem; white-space: nowrap;">
+                                        <i class="fa-solid fa-mattress-pillow fa-rug"></i> {{ get_text('mattress', lang) }}: {{ get_text('request_yes_short', lang) if b.needs_mattress else get_text('request_no_short', lang) }}
+                                    </span>
+                                </div>
+                            </td>
+                            <td>
                                 {% if b.assigned_room %}
                                     <span class="badge badge-success"><i class="fa-solid fa-door-open"></i> {{ b.assigned_room.room_number }}</span>
                                 {% elif b.preferred_building %}
@@ -647,14 +658,14 @@
                             <td>
                                 <div style="display: flex; gap: 6px; align-items: center;">
                                     {% if b.status == 'Pending' %}
-                                    <button class="btn btn-sm btn-primary" style="background: #16a34a; border-color: #16a34a;" onclick="openQualifyBookingModal({{ b.id }}, '{{ b.full_name|replace("'", "\\'") }}', '{{ b.phone_number }}', '{{ b.workplace_name|replace("'", "\\'") }}', '{{ b.job_position|replace("'", "\\'") }}', '{{ b.workplace_phone }}', '{{ b.requested_move_in_date.strftime("%d/%m/%Y") if b.requested_move_in_date else "-" }}', '{{ b.preferred_building_id or "" }}')">
+                                    <button class="btn btn-sm btn-primary" style="background: #16a34a; border-color: #16a34a;" onclick="openQualifyBookingModal({{ b.id }}, '{{ b.full_name|replace("'", "\\'") }}', '{{ b.phone_number }}', '{{ b.workplace_name|replace("'", "\\'") }}', '{{ b.job_position|replace("'", "\\'") }}', '{{ b.workplace_phone }}', '{{ b.requested_move_in_date.strftime("%d/%m/%Y") if b.requested_move_in_date else "-" }}', '{{ b.preferred_building_id or "" }}', {{ 1 if b.needs_bed else 0 }}, {{ 1 if b.needs_mattress else 0 }})">
                                         <i class="fa-solid fa-user-check"></i> {{ get_text('qualify_candidate', lang) }}
                                     </button>
                                     <button class="btn btn-sm btn-danger" onclick="rejectBooking({{ b.id }}, '{{ b.full_name|replace("'", "\\'") }}')">
                                         <i class="fa-solid fa-user-xmark"></i> {{ get_text('disqualify_candidate', lang) }}
                                     </button>
                                     {% else %}
-                                    <button class="btn btn-sm btn-secondary" onclick="openBookingDetailModal({{ b.id }}, '{{ b.full_name|replace("'", "\\'") }}', '{{ b.phone_number }}', '{{ b.workplace_name|replace("'", "\\'") }}', '{{ b.job_position|replace("'", "\\'") }}', '{{ b.workplace_phone }}', '{{ b.requested_move_in_date.strftime("%d/%m/%Y") if b.requested_move_in_date else "-" }}', '{{ b.status }}', '{{ b.admin_notes or "" }}', '{{ b.assigned_room.room_number if b.assigned_room else "-" }}')">
+                                    <button class="btn btn-sm btn-secondary" onclick="openBookingDetailModal({{ b.id }}, '{{ b.full_name|replace("'", "\\'") }}', '{{ b.phone_number }}', '{{ b.workplace_name|replace("'", "\\'") }}', '{{ b.job_position|replace("'", "\\'") }}', '{{ b.workplace_phone }}', '{{ b.requested_move_in_date.strftime("%d/%m/%Y") if b.requested_move_in_date else "-" }}', '{{ b.status }}', '{{ b.admin_notes or "" }}', '{{ b.assigned_room.room_number if b.assigned_room else "-" }}', {{ 1 if b.needs_bed else 0 }}, {{ 1 if b.needs_mattress else 0 }})">
                                         <i class="fa-solid fa-eye"></i> {{ get_text('details', lang) }}
                                     </button>
                                     {% endif %}
@@ -2092,9 +2103,11 @@
                     <!-- Candidate Summary Card -->
                     <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
                         <h4 id="qualify_applicant_name" style="font-size: 1.1rem; color: #0f172a; margin-bottom: 6px;">-</h4>
-                        <div style="font-size: 0.88rem; color: #475569; display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+                        <div style="font-size: 0.88rem; color: #475569; display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
                             <div><i class="fa-solid fa-phone"></i> <span id="qualify_applicant_phone">-</span></div>
                             <div><i class="fa-solid fa-calendar"></i> วันเข้าพัก: <span id="qualify_applicant_date">-</span></div>
+                            <div><i class="fa-solid fa-bed"></i> เตียง: <span id="qualify_applicant_bed" style="font-weight: 600;">-</span></div>
+                            <div><i class="fa-solid fa-mattress-pillow fa-rug"></i> ที่นอน: <span id="qualify_applicant_mattress" style="font-weight: 600;">-</span></div>
                             <div style="grid-column: 1 / -1;"><i class="fa-solid fa-briefcase"></i> <span id="qualify_applicant_work">-</span></div>
                         </div>
                     </div>
@@ -4318,12 +4331,20 @@
             });
         }
 
-        function openQualifyBookingModal(bookingId, fullName, phone, workplace, position, workPhone, date, preferredBuildingId) {
+        function openQualifyBookingModal(bookingId, fullName, phone, workplace, position, workPhone, date, preferredBuildingId, needsBed, needsMattress) {
             document.getElementById('qualify_booking_id').value = bookingId;
             document.getElementById('qualify_applicant_name').innerText = fullName;
             document.getElementById('qualify_applicant_phone').innerText = phone;
             document.getElementById('qualify_applicant_work').innerText = `${workplace} (${position}) • โทร ${workPhone}`;
             document.getElementById('qualify_applicant_date').innerText = date;
+            
+            const isBed = (needsBed == 1 || needsBed === true || needsBed === '1');
+            const isMattress = (needsMattress == 1 || needsMattress === true || needsMattress === '1');
+            document.getElementById('qualify_applicant_bed').innerText = isBed ? 'เอา (รับ)' : 'ไม่เอา (ไม่รับ)';
+            document.getElementById('qualify_applicant_bed').style.color = isBed ? '#0284c7' : '#64748b';
+            document.getElementById('qualify_applicant_mattress').innerText = isMattress ? 'เอา (รับ)' : 'ไม่เอา (ไม่รับ)';
+            document.getElementById('qualify_applicant_mattress').style.color = isMattress ? '#7e22ce' : '#64748b';
+
             document.getElementById('qualify_admin_notes').value = '';
 
             const bSelect = document.getElementById('qualify_building_select');
@@ -4415,8 +4436,10 @@
             }
         }
 
-        function openBookingDetailModal(bookingId, fullName, phone, workplace, position, workPhone, date, status, notes, roomNumber) {
+        function openBookingDetailModal(bookingId, fullName, phone, workplace, position, workPhone, date, status, notes, roomNumber, needsBed, needsMattress) {
             const body = document.getElementById('bookingDetailBody');
+            const isBed = (needsBed == 1 || needsBed === true || needsBed === '1');
+            const isMattress = (needsMattress == 1 || needsMattress === true || needsMattress === '1');
             body.innerHTML = `
                 <div style="display: flex; flex-direction: column; gap: 12px; font-size: 0.95rem;">
                     <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px;">
@@ -4438,6 +4461,14 @@
                     <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px;">
                         <span style="color: #64748b;">วันที่ต้องการเข้าพัก:</span>
                         <span style="font-weight: 600;">${date}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px;">
+                        <span style="color: #64748b;">เตียง:</span>
+                        <span style="font-weight: 700; color: ${isBed ? '#0284c7' : '#64748b'};">${isBed ? 'เอา (รับ)' : 'ไม่เอา (ไม่รับ)'}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px;">
+                        <span style="color: #64748b;">ที่นอน:</span>
+                        <span style="font-weight: 700; color: ${isMattress ? '#7e22ce' : '#64748b'};">${isMattress ? 'เอา (รับ)' : 'ไม่เอา (ไม่รับ)'}</span>
                     </div>
                     <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px;">
                         <span style="color: #64748b;">ห้องที่จัดสรร:</span>

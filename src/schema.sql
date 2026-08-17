@@ -261,3 +261,28 @@ CREATE TABLE login_attempts (
     last_attempt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     locked_until TIMESTAMP
 );
+
+-- 11. Booking Requests (Candidate Screening)
+CREATE TABLE booking_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    uuid TEXT UNIQUE NOT NULL,
+    line_user_id TEXT NOT NULL,
+    full_name TEXT NOT NULL,
+    phone_number TEXT NOT NULL,
+    workplace_name TEXT NOT NULL,
+    job_position TEXT NOT NULL,
+    workplace_phone TEXT NOT NULL,
+    requested_move_in_date DATETIME NOT NULL,
+    preferred_building_id INTEGER REFERENCES buildings(id),
+    preferred_room_id INTEGER REFERENCES rooms(id),
+    assigned_room_id INTEGER REFERENCES rooms(id),
+    needs_bed INTEGER DEFAULT 0,
+    needs_mattress INTEGER DEFAULT 0,
+    agreement_accepted INTEGER DEFAULT 1,
+    agreement_accepted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status TEXT DEFAULT 'Pending',
+    admin_notes TEXT,
+    language TEXT DEFAULT 'th',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

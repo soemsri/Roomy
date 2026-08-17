@@ -333,6 +333,8 @@ class BookingRequest(Base):
     preferred_building_id = Column(Integer, ForeignKey("buildings.id"), index=True, nullable=True)
     preferred_room_id = Column(Integer, ForeignKey("rooms.id"), index=True, nullable=True)
     assigned_room_id = Column(Integer, ForeignKey("rooms.id"), index=True, nullable=True)
+    needs_bed = Column(Integer, default=0) # 1 = Yes, 0 = No
+    needs_mattress = Column(Integer, default=0) # 1 = Yes, 0 = No
     agreement_accepted = Column(Integer, default=1) # 1 = Yes, 0 = No
     agreement_accepted_at = Column(DateTime, server_default=func.now())
     status = Column(String, default="Pending") # Pending, Approved, Rejected, Converted

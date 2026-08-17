@@ -110,6 +110,9 @@ async def submit_booking_form(booking_uuid: str, data: dict, db: Session = Depen
     agreement_accepted = data.get("agreement_accepted", False)
     language = data.get("language", "th")
 
+    needs_bed = 1 if data.get("needs_bed") in [True, 1, "true", "1"] else 0
+    needs_mattress = 1 if data.get("needs_mattress") in [True, 1, "true", "1"] else 0
+
     if not agreement_accepted:
         raise HTTPException(status_code=400, detail="คุณต้องยอมรับสัญญาและกฎระเบียบหอพักก่อนทำการจอง")
 
@@ -134,6 +137,8 @@ async def submit_booking_form(booking_uuid: str, data: dict, db: Session = Depen
             workplace_phone=workplace_phone,
             requested_move_in_date=requested_move_in_date,
             preferred_building_id=int(preferred_building_id) if preferred_building_id else None,
+            needs_bed=needs_bed,
+            needs_mattress=needs_mattress,
             agreement_accepted=1,
             language=language,
             status="Pending"
@@ -147,6 +152,8 @@ async def submit_booking_form(booking_uuid: str, data: dict, db: Session = Depen
         booking.workplace_phone = workplace_phone
         booking.requested_move_in_date = requested_move_in_date
         booking.preferred_building_id = int(preferred_building_id) if preferred_building_id else None
+        booking.needs_bed = needs_bed
+        booking.needs_mattress = needs_mattress
         booking.agreement_accepted = 1
         booking.language = language
         booking.status = "Pending"
@@ -164,7 +171,9 @@ async def submit_booking_form(booking_uuid: str, data: dict, db: Session = Depen
             workplace=workplace_name,
             position=job_position,
             work_phone=workplace_phone,
-            date=requested_move_in_date_str
+            date=requested_move_in_date_str,
+            bed=get_text('request_yes', lang) if needs_bed else get_text('request_no', lang),
+            mattress=get_text('request_yes', lang) if needs_mattress else get_text('request_no', lang)
         )
         try:
             admin_bot_api.push_message(

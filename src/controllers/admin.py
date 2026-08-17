@@ -3659,6 +3659,8 @@ async def list_bookings(
             "preferred_building_name": b.preferred_building.name if b.preferred_building else "-",
             "assigned_room_id": b.assigned_room_id,
             "assigned_room_number": b.assigned_room.room_number if b.assigned_room else "-",
+            "needs_bed": bool(b.needs_bed),
+            "needs_mattress": bool(b.needs_mattress),
             "status": b.status,
             "admin_notes": b.admin_notes,
             "created_at": b.created_at.strftime("%Y-%m-%d %H:%M:%S") if b.created_at else None
