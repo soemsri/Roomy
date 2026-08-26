@@ -278,7 +278,7 @@ def setup_personal_rich_menu(tenant, db: Session, force=False):
         menu_name = f"Tenant Menu {lang.upper()} Multi - {tenant.line_user_id[:10]}"
     
     rich_menu_data = {
-        "size": {"width": 2500, "height": 843},
+        "size": {"width": 2500, "height": 1686},
         "selected": False,
         "name": menu_name,
         "chatBarText": chat_bar_text,
@@ -286,25 +286,34 @@ def setup_personal_rich_menu(tenant, db: Session, force=False):
             {
                 "bounds": {"x": 0, "y": 0, "width": 833, "height": 843},
                 "action": {
-                    "type": "postback",
-                    "data": "action=chat",
-                    "inputOption": "openKeyboard",
-                    "displayText": "สนทนา"
+                    "type": "message",
+                    "text": bill_label
                 }
             },
             {
                 "bounds": {"x": 833, "y": 0, "width": 834, "height": 843},
-                "action": {
-                    "type": "message",
-                    "text": "กฎระเบียบ"
-                }
+                "action": repair_action
             },
             {
                 "bounds": {"x": 1667, "y": 0, "width": 833, "height": 843},
+                "action": history_action
+            },
+            {
+                "bounds": {"x": 0, "y": 843, "width": 833, "height": 843},
                 "action": {
-                    "type": "message",
-                    "text": "จองห้องพัก"
+                    "type": "postback",
+                    "data": "action=chat",
+                    "inputOption": "openKeyboard",
+                    "displayText": chat_label
                 }
+            },
+            {
+                "bounds": {"x": 833, "y": 843, "width": 834, "height": 843},
+                "action": {"type": "message", "text": move_in_label}
+            },
+            {
+                "bounds": {"x": 1667, "y": 843, "width": 833, "height": 843},
+                "action": move_out_action
             }
         ]
     }
@@ -507,4 +516,3 @@ def send_booking_rejected_flex(booking, owner = None, bot_api = None):
         )
     except Exception as e:
         logger.error(f"Failed to send booking rejected message: {e}")
-

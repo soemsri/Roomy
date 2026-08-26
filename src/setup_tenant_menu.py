@@ -34,36 +34,24 @@ HEADERS = {
 }
 
 def create_tenant_rich_menu():
-    # 1. Define the Rich Menu Structure (3 Buttons Compact Layout)
+    # 1. Define the classic 6-button Tenant Rich Menu structure.
     rich_menu_data = {
-        "size": {"width": 2500, "height": 843},
+        "size": {"width": 2500, "height": 1686},
         "selected": True, # Make it default
-        "name": "Tenant 3-Button Menu",
-        "chatBarText": "เมนู",
+        "name": "Tenant 6-Button Menu",
+        "chatBarText": "เมนูผู้เช่า",
         "areas": [
-            {
-                "bounds": {"x": 0, "y": 0, "width": 833, "height": 843},
-                "action": {
-                    "type": "postback",
-                    "data": "action=chat",
-                    "inputOption": "openKeyboard",
-                    "displayText": "สนทนา"
-                }
-            },
-            {
-                "bounds": {"x": 833, "y": 0, "width": 834, "height": 843},
-                "action": {
-                    "type": "message",
-                    "text": "กฎระเบียบ"
-                }
-            },
-            {
-                "bounds": {"x": 1667, "y": 0, "width": 833, "height": 843},
-                "action": {
-                    "type": "message",
-                    "text": "จองห้องพัก"
-                }
-            }
+            {"bounds": {"x": 0, "y": 0, "width": 833, "height": 843}, "action": {"type": "message", "text": "ดูค่าเช่า"}},
+            {"bounds": {"x": 833, "y": 0, "width": 834, "height": 843}, "action": {"type": "message", "text": "แจ้งซ่อม"}},
+            {"bounds": {"x": 1667, "y": 0, "width": 833, "height": 843}, "action": {"type": "message", "text": "ประวัติ"}},
+            {"bounds": {"x": 0, "y": 843, "width": 833, "height": 843}, "action": {
+                "type": "postback",
+                "data": "action=chat",
+                "inputOption": "openKeyboard",
+                "displayText": "สนทนา"
+            }},
+            {"bounds": {"x": 833, "y": 843, "width": 834, "height": 843}, "action": {"type": "message", "text": "ย้ายเข้า"}},
+            {"bounds": {"x": 1667, "y": 843, "width": 833, "height": 843}, "action": {"type": "message", "text": "ย้ายออก"}}
         ]
     }
 
@@ -90,6 +78,13 @@ def create_tenant_rich_menu():
             data=f
         )
     logger.info(f"Image upload status: {img_res.status_code}")
+    if img_res.status_code not in [200, 201]:
+        logger.error(f"Error uploading rich menu image: {img_res.text}")
+        requests.delete(
+            f"https://api.line.me/v2/bot/richmenu/{rich_menu_id}",
+            headers={"Authorization": f"Bearer {CHANNEL_ACCESS_TOKEN}"}
+        )
+        return None
     
     # 4. Set as Default Rich Menu
     def_res = requests.post(
@@ -97,22 +92,33 @@ def create_tenant_rich_menu():
         headers=HEADERS
     )
     logger.info(f"Set default status: {def_res.status_code}")
+    if def_res.status_code not in [200, 201]:
+        logger.error(f"Error setting default rich menu: {def_res.text}")
+        requests.delete(
+            f"https://api.line.me/v2/bot/richmenu/{rich_menu_id}",
+            headers={"Authorization": f"Bearer {CHANNEL_ACCESS_TOKEN}"}
+        )
+        return None
     
     return rich_menu_id
 
-def delete_all_rich_menus():
+def delete_all_rich_menus(exclude_id=None):
     # List all rich menus
     res = requests.get("https://api.line.me/v2/bot/richmenu/list", headers={"Authorization": f"Bearer {CHANNEL_ACCESS_TOKEN}"})
     if res.status_code == 200:
         menus = res.json().get("richmenus", [])
         for m in menus:
             mid = m["richMenuId"]
+            if mid == exclude_id:
+                continue
             requests.delete(f"https://api.line.me/v2/bot/richmenu/{mid}", headers={"Authorization": f"Bearer {CHANNEL_ACCESS_TOKEN}"})
             logger.info(f"Deleted old rich menu: {mid}")
 
 if __name__ == "__main__":
-    logger.info("Cleaning up old rich menus for Tenant channel...")
-    delete_all_rich_menus()
+    logger.info("Creating the Tenant 6-button rich menu...")
     menu_id = create_tenant_rich_menu()
     if menu_id:
+        # Keep the current menu available until the replacement is uploaded and
+        # successfully selected as default.
+        delete_all_rich_menus(exclude_id=menu_id)
         logger.info(f"Tenant Rich Menu setup complete. ID: {menu_id}")
