@@ -230,12 +230,24 @@ class TestActivityLogs(unittest.TestCase):
         db.commit()
         db.close()
         
-        # Successful magic login
+        # Link previews validate without consuming the token.
         response = client.get("/admin/magic-login?token=valid_magic_token", follow_redirects=False)
+        self.assertEqual(response.status_code, 200)
+
+        # Successful magic login is completed explicitly via POST.
+        response = client.post(
+            "/admin/magic-login",
+            data={"token": "valid_magic_token"},
+            follow_redirects=False,
+        )
         self.assertEqual(response.status_code, 303)
         
         # Failed magic login
-        response_fail = client.get("/admin/magic-login?token=invalid_magic_token", follow_redirects=False)
+        response_fail = client.post(
+            "/admin/magic-login",
+            data={"token": "invalid_magic_token"},
+            follow_redirects=False,
+        )
         self.assertEqual(response_fail.status_code, 400)
         
         # Verify logs

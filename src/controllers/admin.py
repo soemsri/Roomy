@@ -2130,37 +2130,86 @@ async def upload_bank_qr(
     
     return {"url": f"/uploads/{file_name}"}
 
-@router.get("/magic-login")
-async def magic_login(request: Request, token: str, db: Session = Depends(get_db)):
+def invalid_magic_login_response(request: Request, db: Session):
+    log_activity(
+        db,
+        f"IP: {request.client.host}",
+        "Failed Magic Login",
+        "Admin Authentication",
+        "Magic login attempt rejected: expired or invalid token"
+    )
+    return HTMLResponse(
+        content="<h2>ลิงก์หมดอายุหรือไม่ถูกต้อง กรุณากดใหม่จาก LINE Admin</h2>",
+        status_code=400
+    )
+
+
+@router.get("/magic-login", response_class=HTMLResponse)
+async def magic_login_page(request: Request, token: str, db: Session = Depends(get_db)):
+    """Validate without consuming so LINE link previews cannot use the token."""
     owner = db.query(models.Owner).filter(
         models.Owner.magic_token == token,
         models.Owner.magic_token_expires > datetime.now()
     ).first()
-    
+
     if not owner:
-        log_activity(db, f"IP: {request.client.host}", "Failed Magic Login", "Admin Authentication", "Magic login attempt rejected: expired or invalid token")
-        return HTMLResponse(content="<h2>ลิงก์หมดอายุหรือไม่ถูกต้อง กรุณากดใหม่จาก LINE Admin</h2>", status_code=400)
-    
-    params = dict(request.query_params)
-    if 'token' in params: del params['token']
-    
-    import urllib.parse
-    query_string = urllib.parse.urlencode(params)
+        return invalid_magic_login_response(request, db)
+
+    mode = "bulk" if request.query_params.get("mode") == "bulk" else ""
+    return templates.TemplateResponse("magic_login.html", {
+        "request": request,
+        "token": token,
+        "mode": mode,
+    })
+
+
+@router.post("/magic-login")
+async def magic_login(
+    request: Request,
+    token: str = Form(...),
+    mode: str = Form(""),
+    fragment: str = Form(""),
+    db: Session = Depends(get_db)
+):
+    owner = db.query(models.Owner).filter(
+        models.Owner.magic_token == token,
+        models.Owner.magic_token_expires > datetime.now()
+    ).first()
+
+    if not owner:
+        return invalid_magic_login_response(request, db)
+
+    session_token = secrets.token_hex(32)
+    claimed = db.query(models.Owner).filter(
+        models.Owner.id == owner.id,
+        models.Owner.magic_token == token,
+        models.Owner.magic_token_expires > datetime.now()
+    ).update({
+        models.Owner.session_token: session_token,
+        models.Owner.magic_token: None,
+        models.Owner.magic_token_expires: None,
+    }, synchronize_session=False)
+
+    if claimed != 1:
+        db.rollback()
+        return invalid_magic_login_response(request, db)
+
     target_url = "/admin/dashboard"
-    if query_string:
-        target_url += "?" + query_string
-    
-    token = secrets.token_hex(32)
-    owner.session_token = token
-    owner.magic_token = None
+    if mode == "bulk":
+        target_url += "?mode=bulk"
+
+    allowed_fragments = {"#billSection", "#leaseSection", "#meterSection"}
+    if fragment in allowed_fragments:
+        target_url += fragment
+
     db.commit()
-    
+
     log_activity(db, "legacy_owner@system.local", "Magic Login", "Admin Authentication", "Logged in successfully via LINE Magic Link")
-    
+
     response = RedirectResponse(url=target_url, status_code=303)
     response.set_cookie(
         key="admin_session", 
-        value=token, 
+        value=session_token,
         httponly=True, 
         secure=True, 
         samesite="lax"

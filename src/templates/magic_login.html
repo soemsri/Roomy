@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="referrer" content="no-referrer">
+    <title>เข้าสู่ระบบ Roomy</title>
+    <style>
+        body {
+            align-items: center;
+            background: #0b1020;
+            color: #fff;
+            display: flex;
+            font-family: sans-serif;
+            justify-content: center;
+            margin: 0;
+            min-height: 100vh;
+        }
+        .card {
+            background: #121a2c;
+            border: 1px solid #29334a;
+            border-radius: 18px;
+            box-sizing: border-box;
+            max-width: 380px;
+            padding: 32px;
+            text-align: center;
+            width: calc(100% - 32px);
+        }
+        button {
+            background: #5146e5;
+            border: 0;
+            border-radius: 12px;
+            color: #fff;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: 700;
+            margin-top: 16px;
+            padding: 14px 20px;
+            width: 100%;
+        }
+        p { color: #b8c0d4; line-height: 1.6; }
+    </style>
+</head>
+<body>
+    <main class="card">
+        <h1>เข้าสู่ระบบ Roomy</h1>
+        <p>กดปุ่มด้านล่างเพื่อยืนยันการเข้าสู่หน้าจัดการ</p>
+        <form method="post" action="/admin/magic-login">
+            <input type="hidden" name="token" value="{{ token }}">
+            <input type="hidden" name="mode" value="{{ mode }}">
+            <input type="hidden" id="fragment" name="fragment" value="">
+            <button type="submit">เข้าสู่ระบบ</button>
+        </form>
+    </main>
+    <script>
+        const allowedFragments = new Set(['#billSection', '#leaseSection', '#meterSection']);
+        if (allowedFragments.has(window.location.hash)) {
+            document.getElementById('fragment').value = window.location.hash;
+        }
+    </script>
+</body>
+</html>
