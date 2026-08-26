@@ -126,6 +126,29 @@
             padding-left: 10px;
         }
         .sidebar-brand span { color: var(--text-main); }
+
+        .mobile-menu-toggle {
+            align-items: center;
+            background: #ffffff;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text-main);
+            cursor: pointer;
+            display: none;
+            flex: 0 0 44px;
+            font-size: 1.2rem;
+            height: 44px;
+            justify-content: center;
+            padding: 0;
+            width: 44px;
+        }
+        .sidebar-overlay {
+            background: rgba(15, 23, 42, 0.55);
+            display: none;
+            inset: 0;
+            position: fixed;
+            z-index: 99;
+        }
         
         .menu-section {
             margin-bottom: 20px;
@@ -361,9 +384,26 @@
 
         /* Responsive */
         @media (max-width: 992px) {
-            .sidebar { transform: translateX(-100%); }
+            .sidebar {
+                box-shadow: 12px 0 30px rgba(15, 23, 42, 0.18);
+                transform: translateX(-100%);
+                z-index: 101;
+            }
             .main-wrapper { margin-left: 0; width: 100%; padding: 15px; }
             .sidebar.active { transform: translateX(0); }
+            .sidebar-overlay.active { display: block; }
+            .mobile-menu-toggle { display: inline-flex; }
+            body.sidebar-open { overflow: hidden; }
+            header { gap: 12px; align-items: center; }
+            header h1 { flex: 1; font-size: 1.15rem !important; margin: 0; }
+            .user-profile { padding: 8px 10px; }
+            .user-profile span { display: none; }
+        }
+
+        @media (max-width: 600px) {
+            #leaseSection { padding: 16px; }
+            #leaseSection .section-header { align-items: stretch; }
+            #leaseSection .search-group { max-width: none !important; }
         }
     </style>
     <!-- CKEditor 5 for Lease Template -->
@@ -374,7 +414,7 @@
 </head>
 <body>
     <!-- Sidebar -->
-    <aside class="sidebar">
+    <aside class="sidebar" id="adminSidebar" aria-label="Admin navigation">
         <div class="sidebar-brand">
             <i class="fa-solid fa-house-chimney-window" style="color: #ef4444;"></i>
             <span>Roomy.</span>
@@ -463,12 +503,24 @@
             <form id="logout-form" action="/admin/logout" method="POST" style="display: none;"></form>
         </div>
     </aside>
+    <div class="sidebar-overlay" id="sidebarOverlay" aria-hidden="true"></div>
 
     <!-- Main Content -->
     <div class="main-wrapper">
         <header>
             {% set display_name = current_user.full_name if current_user and current_user.full_name else (owner.display_name if owner else 'Admin') %}
             {% set display_role = get_text(current_user.role, lang) if current_user and current_user.role else get_text('admin_profile', lang) %}
+            <button
+                type="button"
+                class="mobile-menu-toggle"
+                id="mobileMenuToggle"
+                aria-label="เปิดเมนู"
+                aria-controls="adminSidebar"
+                aria-expanded="false"
+                onclick="toggleMobileSidebar()"
+            >
+                <i class="fa-solid fa-bars"></i>
+            </button>
             <h1 style="font-size: 1.5em; font-weight: 700;">{{ get_text('welcome', lang) }}, {{ display_name }}</h1>
             <div class="user-profile">
                 <i class="fa-solid fa-circle-user" style="color: var(--primary); font-size: 1.2em;"></i>
@@ -2709,6 +2761,24 @@
             });
         }
 
+        function setMobileSidebar(open) {
+            const sidebar = document.getElementById('adminSidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            const toggle = document.getElementById('mobileMenuToggle');
+            if (!sidebar || !overlay || !toggle) return;
+
+            sidebar.classList.toggle('active', open);
+            overlay.classList.toggle('active', open);
+            document.body.classList.toggle('sidebar-open', open);
+            toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+            overlay.setAttribute('aria-hidden', open ? 'false' : 'true');
+        }
+
+        function toggleMobileSidebar() {
+            const sidebar = document.getElementById('adminSidebar');
+            setMobileSidebar(!sidebar.classList.contains('active'));
+        }
+
         let currentReceiptPage = 1;
         async function loadReceipts(page = 1) {
             currentReceiptPage = page;
@@ -3164,6 +3234,7 @@
 
         window.addEventListener('DOMContentLoaded', () => {
             initPP(); initBank(); initFees();
+            document.getElementById('sidebarOverlay').addEventListener('click', () => setMobileSidebar(false));
             const hash = window.location.hash.replace('#', '');
             if (hash) showSection(hash); else showSection('overview');
             document.querySelectorAll('.menu-item').forEach(m => {
@@ -3173,10 +3244,19 @@
                         const id = m.getAttribute('href').replace('#', '');
                         showSection(id);
                         window.location.hash = id;
+                        setMobileSidebar(false);
                     }
                 }
             });
             paginateRooms(1);
+        });
+
+        window.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') setMobileSidebar(false);
+        });
+
+        window.addEventListener('resize', () => {
+            if (window.innerWidth > 992) setMobileSidebar(false);
         });
 
         let editorInstance;
