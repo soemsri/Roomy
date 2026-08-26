@@ -2493,15 +2493,15 @@ async def search_tenants(q: str = "", db: Session = Depends(get_db), admin: bool
         if tenant.status == "Active":
             result_type = "Current"
             period = "ปัจจุบัน"
-        elif approved_booking:
-            result_type = "Approved"
-            period = "ผ่านการคัดเลือก / รอดำเนินการแรกเข้า"
-        elif tenant.status == "Pending":
-            result_type = "Registration"
-            period = "รอตรวจสอบข้อมูลทำสัญญา"
         elif tenant.status == "Awaiting Payment":
             result_type = "Payment"
             period = "รอชำระเงินแรกเข้า"
+        elif tenant.status == "Pending":
+            result_type = "Registration"
+            period = "รอตรวจสอบข้อมูลทำสัญญา"
+        elif approved_booking:
+            result_type = "Approved"
+            period = "ผ่านการคัดเลือก / รอดำเนินการแรกเข้า"
         else:
             result_type = tenant.status or "Applicant"
             period = "อยู่ระหว่างดำเนินการ"
