@@ -482,6 +482,8 @@ async def upload_slip(
     invoice = db.query(models.Invoice).options(joinedload(models.Invoice.room)).filter(models.Invoice.uuid == invoice_uuid).first()
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
+    if invoice.status in ["Paid", "Cancelled"]:
+        raise HTTPException(status_code=400, detail="Invoice is already closed")
     
     # Ensure directory exists
     if not os.path.exists(uploads_dir):
@@ -496,7 +498,7 @@ async def upload_slip(
     invoice.status = "Pending Verification"
     invoice.payment_method = "PromptPay"
     invoice.payment_receipt_img = f"/uploads/{file_name}"
-    invoice.paid_at = datetime.now()
+    invoice.paid_at = None
     db.commit()
     
     # Notify Owner

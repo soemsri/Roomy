@@ -6,6 +6,8 @@ def test_dashboard_has_mobile_navigation_controls(client):
 
     assert response.status_code == 200
     assert 'id="mobileMenuToggle"' in response.text
+    assert "reviewTransfer" in response.text
+    assert "ยืนยันว่าเงินเข้าบัญชีแล้ว" in response.text
     assert 'aria-controls="adminSidebar"' in response.text
     assert 'id="adminSidebar"' in response.text
     assert 'id="sidebarOverlay"' in response.text

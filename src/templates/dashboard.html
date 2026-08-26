@@ -843,7 +843,7 @@
                                 <td>
                                     {% if initial_bill %}
                                         {% if initial_bill.status == 'Pending Verification' %}
-                                            <span class="badge badge-warning" style="cursor: pointer;" onclick="viewSlip({{ initial_bill.id }})">
+                                            <span class="badge badge-warning" style="cursor: pointer;" onclick="reviewTransfer({{ initial_bill.id }})">
                                                 <i class="fa-solid fa-receipt"></i> {{ get_text('status_slip_uploaded', lang) }}
                                             </span>
                                         {% else %}
@@ -860,11 +860,15 @@
                                 <td>
                                     {% if initial_bill %}
                                         {% if initial_bill.status == 'Pending Verification' %}
-                                            <button class="btn btn-primary" style="background: var(--success);" onclick="approveInvoice({{ initial_bill.id }})">{{ get_text('approve_payment', lang) }}</button>
-                                            <button class="btn btn-danger" style="background: var(--danger); border:none; margin-left:5px;" onclick="rejectInvoice({{ initial_bill.id }})">{{ get_text('reject', lang) }}</button>
+                                            <button class="btn btn-primary" style="background: var(--success);" onclick="reviewTransfer({{ initial_bill.id }})">
+                                                <i class="fa-solid fa-building-columns"></i> ตรวจสอบสลิปและยืนยันเงินเข้า
+                                            </button>
                                         {% else %}
+                                            <button class="btn btn-primary" onclick="reviewTransfer({{ initial_bill.id }})">
+                                                <i class="fa-solid fa-rotate"></i> ตรวจสอบการโอน
+                                            </button>
                                             <button class="btn btn-secondary" onclick="confirmCashPayment({{ initial_bill.id }})">
-                                                <i class="fa-solid fa-money-bill-1-wave"></i> {{ get_text('receive_cash', lang) }}
+                                                <i class="fa-solid fa-money-bill-1-wave"></i> บันทึกรับเงินสด
                                             </button>
                                         {% endif %}
                                     {% endif %}
@@ -3786,6 +3790,61 @@
 
         function viewSlip(id) { viewInvoiceDetails(id); }
 
+        async function reviewTransfer(id) {
+            const body = document.getElementById('invDetailBody');
+            document.getElementById('invoiceDetailModal').style.display = 'block';
+            body.innerHTML = `<p style="text-align:center;"><i class="fa-solid fa-spinner fa-spin"></i> กำลังตรวจสอบสถานะล่าสุด...</p>`;
+            try {
+                const res = await fetch(`/admin/invoice/${id}/details`);
+                const d = await res.json();
+                if (!res.ok) throw new Error(d.detail || `Server error: ${res.status}`);
+
+                if (d.status === 'Paid') {
+                    body.innerHTML = `<div style="text-align:center; padding:20px;"><i class="fa-solid fa-circle-check" style="font-size:3em; color:var(--success);"></i><h3>รายการนี้ยืนยันการชำระแล้ว</h3></div>`;
+                    return;
+                }
+                if (d.status !== 'Pending Verification' || !d.receipt_img) {
+                    body.innerHTML = `<div style="text-align:center; padding:20px;"><i class="fa-solid fa-clock" style="font-size:3em; color:var(--warning);"></i><h3>ยังไม่พบสลิปโอนเงิน</h3><p style="color:var(--text-muted);">ผู้เช่ายังไม่ได้แนบสลิป หรือสลิปเดิมถูกปฏิเสธ กรุณารอผู้เช่าแจ้งโอนแล้วกดตรวจสอบอีกครั้ง</p></div>`;
+                    return;
+                }
+
+                body.innerHTML = `
+                    <div style="background:#fff7ed; border:1px solid #fdba74; padding:14px; border-radius:10px; margin-bottom:16px; color:#9a3412;">
+                        <strong><i class="fa-solid fa-triangle-exclamation"></i> กรุณาตรวจสอบยอดเงินจริงในบัญชีธนาคารก่อนยืนยัน</strong>
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;">
+                        <div><label>${translations.room}</label><strong>${d.room_number}</strong></div>
+                        <div><label>${translations.tenant}</label><strong>${d.tenant_name}</strong></div>
+                        <div style="grid-column:1/-1;"><label>${translations.total}</label><strong style="font-size:1.3em; color:var(--primary);">฿${d.total.toLocaleString(undefined, {minimumFractionDigits:2})}</strong></div>
+                    </div>
+                    <div style="text-align:center; margin-bottom:18px;">
+                        <a href="${d.receipt_img}" target="_blank"><img src="${d.receipt_img}" style="max-width:100%; max-height:420px; border-radius:10px; border:1px solid var(--border);"></a>
+                    </div>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                        <button class="btn btn-primary" style="background:var(--success); flex:1;" onclick="confirmTransfer(${id})"><i class="fa-solid fa-check"></i> ยืนยันว่าเงินเข้าบัญชีแล้ว</button>
+                        <button class="btn btn-danger" style="flex:1;" onclick="rejectTransfer(${id})"><i class="fa-solid fa-xmark"></i> ปฏิเสธสลิป</button>
+                    </div>`;
+            } catch (err) {
+                body.innerHTML = `<p style="color:var(--danger);">${translations.load_error}: ${err.message}</p>`;
+            }
+        }
+
+        async function confirmTransfer(id) {
+            if (!confirm('ยืนยันว่าตรวจสอบบัญชีธนาคารแล้ว และยอดเงินเข้าจริง?')) return;
+            const res = await fetch(`/admin/invoice/${id}/approve`, {method:'POST'});
+            const data = await res.json();
+            if (res.ok) { alert('ยืนยันการรับเงินโอนเรียบร้อย'); location.reload(); }
+            else alert(data.detail || 'ไม่สามารถยืนยันรายการได้');
+        }
+
+        async function rejectTransfer(id) {
+            if (!confirm('ปฏิเสธสลิปนี้และให้ผู้เช่าอัปโหลดใหม่?')) return;
+            const res = await fetch(`/admin/invoice/${id}/reject`, {method:'POST'});
+            const data = await res.json();
+            if (res.ok) { alert('ปฏิเสธสลิปแล้ว ระบบจะแจ้งให้ผู้เช่าอัปโหลดใหม่'); location.reload(); }
+            else alert(data.detail || 'ไม่สามารถปฏิเสธรายการได้');
+        }
+
         async function cancelInvoice(id) { if(confirm(translations.cancel_confirm)) { await fetch(`/admin/invoice/${id}/cancel`, {method:'POST'}); location.reload(); } }
         async function requestPayment(id) {
             const roomIds = Array.from(document.querySelectorAll(`.reg-room-checkbox-${id}:checked`)).map(cb => cb.value);
@@ -3824,8 +3883,8 @@
         }
         async function rejectReg(id) { await fetch(`/admin/registration/${id}/reject`, {method:'POST'}); location.reload(); }
         async function sendLine(id) { await fetch(`/admin/invoice/${id}/send-line`, {method:'POST'}); alert(translations.approve_success); }
-        async function approveInvoice(id) { await fetch(`/admin/invoice/${id}/approve`, {method:'POST'}); location.reload(); }
-        async function rejectInvoice(id) { await fetch(`/admin/invoice/${id}/reject`, {method:'POST'}); location.reload(); }
+        async function approveInvoice(id) { reviewTransfer(id); }
+        async function rejectInvoice(id) { rejectTransfer(id); }
         async function unmapTenant(id) { openSettlementModal(id); }
         async function cancelMoveOut(id) { if(confirm(translations.cancel_move_out_confirm)) { const res = await fetch(`/admin/move-out/cancel/${id}`, {method: 'POST'}); if(res.ok) location.reload(); else alert(translations.cancel_move_out_error); } }
 

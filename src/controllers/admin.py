@@ -1680,6 +1680,13 @@ async def confirm_cash_payment(
 ):
     invoice = db.query(models.Invoice).filter(models.Invoice.id == invoice_id).first()
     if not invoice: raise HTTPException(status_code=404, detail="Invoice not found")
+    if invoice.status != "Unpaid":
+        detail = (
+            "รายการนี้มีสลิปโอนเงินรอตรวจสอบ กรุณาใช้ปุ่มตรวจสอบสลิป"
+            if invoice.status == "Pending Verification"
+            else "รายการนี้ไม่สามารถบันทึกเป็นเงินสดได้"
+        )
+        raise HTTPException(status_code=400, detail=detail)
     
     file_ext = os.path.splitext(image.filename)[1]
     file_name = f"receipt_{invoice_id}_{uuid.uuid4().hex}{file_ext}"
@@ -1776,10 +1783,16 @@ async def approve_invoice(
 ):
     invoice = db.query(models.Invoice).filter(models.Invoice.id == invoice_id).first()
     if not invoice: raise HTTPException(status_code=404, detail="Invoice not found")
-    
+
+    if invoice.status != "Pending Verification" or not invoice.payment_receipt_img:
+        raise HTTPException(
+            status_code=400,
+            detail="รายการนี้ยังไม่มีสลิปโอนเงินที่รอตรวจสอบ"
+        )
+
     invoice.status = "Paid"
-    if not invoice.paid_at:
-        invoice.paid_at = datetime.now()
+    invoice.payment_method = invoice.payment_method or "PromptPay"
+    invoice.paid_at = datetime.now()
     
     if invoice.invoice_type == "Initial":
         owner = db.query(models.Owner).first()
@@ -1800,8 +1813,14 @@ async def reject_invoice(
 ):
     invoice = db.query(models.Invoice).filter(models.Invoice.id == invoice_id).first()
     if not invoice: raise HTTPException(status_code=404, detail="Invoice not found")
-    
+
+    if invoice.status != "Pending Verification":
+        raise HTTPException(status_code=400, detail="รายการนี้ไม่ได้อยู่ระหว่างรอตรวจสอบสลิป")
+
     invoice.status = "Unpaid"
+    invoice.payment_method = None
+    invoice.payment_receipt_img = None
+    invoice.paid_at = None
     db.commit()
     
     tenant = invoice.tenant

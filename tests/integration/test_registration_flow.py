@@ -1,5 +1,6 @@
 import os
 import sys
+from io import BytesIO
 import uuid
 import json
 from datetime import datetime
@@ -114,10 +115,32 @@ def test_registration_flow():
     res = client.post(f"/admin/registration/{tenant.id}/request-payment", data={"room_ids": str(room.id)}, cookies=cookies)
     assert res.status_code == 200
     
-    # Step 2b: Approve the initial payment invoice (Step 2 of approval)
+    # Step 2b: An unpaid invoice cannot be approved before the tenant uploads a slip.
     invoice = db.query(models.Invoice).filter(models.Invoice.tenant_id == tenant.id).first()
     assert invoice is not None
-    
+
+    res = client.post(f"/admin/invoice/{invoice.id}/approve", cookies=cookies)
+    assert res.status_code == 400
+
+    upload = client.post(
+        f"/bill/{invoice.uuid}/upload-slip",
+        files={"image": ("transfer.jpg", BytesIO(b"fake-image-data"), "image/jpeg")}
+    )
+    assert upload.status_code == 200
+    db.refresh(invoice)
+    assert invoice.status == "Pending Verification"
+    assert invoice.paid_at is None
+
+    stale_cash_action = client.post(
+        f"/admin/invoice/{invoice.id}/confirm-cash",
+        files={"image": ("cash.jpg", BytesIO(b"fake-cash-receipt"), "image/jpeg")},
+        cookies=cookies
+    )
+    assert stale_cash_action.status_code == 400
+    db.refresh(invoice)
+    assert invoice.status == "Pending Verification"
+
+    # Step 2c: Owner verifies the bank account and approves the transfer.
     res = client.post(f"/admin/invoice/{invoice.id}/approve", cookies=cookies)
     assert res.status_code == 200
     
