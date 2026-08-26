@@ -252,6 +252,8 @@
     "search_room_tenant": "Search room or tenant...",
     "bill_cycle": "Bill Cycle",
     "bill_details": "Bill Details",
+    "total_payment": "Total",
+    "view_bill_btn": "View Bill Details",
     "bill_for_room": "Invoice - Room",
     "pay_online": "Pay Online",
     "pay_cash": "Pay with Cash",

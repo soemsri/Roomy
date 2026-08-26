@@ -6,6 +6,7 @@ exclude = [
     ".git",
     ".github",
     ".pytest_cache",
+    ".venv",
     "venv",
     "tests/legacy",
     "**/*.bak",  # Exclude backup files (like main.py.bak)

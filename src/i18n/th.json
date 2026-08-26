@@ -252,6 +252,8 @@
     "search_room_tenant": "ค้นหาเลขห้อง หรือ ชื่อผู้เช่า...",
     "bill_cycle": "รอบบิล",
     "bill_details": "รายละเอียดบิล",
+    "total_payment": "รวม",
+    "view_bill_btn": "ดูรายละเอียดบิล",
     "bill_for_room": "ใบแจ้งหนี้ - ห้อง",
     "pay_online": "ชำระเงินออนไลน์",
     "pay_cash": "ชำระด้วยเงินสด",
