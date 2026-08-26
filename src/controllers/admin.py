@@ -3142,7 +3142,7 @@ def send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_oth
                 "type": "button",
                 "action": {
                     "type": "uri",
-                    "label": get_text('download_csv', lang).replace("CSV", "QR"),
+                    "label": get_text('download_qr_btn', lang),
                     "uri": qr_large_url
                 },
                 "style": "secondary",

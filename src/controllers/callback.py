@@ -453,7 +453,7 @@ if tenant_handler:
                         "type": "box",
                         "layout": "vertical",
                         "contents": [
-                            {"type": "text", "text": get_text('book_room', lang), "weight": "bold", "size": "lg", "color": "#0f172a"},
+                            {"type": "text", "text": get_text('book_room_card_title', lang), "weight": "bold", "size": "lg", "color": "#0f172a"},
                             {"type": "text", "text": get_text('book_room_subtitle', lang), "size": "sm", "color": "#64748b", "wrap": True, "margin": "md"}
                         ]
                     },
@@ -663,14 +663,23 @@ if tenant_handler:
                         t = active_tenants[0]
                         room_no = t.room.room_number if t.room else "N/A"
                         if cmd == "แจ้งซ่อม":
-                            reply_text = f"{get_text('repairs', lang)} {get_text('room_label_with_no', lang).format(no=room_no)}:\n{BASE_URL}/repair/{t.uuid}?lang={lang}"
+                            reply_text = f"🛠️ {get_text('repair_single_room_header', lang)} ({get_text('room_label_with_no', lang).format(no=room_no)}):\n{BASE_URL}/repair/{t.uuid}?lang={lang}"
                         elif cmd == "ประวัติ":
-                            reply_text = f"{get_text('history', lang)} {get_text('room_label_with_no', lang).format(no=room_no)}:\n{BASE_URL}/history/{t.uuid}?lang={lang}"
+                            reply_text = f"📜 {get_text('history_single_room_header', lang)} ({get_text('room_label_with_no', lang).format(no=room_no)}):\n{BASE_URL}/history/{t.uuid}?lang={lang}"
                         else:
-                            reply_text = f"{get_text('move_out', lang)} {get_text('room_label_with_no', lang).format(no=room_no)}:\n{BASE_URL}/move-out/{t.uuid}?lang={lang}"
+                            reply_text = f"🚪 {get_text('move_out_single_room_header', lang)} ({get_text('room_label_with_no', lang).format(no=room_no)}):\n{BASE_URL}/move-out/{t.uuid}?lang={lang}"
                         safe_reply_or_push(tenant_bot_api, event.reply_token, user_id, [TextMessage(text=reply_text)])
                         return
                     else:
+                        if cmd == "แจ้งซ่อม":
+                            action_title = get_text('select_room_repair', lang)
+                        elif cmd == "ประวัติ":
+                            action_title = get_text('select_room_history', lang)
+                        elif cmd == "ย้ายออก":
+                            action_title = get_text('select_room_move_out', lang)
+                        else:
+                            action_title = get_text('select_room_action', lang)
+
                         bubble_contents = []
                         for t in active_tenants:
                             room_no = t.room.room_number if t.room else "N/A"
@@ -692,7 +701,7 @@ if tenant_handler:
                                 "type": "box",
                                 "layout": "vertical",
                                 "contents": [
-                                    {"type": "text", "text": get_text('select_room_action', lang).format(action=text), "weight": "bold", "size": "md"},
+                                    {"type": "text", "text": action_title, "weight": "bold", "size": "md"},
                                     {"type": "box", "layout": "vertical", "margin": "lg", "contents": bubble_contents}
                                 ]
                             }
@@ -701,7 +710,7 @@ if tenant_handler:
                             tenant_bot_api,
                             event.reply_token,
                             user_id,
-                            [FlexMessage(alt_text=get_text('select_room_action', lang).format(action=text), contents=FlexContainer.from_dict(flex_contents))]
+                            [FlexMessage(alt_text=action_title, contents=FlexContainer.from_dict(flex_contents))]
                         )
                         return
 

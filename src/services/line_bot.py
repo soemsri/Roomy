@@ -69,7 +69,7 @@ def send_initial_payment_flex(tenant, success_rooms, g_deposit, g_advance, g_oth
                 "type": "button",
                 "action": {
                     "type": "uri",
-                    "label": get_text('download_csv', lang).replace("CSV", "QR"), # Hacky but download_csv is "Download ..."
+                    "label": get_text('download_qr_btn', lang),
                     "uri": qr_large_url
                 },
                 "style": "secondary",
@@ -379,7 +379,7 @@ def send_booking_invitation(user_id: str, lang: str = "th", bot_api = None):
             "type": "box",
             "layout": "vertical",
             "contents": [
-                {"type": "text", "text": f"🏢 {get_text('book_room', lang)}", "weight": "bold", "size": "xl", "color": "#FFFFFF", "align": "center"}
+                {"type": "text", "text": f"🏢 {get_text('book_room_card_title', lang)}", "weight": "bold", "size": "xl", "color": "#FFFFFF", "align": "center"}
             ],
             "backgroundColor": "#0078d4",
             "paddingAll": "20px"
@@ -416,7 +416,7 @@ def send_booking_invitation(user_id: str, lang: str = "th", bot_api = None):
         bot_api.push_message(
             PushMessageRequest(
                 to=user_id,
-                messages=[FlexMessage(alt_text=get_text('book_room', lang), contents=FlexContainer.from_dict(flex_contents))]
+                messages=[FlexMessage(alt_text=get_text('book_room_card_title', lang), contents=FlexContainer.from_dict(flex_contents))]
             )
         )
     except Exception as e:
