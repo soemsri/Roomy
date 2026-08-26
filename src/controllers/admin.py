@@ -403,7 +403,12 @@ async def reset_password_page(request: Request, token: str = None, db: Session =
     return templates.TemplateResponse("reset_password.html", {"request": request, "token": token, "lang": lang})
 
 @router.post("/reset-password")
-async def reset_password(token: str = Form(...), new_password: str = Form(...), db: Session = Depends(get_db)):
+async def reset_password(
+    request: Request,
+    token: str = Form(...),
+    new_password: str = Form(...),
+    db: Session = Depends(get_db)
+):
     owner = db.query(models.Owner).first()
     lang = owner.language if owner else "th"
 
@@ -423,6 +428,16 @@ async def reset_password(token: str = Form(...), new_password: str = Form(...), 
         return HTMLResponse(content=f"<h2>{get_text('link_expired', lang)}</h2>", status_code=400)
 
     owner.password_hash = security.hash_password(new_password)
+
+    # A verified password reset proves control of the admin's LINE account.
+    # Clear only this requester's lockout so unrelated attacking IPs stay blocked.
+    login_attempt = db.query(models.LoginAttempt).filter(
+        models.LoginAttempt.ip_address == request.client.host
+    ).first()
+    if login_attempt:
+        login_attempt.attempts = 0
+        login_attempt.locked_until = None
+
     db.commit()
     return RedirectResponse(url="/admin/login?reset_success=1", status_code=303)
 

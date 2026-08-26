@@ -88,3 +88,25 @@ def test_reset_token_is_consumed_once(client, db_session):
     db_session.refresh(owner)
     assert security.verify_password("new-secure-password", owner.password_hash)
     assert not security.verify_password("attacker-password", owner.password_hash)
+
+
+def test_successful_reset_clears_requesting_ip_lockout(client, db_session):
+    reset_token = create_reset_token(db_session)
+    login_attempt = models.LoginAttempt(
+        ip_address="testclient",
+        attempts=3,
+        locked_until=datetime.now() + timedelta(minutes=30),
+    )
+    db_session.add(login_attempt)
+    db_session.commit()
+
+    response = client.post(
+        "/admin/reset-password",
+        data={"token": reset_token.token, "new_password": "new-secure-password"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    db_session.refresh(login_attempt)
+    assert login_attempt.attempts == 0
+    assert login_attempt.locked_until is None
