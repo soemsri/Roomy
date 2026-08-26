@@ -221,7 +221,14 @@ def test_booking_workflow():
     assert approved_tenant.temp_building_id == room.building_id
     assert approved_tenant.current_room_id is None
     assert room.status == "Vacant"
+    approved_tenant_uuid = approved_tenant.uuid
     db.close()
+
+    registration_form = client.get(f"/register/{approved_tenant_uuid}?lang=th")
+    assert registration_form.status_code == 200
+    assert approved_booking.full_name in registration_form.text
+    assert approved_booking.phone_number in registration_form.text
+    assert "2026-09-01" in registration_form.text
 
     # Verify LINE notification was pushed
     assert main.tenant_bot_api.push_message.called

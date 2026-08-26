@@ -137,7 +137,7 @@
         // Initialize Flatpickr
         flatpickr("#requested_move_in_date", {
             dateFormat: "Y-m-d",
-            defaultDate: new Date(),
+            defaultDate: {% if default_data and default_data.requested_move_in_date %}{{ default_data.requested_move_in_date | tojson }}{% else %}new Date(){% endif %},
             locale: lang === 'th' ? 'th' : (lang === 'jp' ? 'ja' : 'default'),
             disableMobile: "true"
         });

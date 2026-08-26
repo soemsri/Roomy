@@ -193,8 +193,17 @@ async def view_registration(request: Request, tenant_uuid: str, db: Session = De
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
 
-    # Try to find default data from previous stays
-    default_data = None
+    # Pre-fill known details from the approved booking/tenant record, then use a
+    # previous stay only to fill any details that are still missing.
+    default_data = {
+        "full_name": tenant.full_name,
+        "phone_number": tenant.phone_number,
+        "citizen_id": tenant.citizen_id,
+        "requested_move_in_date": (
+            tenant.requested_move_in_date.strftime("%Y-%m-%d")
+            if tenant.requested_move_in_date else None
+        )
+    }
 
     prev_tenant = db.query(models.Tenant).filter(
         models.Tenant.line_user_id == tenant.line_user_id,
@@ -202,11 +211,9 @@ async def view_registration(request: Request, tenant_uuid: str, db: Session = De
     ).order_by(models.Tenant.id.desc()).first()
 
     if prev_tenant:
-        default_data = {
-            "full_name": prev_tenant.full_name,
-            "phone_number": prev_tenant.phone_number,
-            "citizen_id": prev_tenant.citizen_id
-        }
+        default_data["full_name"] = default_data["full_name"] or prev_tenant.full_name
+        default_data["phone_number"] = default_data["phone_number"] or prev_tenant.phone_number
+        default_data["citizen_id"] = default_data["citizen_id"] or prev_tenant.citizen_id
 
     return templates.TemplateResponse("register.html", {
         "request": request, 
