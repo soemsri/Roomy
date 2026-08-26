@@ -211,10 +211,37 @@ def test_booking_workflow():
     assert approved_booking.assigned_room_id == room.id
     assert approved_booking.needs_bed == 1
     assert approved_booking.needs_mattress == 0
+    approved_tenant = db.query(models.Tenant).filter(
+        models.Tenant.line_user_id == "U_APPLICANT_123",
+        models.Tenant.status != "Active"
+    ).order_by(models.Tenant.id.desc()).first()
+    assert approved_tenant is not None
+    assert approved_tenant.full_name == approved_booking.full_name
+    assert approved_tenant.phone_number == approved_booking.phone_number
+    assert approved_tenant.temp_building_id == room.building_id
+    assert approved_tenant.current_room_id is None
+    assert room.status == "Vacant"
     db.close()
 
     # Verify LINE notification was pushed
     assert main.tenant_bot_api.push_message.called
+
+    # Approved applicants must see their allocated-room onboarding status, not
+    # the generic "no room" booking invitation.
+    main.tenant_bot_api.reset_mock()
+    event = MockEvent(user_id="U_APPLICANT_123", text="ดูค่าเช่า")
+    db = TestingSessionLocal()
+    handle_tenant_message(event, db=db)
+    db.close()
+    assert main.tenant_bot_api.reply_message.called or main.tenant_bot_api.push_message.called
+    line_call = (
+        main.tenant_bot_api.reply_message.call_args
+        if main.tenant_bot_api.reply_message.called
+        else main.tenant_bot_api.push_message.call_args
+    )
+    assert "ผ่านการคัดเลือกแล้ว" in str(line_call)
+    assert "ยังไม่มีห้องพักในระบบ" not in str(line_call)
+    assert "/register/" in str(line_call)
 
     # 9. Test Admin Rejecting Candidate
     # Create another booking for rejection test

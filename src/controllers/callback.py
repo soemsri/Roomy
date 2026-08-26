@@ -1,6 +1,8 @@
 import logging
+import os
 import traceback
 import re
+import uuid
 from fastapi import APIRouter, Request, HTTPException, Depends
 from sqlalchemy.orm import Session
 from models.database import get_db, SessionLocal
@@ -722,8 +724,53 @@ if tenant_handler:
                     db.refresh(tenant)
 
                 booking_url = f"{BASE_URL}/booking?uid={user_id}&lang={lang}"
-                
-                if text in ["ประวัติ", "ดูค่าเช่า", "แจ้งซ่อม", "ย้ายออก"] or text in [get_text('history', lang), get_text('view_bill', lang), get_text('repairs', lang), get_text('move_out', lang)]:
+
+                approved_booking = db.query(models.BookingRequest).filter(
+                    models.BookingRequest.line_user_id == user_id,
+                    models.BookingRequest.status == "Approved"
+                ).order_by(models.BookingRequest.id.desc()).first()
+
+                pending_action = (
+                    text in ["ประวัติ", "ดูค่าเช่า", "แจ้งซ่อม", "ย้ายเข้า", "ย้ายออก"]
+                    or text in [
+                        get_text('history', lang), get_text('view_bill', lang),
+                        get_text('repairs', lang), get_text('move_in', lang),
+                        get_text('move_out', lang)
+                    ]
+                )
+
+                footer_label = f"📝 {get_text('book_room', lang)}"
+                footer_url = booking_url
+                status_detail = None
+
+                if approved_booking and pending_action:
+                    room = approved_booking.assigned_room
+                    room_no = room.room_number if room else "รอจัดสรร"
+                    building_name = room.building.name if room and room.building else "-"
+                    title_text = "ผ่านการคัดเลือกแล้ว"
+
+                    latest_invoice = db.query(models.Invoice).filter(
+                        models.Invoice.tenant_id == tenant.id
+                    ).order_by(models.Invoice.id.desc()).first()
+
+                    if latest_invoice:
+                        if not latest_invoice.uuid:
+                            latest_invoice.uuid = str(uuid.uuid4())
+                            db.commit()
+                        desc_text = "มีใบแจ้งยอดสำหรับขั้นตอนเข้าพักแล้ว กรุณากดปุ่มด้านล่างเพื่อตรวจสอบและชำระเงิน"
+                        footer_label = "ดูใบแจ้งยอดแรกเข้า"
+                        footer_url = f"{BASE_URL}/bill/{latest_invoice.uuid}?lang={lang}"
+                    elif tenant.status == "AwaitingRegistration":
+                        desc_text = "ห้องของคุณอยู่ระหว่างขั้นตอนกรอกข้อมูลทำสัญญาและชำระเงินแรกเข้า จึงยังไม่มีใบแจ้งค่าเช่า"
+                        footer_label = "กรอกข้อมูลเพื่อทำสัญญา"
+                        footer_url = f"{BASE_URL}/register/{tenant.uuid}?lang={lang}"
+                    else:
+                        desc_text = "ระบบได้รับข้อมูลทำสัญญาแล้ว ขณะนี้กำลังรอผู้ดูแลตรวจสอบและออกใบแจ้งยอดแรกเข้า"
+                        footer_label = "ตรวจสอบข้อมูลทำสัญญา"
+                        footer_url = f"{BASE_URL}/register/{tenant.uuid}?lang={lang}"
+
+                    status_detail = f"อาคาร {building_name} • ห้อง {room_no}"
+                elif pending_action:
                     title_text = "ยังไม่มีห้องพักในระบบ"
                     desc_text = "ไม่พบห้องพักที่เปิดใช้งานของคุณในระบบ หากคุณสนใจเข้าพัก สามารถกดจองห้องพักออนไลน์ได้ที่ปุ่มด้านล่างครับ"
                 else:
@@ -744,6 +791,7 @@ if tenant_handler:
                         "layout": "vertical",
                         "contents": [
                             {"type": "text", "text": title_text, "weight": "bold", "size": "lg", "color": "#0f172a"},
+                            *([{"type": "text", "text": status_detail, "weight": "bold", "size": "sm", "color": "#0284c7", "wrap": True, "margin": "sm"}] if status_detail else []),
                             {"type": "text", "text": desc_text, "size": "sm", "color": "#64748b", "wrap": True, "margin": "md"}
                         ]
                     },
@@ -759,8 +807,8 @@ if tenant_handler:
                                 "color": "#0284c7",
                                 "action": {
                                     "type": "uri",
-                                    "label": f"📝 {get_text('book_room', lang)}",
-                                    "uri": booking_url
+                                    "label": footer_label,
+                                    "uri": footer_url
                                 }
                             }
                         ]
@@ -799,4 +847,3 @@ if not tenant_handler:
         pass
     def handle_tenant_postback(event, *args, **kwargs):
         pass
-

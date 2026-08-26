@@ -3776,6 +3776,34 @@ async def approve_booking_endpoint(
     booking.status = "Approved"
     if admin_notes:
         booking.admin_notes = admin_notes
+
+    # Booking approval is candidate selection, not an active tenancy yet.  Keep a
+    # non-active tenant record in sync so the candidate can continue to the
+    # registration/contract and initial-payment workflow without being shown as
+    # an entirely new visitor.
+    tenant = db.query(models.Tenant).filter(
+        models.Tenant.line_user_id == booking.line_user_id,
+        models.Tenant.status.in_([
+            "AwaitingRegistration", "AwaitingBuilding", "AwaitingRoom",
+            "AwaitingName", "AwaitingPhone", "Pending"
+        ])
+    ).order_by(models.Tenant.id.desc()).first()
+    if not tenant:
+        tenant = models.Tenant(
+            line_user_id=booking.line_user_id,
+            status="AwaitingRegistration"
+        )
+        db.add(tenant)
+
+    tenant.full_name = booking.full_name
+    tenant.phone_number = booking.phone_number
+    tenant.requested_move_in_date = booking.requested_move_in_date
+    tenant.language = booking.language or tenant.language or "th"
+    if room:
+        tenant.temp_building_id = room.building_id
+
+    db.flush()
+    registration_url = f"{BASE_URL}/register/{tenant.uuid}?lang={tenant.language or 'th'}"
     db.commit()
 
     owner = db.query(models.Owner).first()
@@ -3787,7 +3815,8 @@ async def approve_booking_endpoint(
         room_number=room_number,
         building_name=building_name,
         owner=owner,
-        bot_api=tenant_bot_api
+        bot_api=tenant_bot_api,
+        registration_url=registration_url
     )
 
     log_activity(

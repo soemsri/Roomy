@@ -422,7 +422,7 @@ def send_booking_invitation(user_id: str, lang: str = "th", bot_api = None):
     except Exception as e:
         logger.error(f"Failed to send booking invitation: {e}")
 
-def send_booking_approved_flex(booking, room_number: str = "N/A", building_name: str = "อาคารหลัก", owner = None, bot_api = None):
+def send_booking_approved_flex(booking, room_number: str = "N/A", building_name: str = "อาคารหลัก", owner = None, bot_api = None, registration_url: str = None):
     """Sends a celebratory approval Flex Message to the candidate's LINE."""
     if not bot_api or not booking or not booking.line_user_id:
         return
@@ -489,6 +489,25 @@ def send_booking_approved_flex(booking, room_number: str = "N/A", building_name:
             "paddingAll": "20px"
         }
     }
+
+    if registration_url:
+        flex_contents["footer"] = {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {
+                    "type": "button",
+                    "style": "primary",
+                    "color": "#22c55e",
+                    "action": {
+                        "type": "uri",
+                        "label": "กรอกข้อมูลเพื่อทำสัญญา",
+                        "uri": registration_url
+                    }
+                }
+            ],
+            "paddingAll": "16px"
+        }
     
     try:
         bot_api.push_message(
