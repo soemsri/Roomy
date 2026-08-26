@@ -219,7 +219,7 @@ def test_booking_workflow():
     assert approved_tenant.full_name == approved_booking.full_name
     assert approved_tenant.phone_number == approved_booking.phone_number
     assert approved_tenant.temp_building_id == room.building_id
-    assert approved_tenant.current_room_id is None
+    assert approved_tenant.current_room_id == room.id
     assert room.status == "Vacant"
     approved_tenant_uuid = approved_tenant.uuid
     db.close()
@@ -229,6 +229,13 @@ def test_booking_workflow():
     assert approved_booking.full_name in registration_form.text
     assert approved_booking.phone_number in registration_form.text
     assert "2026-09-01" in registration_form.text
+
+    search_response = client.get("/admin/tenants/search?q=สมชาย")
+    assert search_response.status_code == 200
+    search_results = search_response.json()
+    approved_result = next(r for r in search_results if r["name"] == "สมชาย ใจดี")
+    assert approved_result["type"] == "Approved"
+    assert approved_result["room"] == "101"
 
     # Verify LINE notification was pushed
     assert main.tenant_bot_api.push_message.called

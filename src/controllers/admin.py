@@ -479,6 +479,13 @@ async def admin_dashboard(
         .all()
     pending_registrations = db.query(models.Tenant).filter(models.Tenant.status == "Pending").all()
     awaiting_payment_tenants = db.query(models.Tenant).filter(models.Tenant.status == "Awaiting Payment").all()
+    room_reservations = {
+        tenant.current_room_id: tenant.id
+        for tenant in db.query(models.Tenant).filter(
+            models.Tenant.current_room_id != None,
+            models.Tenant.status.notin_(["Active", "Rejected", "MovedOut"])
+        ).all()
+    }
     move_out_requests = db.query(models.MoveOutRequest).filter(models.MoveOutRequest.status == "Pending").all()
     bookings = db.query(models.BookingRequest).options(joinedload(models.BookingRequest.preferred_building), joinedload(models.BookingRequest.assigned_room)).order_by(models.BookingRequest.id.desc()).all()
     pending_bookings = [b for b in bookings if b.status == "Pending"]
@@ -500,6 +507,7 @@ async def admin_dashboard(
         "active_tenants": active_tenants,
         "pending_registrations": pending_registrations,
         "awaiting_payment_tenants": awaiting_payment_tenants,
+        "room_reservations": room_reservations,
         "move_out_requests": move_out_requests,
         "bookings": bookings,
         "pending_bookings": pending_bookings,
@@ -2450,6 +2458,13 @@ async def get_tenant_history(page: int = 1, page_size: int = 10, db: Session = D
 
 @router.get("/tenants/search")
 async def search_tenants(q: str = "", db: Session = Depends(get_db), admin: bool = Depends(get_admin)):
+    tenants = db.query(models.Tenant).filter(
+        or_(
+            models.Tenant.full_name.ilike(f"%{q}%"),
+            models.Tenant.phone_number.ilike(f"%{q}%")
+        )
+    ).order_by(models.Tenant.id.desc()).all()
+
     current_residents = db.query(models.Resident).filter(
         or_(
             models.Resident.first_name.ilike(f"%{q}%"),
@@ -2468,6 +2483,38 @@ async def search_tenants(q: str = "", db: Session = Depends(get_db), admin: bool
     ).all()
     
     results = []
+    for tenant in tenants:
+        approved_booking = db.query(models.BookingRequest).filter(
+            models.BookingRequest.line_user_id == tenant.line_user_id,
+            models.BookingRequest.status == "Approved"
+        ).order_by(models.BookingRequest.id.desc()).first()
+        allocated_room = tenant.room or (approved_booking.assigned_room if approved_booking else None)
+
+        if tenant.status == "Active":
+            result_type = "Current"
+            period = "ปัจจุบัน"
+        elif approved_booking:
+            result_type = "Approved"
+            period = "ผ่านการคัดเลือก / รอดำเนินการแรกเข้า"
+        elif tenant.status == "Pending":
+            result_type = "Registration"
+            period = "รอตรวจสอบข้อมูลทำสัญญา"
+        elif tenant.status == "Awaiting Payment":
+            result_type = "Payment"
+            period = "รอชำระเงินแรกเข้า"
+        else:
+            result_type = tenant.status or "Applicant"
+            period = "อยู่ระหว่างดำเนินการ"
+
+        results.append({
+            "type": result_type,
+            "room": allocated_room.room_number if allocated_room else "N/A",
+            "name": tenant.full_name or "-",
+            "phone": tenant.phone_number or "-",
+            "workplace": "",
+            "period": period
+        })
+
     for r in current_residents:
         results.append({
             "type": "Current",
@@ -3801,6 +3848,14 @@ async def approve_booking_endpoint(
     tenant.language = booking.language or tenant.language or "th"
     if room:
         tenant.temp_building_id = room.building_id
+        conflicting_tenant = db.query(models.Tenant).filter(
+            models.Tenant.current_room_id == room.id,
+            models.Tenant.id != tenant.id,
+            models.Tenant.status.notin_(["Rejected", "MovedOut"])
+        ).first()
+        if room.status != "Vacant" or conflicting_tenant:
+            raise HTTPException(status_code=400, detail="ห้องนี้ถูกใช้งานหรือจัดสรรให้บุคคลอื่นแล้ว")
+        tenant.current_room_id = room.id
 
     db.flush()
     registration_url = f"{BASE_URL}/register/{tenant.uuid}?lang={tenant.language or 'th'}"
@@ -3847,6 +3902,22 @@ async def reject_booking_endpoint(
     booking.status = "Rejected"
     if reason:
         booking.admin_notes = reason
+
+    if booking.assigned_room_id:
+        tenant = db.query(models.Tenant).filter(
+            models.Tenant.line_user_id == booking.line_user_id,
+            models.Tenant.current_room_id == booking.assigned_room_id,
+            models.Tenant.status != "Active"
+        ).order_by(models.Tenant.id.desc()).first()
+        if tenant:
+            other_approved = db.query(models.BookingRequest).filter(
+                models.BookingRequest.id != booking.id,
+                models.BookingRequest.line_user_id == booking.line_user_id,
+                models.BookingRequest.assigned_room_id == booking.assigned_room_id,
+                models.BookingRequest.status == "Approved"
+            ).first()
+            if not other_approved:
+                tenant.current_room_id = None
     db.commit()
 
     owner = db.query(models.Owner).first()

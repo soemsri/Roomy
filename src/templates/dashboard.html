@@ -2539,7 +2539,7 @@
     <script id="vacant_rooms_data" type="application/json">
         [
             {% for r in all_rooms if r.status == 'Vacant' %}
-            {"id": {{ r.id }}, "room_number": "{{ r.room_number }}", "floor": {{ r.floor }}, "building_id": {{ r.building_id or 'null' }}}{% if not loop.last %},{% endif %}
+            {"id": {{ r.id }}, "room_number": "{{ r.room_number }}", "floor": {{ r.floor }}, "building_id": {{ r.building_id or 'null' }}, "reserved_tenant_id": {% if room_reservations.get(r.id) %}{{ room_reservations.get(r.id) }}{% else %}null{% endif %}}{% if not loop.last %},{% endif %}
             {% endfor %}
         ]
     </script>
@@ -2725,14 +2725,16 @@
                 container.innerHTML = `<span style="color: #888; font-size: 0.85rem;">-- ${translations.select_building_placeholder || '--'} --</span>`;
                 return;
             }
-            const filtered = allVacantRooms.filter(r => r.building_id == buildingId);
+            const filtered = allVacantRooms.filter(r =>
+                r.building_id == buildingId && (!r.reserved_tenant_id || r.reserved_tenant_id == tenantId)
+            );
             if (filtered.length === 0) {
                 container.innerHTML = `<span style="color: var(--danger); font-size: 0.85rem;">-- ${translations.no_rooms_available || '--'} --</span>`;
                 return;
             }
             container.innerHTML = filtered.map(r => `
                 <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
-                    <input type="checkbox" class="reg-room-checkbox-${tenantId}" value="${r.id}" id="room_${tenantId}_${r.id}" style="width: 16px; height: 16px; margin: 0;">
+                    <input type="checkbox" class="reg-room-checkbox-${tenantId}" value="${r.id}" id="room_${tenantId}_${r.id}" style="width: 16px; height: 16px; margin: 0;" ${r.reserved_tenant_id == tenantId ? 'checked' : ''}>
                     <label for="room_${tenantId}_${r.id}" style="margin: 0; font-size: 0.9rem; cursor: pointer;">${translations.room} ${r.room_number} (${translations.floor} ${r.floor})</label>
                 </div>
             `).join('');
@@ -3123,7 +3125,7 @@
             const res = await fetch(`/admin/tenants/search?q=${encodeURIComponent(q)}`);
             const data = await res.json();
             document.getElementById('searchResultArea').style.display = 'block';
-            document.getElementById('searchResultList').innerHTML = data.map(r => `<tr><td><span class="badge ${r.type=='Current'?'badge-success':'badge-danger'}">${r.type}</span></td><td>${r.room}</td><td>${r.name}</td><td>${r.phone}</td><td>${r.period}</td></tr>`).join('') || `<tr><td colspan="5">${translations.no_data}</td></tr>`;
+            document.getElementById('searchResultList').innerHTML = data.map(r => `<tr><td><span class="badge ${r.type=='Current'?'badge-success':(r.type=='Past'?'badge-danger':'badge-warning')}">${r.type}</span></td><td>${r.room}</td><td>${r.name}</td><td>${r.phone}</td><td>${r.period}</td></tr>`).join('') || `<tr><td colspan="5">${translations.no_data}</td></tr>`;
         }
 
         function manageResidents(tenantId, roomNumber) {
@@ -4401,7 +4403,8 @@
                 vacantRooms = JSON.parse(document.getElementById('vacant_rooms_data').textContent);
             } catch(e) {}
 
-            const filtered = buildingId ? vacantRooms.filter(r => String(r.building_id) === String(buildingId)) : vacantRooms;
+            const availableRooms = vacantRooms.filter(r => !r.reserved_tenant_id);
+            const filtered = buildingId ? availableRooms.filter(r => String(r.building_id) === String(buildingId)) : availableRooms;
             if (filtered.length === 0) {
                 select.innerHTML = '<option value="">-- ไม่มีห้องว่างในอาคารนี้ --</option>';
                 return;
