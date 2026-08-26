@@ -345,6 +345,11 @@ async def request_password_reset(db: Session = Depends(get_db)):
     if not owner or not owner.line_user_id or owner.line_user_id == "SYSTEM":
         return {"error": "No valid admin LINE ID found. Please contact support."}
     
+    # Invalidate older reset links before issuing a new one.
+    db.query(models.PasswordResetToken).filter(
+        models.PasswordResetToken.used == 0
+    ).update({models.PasswordResetToken.used: 1}, synchronize_session=False)
+
     # Generate token
     token = secrets.token_urlsafe(32)
     expires_at = datetime.now() + timedelta(minutes=5)
@@ -359,7 +364,10 @@ async def request_password_reset(db: Session = Depends(get_db)):
     # Send LINE message
     if admin_bot_api:
         lang = owner.language or "th"
-        reset_link = f"{BASE_URL}/admin/magic-login?token={token}&redirect=/admin/reset-password"
+        # Password-reset tokens are separate from one-time magic-login tokens.
+        # A direct reset URL also allows LINE's link preview to perform a safe GET
+        # without consuming the token before the user submits a new password.
+        reset_link = f"{BASE_URL}/admin/reset-password?token={token}"
         message = get_text('reset_link_msg', lang).format(link=reset_link)
         try:
             admin_bot_api.push_message(
@@ -379,41 +387,44 @@ async def reset_password_page(request: Request, token: str = None, db: Session =
     owner = db.query(models.Owner).first()
     lang = owner.language if owner else "th"
     
+    # GET only validates the token. It must not consume it because messaging
+    # platforms may fetch links automatically to generate a preview.
+    reset_token = None
     if token:
-        # Check token validity
         reset_token = db.query(models.PasswordResetToken).filter(
             models.PasswordResetToken.token == token,
             models.PasswordResetToken.used == 0,
             models.PasswordResetToken.expires_at > datetime.now()
         ).first()
-        
-        if not reset_token:
-            return HTMLResponse(content=f"<h2>{get_text('link_expired', lang)}</h2>", status_code=400)
+
+    if not reset_token:
+        return HTMLResponse(content=f"<h2>{get_text('link_expired', lang)}</h2>", status_code=400)
     
     return templates.TemplateResponse("reset_password.html", {"request": request, "token": token, "lang": lang})
 
 @router.post("/reset-password")
-async def reset_password(token: str = Form(None), new_password: str = Form(...), db: Session = Depends(get_db)):
+async def reset_password(token: str = Form(...), new_password: str = Form(...), db: Session = Depends(get_db)):
     owner = db.query(models.Owner).first()
     lang = owner.language if owner else "th"
 
-    if token:
-        reset_token = db.query(models.PasswordResetToken).filter(
-            models.PasswordResetToken.token == token,
-            models.PasswordResetToken.used == 0,
-            models.PasswordResetToken.expires_at > datetime.now()
-        ).first()
-        
-        if not reset_token:
-            return HTMLResponse(content=f"<h2>{get_text('link_expired', lang)}</h2>", status_code=400)
-        reset_token.used = 1
+    if not owner:
+        return HTMLResponse(content=f"<h2>{get_text('reset_error', lang)}</h2>", status_code=500)
 
-    if owner:
-        owner.password_hash = security.hash_password(new_password)
-        db.commit()
-        return RedirectResponse(url="/admin/login?reset_success=1", status_code=303)
-    
-    return HTMLResponse(content=f"<h2>{get_text('reset_error', lang)}</h2>", status_code=500)
+    # Claim the token conditionally so concurrent or replayed submissions cannot
+    # use the same link twice. The claim and password update share one transaction.
+    claimed = db.query(models.PasswordResetToken).filter(
+        models.PasswordResetToken.token == token,
+        models.PasswordResetToken.used == 0,
+        models.PasswordResetToken.expires_at > datetime.now()
+    ).update({models.PasswordResetToken.used: 1}, synchronize_session=False)
+
+    if claimed != 1:
+        db.rollback()
+        return HTMLResponse(content=f"<h2>{get_text('link_expired', lang)}</h2>", status_code=400)
+
+    owner.password_hash = security.hash_password(new_password)
+    db.commit()
+    return RedirectResponse(url="/admin/login?reset_success=1", status_code=303)
 
 @router.post("/generate-pairing-code")
 async def generate_pairing_code(db: Session = Depends(get_db), admin: bool = Depends(get_super_admin)):
@@ -3789,4 +3800,3 @@ async def delete_booking_endpoint(
     )
 
     return {"status": "Success"}
-
