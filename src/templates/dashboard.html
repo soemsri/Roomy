@@ -327,6 +327,42 @@
         .modal-body { padding: 25px; }
         .modal-footer { padding: 15px 25px; background: #f8f9fa; border-top: 1px solid var(--border); text-align: right; }
 
+        /* Parcel entry modal: keep the actions inside the mobile viewport while
+           allowing only the form fields to scroll. */
+        #newParcelModal {
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+            padding: 12px;
+            overflow: hidden;
+        }
+        #newParcelModal .modal-content {
+            display: flex;
+            flex-direction: column;
+            width: min(520px, 100%);
+            max-height: calc(100vh - 24px);
+            max-height: calc(100dvh - 24px);
+            margin: 0;
+        }
+        #newParcelModal form {
+            display: flex;
+            flex: 1 1 auto;
+            flex-direction: column;
+            min-height: 0;
+        }
+        #newParcelModal .modal-header,
+        #newParcelModal .modal-footer {
+            flex: 0 0 auto;
+        }
+        #newParcelModal .modal-body {
+            flex: 1 1 auto;
+            min-height: 0;
+            max-height: none !important;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch;
+        }
+
         .tabs { display: flex; background: #f8f9fa; padding: 5px; border-radius: 10px; margin-bottom: 25px; }
         .tab { flex: 1; padding: 10px; text-align: center; cursor: pointer; border-radius: 8px; font-weight: 600; font-size: 0.9em; color: var(--secondary); transition: all 0.2s; }
         .tab.active { background: white; color: var(--primary); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
@@ -404,6 +440,25 @@
             #leaseSection { padding: 16px; }
             #leaseSection .section-header { align-items: stretch; }
             #leaseSection .search-group { max-width: none !important; }
+
+            #newParcelModal { padding: 8px; }
+            #newParcelModal .modal-content {
+                max-height: calc(100vh - 16px);
+                max-height: calc(100dvh - 16px);
+                border-radius: 12px !important;
+            }
+            #newParcelModal .modal-header { padding: 13px 15px !important; }
+            #newParcelModal .modal-header h3 { font-size: 1rem !important; }
+            #newParcelModal .modal-body { padding: 16px !important; }
+            #newParcelModal .modal-footer {
+                padding: 10px 12px max(10px, env(safe-area-inset-bottom)) !important;
+                gap: 8px !important;
+            }
+            #newParcelModal .modal-footer .btn {
+                flex: 1 1 auto;
+                justify-content: center;
+                padding: 10px 8px !important;
+            }
         }
     </style>
     <!-- CKEditor 5 for Lease Template -->

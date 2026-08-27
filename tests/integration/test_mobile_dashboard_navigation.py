@@ -13,3 +13,6 @@ def test_dashboard_has_mobile_navigation_controls(client):
     assert 'id="sidebarOverlay"' in response.text
     assert "function toggleMobileSidebar()" in response.text
     assert 'href="#leaseSection"' in response.text
+    assert "#newParcelModal .modal-content" in response.text
+    assert "max-height: calc(100dvh - 16px)" in response.text
+    assert "max-height: none !important" in response.text
