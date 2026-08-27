@@ -346,3 +346,25 @@ class BookingRequest(Base):
     preferred_building = relationship("Building", foreign_keys=[preferred_building_id])
     preferred_room = relationship("Room", foreign_keys=[preferred_room_id])
     assigned_room = relationship("Room", foreign_keys=[assigned_room_id])
+
+class Parcel(Base):
+    __tablename__ = "parcels"
+    id = Column(Integer, primary_key=True, index=True)
+    room_id = Column(Integer, ForeignKey("rooms.id"), index=True, nullable=False)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), index=True, nullable=True)
+    carrier = Column(String(50), nullable=False)
+    tracking_number = Column(String(100), nullable=True)
+    parcel_image_url = Column(String(255), nullable=True)
+    status = Column(String(20), default="pending") # pending, received, cancelled
+    arrived_at = Column(DateTime, server_default=func.now())
+    received_at = Column(DateTime, nullable=True)
+    received_by_name = Column(String(100), nullable=True)
+    proof_image_url = Column(String(255), nullable=True)
+    notes = Column(Text, nullable=True)
+    created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    room = relationship("Room")
+    tenant = relationship("Tenant")
+    created_by_user = relationship("User", foreign_keys=[created_by_user_id])

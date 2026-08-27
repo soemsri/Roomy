@@ -653,6 +653,50 @@ if tenant_handler:
                     safe_reply_or_push(tenant_bot_api, event.reply_token, user_id, messages[:5])
                     return
                 
+                elif text in ["พัสดุ", "parcel", "parcels", "พัสดุของฉัน", "เช็คพัสดุ"] or text == get_text('parcels', lang):
+                    if len(active_tenants) == 1:
+                        t = active_tenants[0]
+                        room_no = t.room.room_number if t.room else "N/A"
+                        pending_count = db.query(models.Parcel).filter(
+                            models.Parcel.room_id == t.current_room_id,
+                            models.Parcel.status == "pending"
+                        ).count()
+                        parcel_url = f"{BASE_URL}/parcels/{t.uuid}?lang={lang}"
+                        status_msg = f"คุณมีพัสดุรอรับ {pending_count} ชิ้น" if lang == "th" else f"You have {pending_count} parcel(s) pending."
+                        reply_text = f"📦 {get_text('parcels', lang) or 'พัสดุ'} ({get_text('room_label_with_no', lang).format(no=room_no)}):\n{status_msg}\n{parcel_url}"
+                        safe_reply_or_push(tenant_bot_api, event.reply_token, user_id, [TextMessage(text=reply_text)])
+                        return
+                    else:
+                        action_title = "📦 " + (get_text('parcels', lang) or "รายการพัสดุ")
+                        bubble_contents = []
+                        for t in active_tenants:
+                            room_no = t.room.room_number if t.room else "N/A"
+                            parcel_url = f"{BASE_URL}/parcels/{t.uuid}?lang={lang}"
+                            bubble_contents.append({
+                                "type": "button",
+                                "style": "secondary",
+                                "margin": "sm",
+                                "action": {"type": "uri", "label": get_text('room_label_with_no', lang).format(no=room_no), "uri": parcel_url}
+                            })
+                        flex_contents = {
+                            "type": "bubble",
+                            "body": {
+                                "type": "box",
+                                "layout": "vertical",
+                                "contents": [
+                                    {"type": "text", "text": action_title, "weight": "bold", "size": "md"},
+                                    {"type": "box", "layout": "vertical", "margin": "lg", "contents": bubble_contents}
+                                ]
+                            }
+                        }
+                        safe_reply_or_push(
+                            tenant_bot_api,
+                            event.reply_token,
+                            user_id,
+                            [FlexMessage(alt_text=action_title, contents=FlexContainer.from_dict(flex_contents))]
+                        )
+                        return
+
                 elif text in ["แจ้งซ่อม", "ประวัติ", "ย้ายออก"] or text in [get_text('repairs', lang), get_text('history', lang), get_text('move_out', lang)]:
                     cmd = text
                     if text == get_text('repairs', lang): cmd = "แจ้งซ่อม"

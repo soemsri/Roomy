@@ -462,12 +462,18 @@ async def admin_dashboard(
     current_user: models.User = Depends(get_current_user)
 ):
     lang = request.cookies.get("lang", "th")
+    seven_days_ago = datetime.now() - timedelta(days=7)
+    today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
     stats = {
         "total_rooms": db.query(models.Room).count(),
         "vacant_rooms": db.query(models.Room).filter(models.Room.status == "Vacant").count(),
         "unpaid_invoices": db.query(models.Invoice).filter(models.Invoice.status == "Unpaid").count(),
         "pending_verification": db.query(models.Invoice).filter(models.Invoice.status == "Pending Verification").count(),
-        "pending_repairs": db.query(models.MaintenanceRequest).filter(models.MaintenanceRequest.status == "Pending").count()
+        "pending_repairs": db.query(models.MaintenanceRequest).filter(models.MaintenanceRequest.status == "Pending").count(),
+        "pending_parcels": db.query(models.Parcel).filter(models.Parcel.status == "pending").count(),
+        "overdue_parcels": db.query(models.Parcel).filter(models.Parcel.status == "pending", models.Parcel.arrived_at < seven_days_ago).count(),
+        "received_today_parcels": db.query(models.Parcel).filter(models.Parcel.status == "received", models.Parcel.received_at >= today_start).count()
     }
     recent_invoices = db.query(models.Invoice).options(joinedload(models.Invoice.tenant)).order_by(models.Invoice.id.desc()).limit(10).all()
     recent_repairs = db.query(models.MaintenanceRequest).order_by(models.MaintenanceRequest.id.desc()).limit(5).all()
@@ -3983,3 +3989,305 @@ async def delete_booking_endpoint(
     )
 
     return {"status": "Success"}
+
+# ==========================================
+# PARCEL MANAGEMENT SYSTEM (ระบบจัดการพัสดุ)
+# ==========================================
+
+@router.get("/parcels/stats")
+async def get_parcel_stats(
+    db: Session = Depends(get_db),
+    admin: bool = Depends(get_admin)
+):
+    seven_days_ago = datetime.now() - timedelta(days=7)
+    today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+    pending_count = db.query(models.Parcel).filter(models.Parcel.status == "pending").count()
+    overdue_count = db.query(models.Parcel).filter(models.Parcel.status == "pending", models.Parcel.arrived_at < seven_days_ago).count()
+    received_today = db.query(models.Parcel).filter(models.Parcel.status == "received", models.Parcel.received_at >= today_start).count()
+    total_received = db.query(models.Parcel).filter(models.Parcel.status == "received").count()
+
+    return {
+        "pending": pending_count,
+        "overdue": overdue_count,
+        "received_today": received_today,
+        "total_received": total_received
+    }
+
+@router.get("/parcels/list")
+async def list_parcels(
+    status: str = "all",
+    building_id: str = None,
+    room_id: str = None,
+    q: str = None,
+    page: int = 1,
+    page_size: int = 20,
+    db: Session = Depends(get_db),
+    admin: bool = Depends(get_admin)
+):
+    seven_days_ago = datetime.now() - timedelta(days=7)
+    query = db.query(models.Parcel).options(
+        joinedload(models.Parcel.room).joinedload(models.Room.building),
+        joinedload(models.Parcel.tenant),
+        joinedload(models.Parcel.created_by_user)
+    )
+
+    if status == "pending":
+        query = query.filter(models.Parcel.status == "pending")
+    elif status == "received":
+        query = query.filter(models.Parcel.status == "received")
+    elif status == "overdue":
+        query = query.filter(models.Parcel.status == "pending", models.Parcel.arrived_at < seven_days_ago)
+
+    if building_id and building_id != "all":
+        try:
+            bid = int(building_id)
+            query = query.join(models.Room, models.Parcel.room_id == models.Room.id).filter(models.Room.building_id == bid)
+        except ValueError:
+            pass
+
+    if room_id and room_id != "all":
+        try:
+            rid = int(room_id)
+            query = query.filter(models.Parcel.room_id == rid)
+        except ValueError:
+            pass
+
+    if q:
+        search_term = f"%{q.strip()}%"
+        query = query.outerjoin(models.Room, models.Parcel.room_id == models.Room.id)\
+            .outerjoin(models.Tenant, models.Parcel.tenant_id == models.Tenant.id)\
+            .filter(
+                or_(
+                    models.Parcel.carrier.ilike(search_term),
+                    models.Parcel.tracking_number.ilike(search_term),
+                    models.Parcel.notes.ilike(search_term),
+                    models.Parcel.received_by_name.ilike(search_term),
+                    models.Room.room_number.ilike(search_term),
+                    models.Tenant.full_name.ilike(search_term)
+                )
+            )
+
+    total_items = query.count()
+    items = query.order_by(
+        models.Parcel.status == "pending",
+        models.Parcel.id.desc()
+    ).offset((page - 1) * page_size).limit(page_size).all()
+
+    import math
+    total_pages = math.ceil(total_items / page_size) if total_items > 0 else 1
+
+    results = []
+    for p in items:
+        is_overdue = bool(p.status == "pending" and p.arrived_at and p.arrived_at < seven_days_ago)
+        results.append({
+            "id": p.id,
+            "room_id": p.room_id,
+            "room_number": p.room.room_number if p.room else "N/A",
+            "building_id": p.room.building_id if (p.room and p.room.building) else None,
+            "building_name": p.room.building.name if (p.room and p.room.building) else "",
+            "tenant_id": p.tenant_id,
+            "tenant_name": p.tenant.full_name if p.tenant else "-",
+            "tenant_phone": p.tenant.phone_number if p.tenant else "-",
+            "tenant_uuid": p.tenant.uuid if p.tenant else None,
+            "carrier": p.carrier,
+            "tracking_number": p.tracking_number,
+            "parcel_image_url": p.parcel_image_url,
+            "status": p.status,
+            "arrived_at": p.arrived_at.isoformat() if p.arrived_at else None,
+            "arrived_at_formatted": p.arrived_at.strftime("%d/%m/%Y %H:%M") if p.arrived_at else "-",
+            "received_at": p.received_at.isoformat() if p.received_at else None,
+            "received_at_formatted": p.received_at.strftime("%d/%m/%Y %H:%M") if p.received_at else "-",
+            "received_by_name": p.received_by_name,
+            "proof_image_url": p.proof_image_url,
+            "notes": p.notes,
+            "is_overdue": is_overdue,
+            "created_by_user_id": p.created_by_user_id,
+            "created_by_name": p.created_by_user.full_name if p.created_by_user else "Admin"
+        })
+
+    return {
+        "items": results,
+        "total": total_items,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": total_pages
+    }
+
+@router.post("/parcels/create")
+async def create_parcel(
+    room_id: int = Form(...),
+    carrier: str = Form(...),
+    tracking_number: str = Form(None),
+    notes: str = Form(None),
+    parcel_image: UploadFile = File(None),
+    db: Session = Depends(get_db),
+    admin: bool = Depends(get_admin),
+    current_user: models.User = Depends(get_current_user)
+):
+    room = db.query(models.Room).filter(models.Room.id == room_id).first()
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+
+    # Find active tenant in room
+    tenant = db.query(models.Tenant).filter(
+        models.Tenant.current_room_id == room_id,
+        models.Tenant.status == "Active"
+    ).first()
+
+    # Handle image upload
+    parcel_image_url = None
+    if parcel_image and parcel_image.filename:
+        file_ext = os.path.splitext(parcel_image.filename)[1].lower() or ".jpg"
+        file_name = f"parcel_{uuid.uuid4().hex}{file_ext}"
+        file_path = os.path.join(uploads_dir, file_name)
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(parcel_image.file, buffer)
+        parcel_image_url = f"/uploads/{file_name}"
+
+    user_id = getattr(current_user, 'id', None)
+    if not user_id:
+        real_user = db.query(models.User).filter(models.User.email == current_user.email).first()
+        user_id = real_user.id if real_user else None
+
+    clean_tracking = tracking_number.strip() if tracking_number else None
+    clean_notes = notes.strip() if notes else None
+    clean_carrier = carrier.strip()
+
+    parcel = models.Parcel(
+        room_id=room_id,
+        tenant_id=tenant.id if tenant else None,
+        carrier=clean_carrier,
+        tracking_number=clean_tracking,
+        parcel_image_url=parcel_image_url,
+        status="pending",
+        arrived_at=datetime.now(),
+        notes=clean_notes,
+        created_by_user_id=user_id
+    )
+    db.add(parcel)
+    db.commit()
+    db.refresh(parcel)
+
+    # Activity Log
+    log_activity(
+        db,
+        current_user.email,
+        "Create Parcel",
+        f"Room {room.room_number}",
+        f"Registered parcel #{parcel.id} from {clean_carrier} (Tracking: {clean_tracking or '-'})"
+    )
+
+    # LINE Push Notification to Tenant
+    if tenant and tenant.line_user_id:
+        try:
+            import services.line_bot as line_bot_service
+            owner = db.query(models.Owner).first()
+            line_bot_service.send_parcel_arrived_flex(
+                parcel=parcel,
+                room_number=room.room_number,
+                building_name=room.building.name if room.building else "",
+                tenant=tenant,
+                bot_api=tenant_bot_api,
+                owner=owner
+            )
+        except Exception as err:
+            logger.error(f"Failed to push LINE notification for new parcel: {err}")
+
+    return {
+        "status": "success",
+        "message": "Parcel registered successfully",
+        "parcel_id": parcel.id
+    }
+
+@router.post("/parcels/{parcel_id}/receive")
+async def receive_parcel(
+    parcel_id: int,
+    received_by_name: str = Form(None),
+    proof_image: UploadFile = File(None),
+    db: Session = Depends(get_db),
+    admin: bool = Depends(get_admin),
+    current_user: models.User = Depends(get_current_user)
+):
+    parcel = db.query(models.Parcel).filter(models.Parcel.id == parcel_id).first()
+    if not parcel:
+        raise HTTPException(status_code=404, detail="Parcel not found")
+
+    # Handle proof photo if uploaded
+    if proof_image and proof_image.filename:
+        file_ext = os.path.splitext(proof_image.filename)[1].lower() or ".jpg"
+        file_name = f"parcel_proof_{uuid.uuid4().hex}{file_ext}"
+        file_path = os.path.join(uploads_dir, file_name)
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(proof_image.file, buffer)
+        parcel.proof_image_url = f"/uploads/{file_name}"
+
+    # Determine recipient name
+    if received_by_name and received_by_name.strip():
+        parcel.received_by_name = received_by_name.strip()
+    elif parcel.tenant and parcel.tenant.full_name:
+        parcel.received_by_name = parcel.tenant.full_name
+    else:
+        parcel.received_by_name = "ผู้เช่า"
+
+    parcel.status = "received"
+    parcel.received_at = datetime.now()
+    db.commit()
+
+    # Activity Log
+    room_num = parcel.room.room_number if parcel.room else "-"
+    log_activity(
+        db,
+        current_user.email,
+        "Receive Parcel",
+        f"Parcel #{parcel.id} (Room {room_num})",
+        f"Marked parcel as received by: {parcel.received_by_name}"
+    )
+
+    # Optional: Send confirmation notification via LINE
+    if parcel.tenant and parcel.tenant.line_user_id:
+        try:
+            import services.line_bot as line_bot_service
+            owner = db.query(models.Owner).first()
+            line_bot_service.send_parcel_received_flex(
+                parcel=parcel,
+                room_number=room_num,
+                tenant=parcel.tenant,
+                bot_api=tenant_bot_api,
+                owner=owner
+            )
+        except Exception as err:
+            logger.error(f"Failed to push parcel received flex: {err}")
+
+    return {
+        "status": "success",
+        "message": "Parcel marked as received successfully",
+        "parcel_id": parcel.id
+    }
+
+@router.post("/parcels/{parcel_id}/delete")
+async def delete_parcel(
+    parcel_id: int,
+    db: Session = Depends(get_db),
+    admin: bool = Depends(get_admin),
+    current_user: models.User = Depends(get_current_user)
+):
+    parcel = db.query(models.Parcel).filter(models.Parcel.id == parcel_id).first()
+    if not parcel:
+        raise HTTPException(status_code=404, detail="Parcel not found")
+
+    room_num = parcel.room.room_number if parcel.room else "-"
+    carrier_info = parcel.carrier
+    db.delete(parcel)
+    db.commit()
+
+    log_activity(
+        db,
+        current_user.email,
+        "Delete Parcel",
+        f"Parcel #{parcel_id} (Room {room_num})",
+        f"Deleted parcel record #{parcel_id} ({carrier_info})"
+    )
+
+    return {"status": "success", "message": "Parcel deleted successfully"}
+

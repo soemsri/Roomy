@@ -87,3 +87,20 @@
    - created_at: TIMESTAMP
    - updated_at: TIMESTAMP
 
+9. **Parcels (ระบบจัดการพัสดุ)**
+   - id: INT (PK, Auto Increment)
+   - room_id: INT (FK -> rooms.id, Index)
+   - tenant_id: INT (FK -> tenants.id, Nullable, Index)
+   - carrier: TEXT (Flash, Kerry, SPX, J&T, ไปรษณีย์ไทย, etc.)
+   - tracking_number: TEXT (Nullable)
+   - parcel_image_url: TEXT (Nullable - URL รูปถ่ายพัสดุตอนรับเข้า)
+   - status: TEXT (Default: 'pending', values: 'pending', 'received', 'cancelled')
+   - arrived_at: TIMESTAMP (Default: CURRENT_TIMESTAMP)
+   - received_at: TIMESTAMP (Nullable - วันเวลาที่ผู้เช่ามารับ)
+   - received_by_name: TEXT (Nullable - ชื่อผู้มารับ Optional)
+   - proof_image_url: TEXT (Nullable - รูปถ่ายหลักฐานตอนส่งมอบ Optional)
+   - notes: TEXT (Nullable - หมายเหตุเพิ่มเติม)
+   - created_by_user_id: INT (FK -> users.id, Nullable - เจ้าหน้าที่ผู้บันทึก)
+   - created_at: TIMESTAMP (Default: CURRENT_TIMESTAMP)
+   - updated_at: TIMESTAMP (Default: CURRENT_TIMESTAMP)
+

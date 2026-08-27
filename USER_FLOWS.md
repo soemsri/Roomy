@@ -28,3 +28,20 @@
 3. **System**: Notifies Owner (LINE Notify/Messaging API).
 4. **Owner**: Updates status to "In Progress" -> "Fixed".
 5. **System**: Notifies Tenant when status is "Fixed".
+
+## 4. Parcel Management Flow (Simplified Flow - No QR/PIN)
+
+### 4.1 Inward Parcel Registration (รับพัสดุเข้า)
+1. **Owner/Staff**: Receives incoming parcel at front desk / office.
+2. **Owner/Staff**: Fills parcel entry form (Select Room, Carrier e.g. Kerry/Flash/Shopee, Tracking No., optional parcel photo).
+3. **System**: Creates parcel record (`status = 'pending_pickup'`).
+4. **System**: Sends push notification (Flex Message with photo & details) to the tenant's LINE OA.
+
+### 4.2 Parcel Pickup / Handover (ส่งมอบพัสดุให้ผู้เช่า - แบบลดขั้นตอน)
+1. **Tenant**: Comes to front desk to collect parcel (informs room number).
+2. **Owner/Staff**: Locates parcel in Admin Dashboard / Parcel List.
+3. **Owner/Staff**: Clicks the **"รับพัสดุแล้ว (Mark as Received)"** button directly.
+   - *No QR Code scan or PIN Code verification required* (เพื่อความสะดวกรวดเร็ว ไม่ยุ่งยาก).
+   - *Optional Proof*: Staff can optionally attach a photo of the recipient or note, but can also submit immediately without it.
+4. **System**: Updates parcel status to `received` with timestamp.
+5. **System**: (Optional) Sends notification to Tenant LINE confirming receipt.

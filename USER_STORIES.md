@@ -21,5 +21,12 @@
 - **US3.1**: As a tenant, I want to submit a repair request with photos via LINE.
 - **US3.2**: As an owner, I want to track repair statuses and notify the tenant when fixed.
 
+### Parcel Management (Simplified Flow)
+- **US4.1**: As an owner/staff, I want to register incoming parcels (room, courier, tracking, photo) to notify tenants immediately.
+- **US4.2**: As a tenant, I want to receive an automatic LINE notification when a parcel arrives for my room.
+- **US4.3**: As an owner/staff, I want a single-click button to mark a parcel as collected by the tenant without cumbersome QR Code or PIN Code scanning.
+- **US4.4**: As an owner/staff, I want the ability to optionally attach proof of receipt (photo/note) when handing over parcels, without making it mandatory.
+- **US4.5**: As a tenant, I want to check my pending and past received parcels directly via LINE/Web.
+
 ### System Settings
-- **US4.1**: As an owner, I want to toggle QR Payment on/off and configure multiple PromptPay IDs.
+- **US5.1**: As an owner, I want to toggle QR Payment on/off and configure multiple PromptPay IDs.

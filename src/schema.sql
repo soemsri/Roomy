@@ -286,3 +286,29 @@ CREATE TABLE booking_requests (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 12. Parcels (Parcel Management)
+CREATE TABLE parcels (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    room_id INTEGER NOT NULL,
+    tenant_id INTEGER,
+    carrier TEXT NOT NULL,
+    tracking_number TEXT,
+    parcel_image_url TEXT,
+    status TEXT DEFAULT 'pending',
+    arrived_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    received_at TIMESTAMP,
+    received_by_name TEXT,
+    proof_image_url TEXT,
+    notes TEXT,
+    created_by_user_id INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (room_id) REFERENCES rooms(id),
+    FOREIGN KEY (tenant_id) REFERENCES tenants(id),
+    FOREIGN KEY (created_by_user_id) REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS ix_parcels_room_id ON parcels (room_id);
+CREATE INDEX IF NOT EXISTS ix_parcels_tenant_id ON parcels (tenant_id);
+CREATE INDEX IF NOT EXISTS ix_parcels_status ON parcels (status);
+

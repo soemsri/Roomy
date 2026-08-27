@@ -482,6 +482,14 @@
                 {% endif %}
             </a>
             {% endif %}
+            {% if user_role in ['Admin', 'Clerk', 'Housekeeper', 'Technician', 'Accountant'] %}
+            <a href="#parcelSection" class="menu-item">
+                <i class="fa-solid fa-boxes-packing"></i> <span>{{ get_text('parcel_management', lang) or 'จัดการพัสดุ' }}</span>
+                {% if stats.pending_parcels > 0 %}
+                <span class="nav-badge pulse">{{ stats.pending_parcels }}</span>
+                {% endif %}
+            </a>
+            {% endif %}
         </div>
 
         {% if user_role in ['Admin', 'Clerk'] %}
@@ -556,6 +564,13 @@
                 <div class="stat-info">
                     <h3>{{ get_text('pending_repairs', lang) }}</h3>
                     <p>{{ stats.pending_repairs }}</p>
+                </div>
+            </div>
+            <div class="stat-card" style="cursor: pointer;" onclick="window.location.hash='parcelSection'; showSection('parcelSection');">
+                <div class="stat-icon" style="background: #e0f2fe; color: #0284c7;"><i class="fa-solid fa-boxes-packing"></i></div>
+                <div class="stat-info">
+                    <h3>{{ get_text('pending_parcels', lang) or 'พัสดุรอรับ' }}</h3>
+                    <p id="overview_pending_parcels">{{ stats.pending_parcels or 0 }}</p>
                 </div>
             </div>
         </div>
@@ -1358,6 +1373,97 @@
                         <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">{{ get_text('select_room_history', lang) }}</td></tr>
                     </tbody>
                 </table>
+            </div>
+        </div>
+
+        <!-- Parcel Management Section -->
+        <div class="section-card" id="parcelSection" style="margin-top: 30px;">
+            <div class="section-header" style="flex-wrap: wrap; gap: 15px;">
+                <h2><i class="fa-solid fa-boxes-packing" style="color: #0284c7;"></i> {{ get_text('parcel_management', lang) or 'ระบบจัดการพัสดุ' }}</h2>
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <button class="btn btn-primary" onclick="openNewParcelModal()" style="background: #0284c7;">
+                        <i class="fa-solid fa-plus"></i> {{ get_text('add_parcel', lang) or 'บันทึกรับพัสดุเข้า' }}
+                    </button>
+                </div>
+            </div>
+
+            <!-- 3 Mini Stats Cards -->
+            <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px;">
+                <div class="stat-card" style="padding: 16px; border-left: 4px solid #f59e0b; cursor: pointer;" onclick="filterParcelStatus('pending')">
+                    <div class="stat-icon" style="background: #fef3c7; color: #d97706; width: 42px; height: 42px; font-size: 1.2rem;"><i class="fa-solid fa-box-open"></i></div>
+                    <div class="stat-info">
+                        <h3 style="font-size: 0.8rem;">{{ get_text('pending_parcels', lang) or 'พัสดุรอรับ' }}</h3>
+                        <p id="stat_parcel_pending" style="font-size: 1.4rem; color: #d97706;">{{ stats.pending_parcels or 0 }}</p>
+                    </div>
+                </div>
+                <div class="stat-card" style="padding: 16px; border-left: 4px solid #10b981; cursor: pointer;" onclick="filterParcelStatus('received')">
+                    <div class="stat-icon" style="background: #dcfce7; color: #16a34a; width: 42px; height: 42px; font-size: 1.2rem;"><i class="fa-solid fa-check-double"></i></div>
+                    <div class="stat-info">
+                        <h3 style="font-size: 0.8rem;">{{ get_text('received_today_parcels', lang) or 'รับแล้ววันนี้' }}</h3>
+                        <p id="stat_parcel_today" style="font-size: 1.4rem; color: #16a34a;">{{ stats.received_today_parcels or 0 }}</p>
+                    </div>
+                </div>
+                <div class="stat-card" style="padding: 16px; border-left: 4px solid #ef4444; cursor: pointer;" onclick="filterParcelStatus('overdue')">
+                    <div class="stat-icon" style="background: #fee2e2; color: #dc2626; width: 42px; height: 42px; font-size: 1.2rem;"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                    <div class="stat-info">
+                        <h3 style="font-size: 0.8rem;">{{ get_text('overdue_parcels', lang) or 'ตกค้าง > 7 วัน' }}</h3>
+                        <p id="stat_parcel_overdue" style="font-size: 1.4rem; color: #dc2626;">{{ stats.overdue_parcels or 0 }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filters & Search Bar -->
+            <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center;">
+                <div style="flex: 2; min-width: 220px; position: relative;">
+                    <input type="text" id="parcel_search_query" placeholder="ค้นหาเลขห้อง / ขนส่ง / Tracking / ผู้รับ..." oninput="debounceLoadParcels()" style="padding-right: 35px;">
+                    <i class="fa-solid fa-magnifying-glass" style="position: absolute; right: 12px; top: 12px; color: var(--text-muted);"></i>
+                </div>
+                <div style="flex: 1; min-width: 140px;">
+                    <select id="parcel_filter_status" onchange="loadParcels(1)">
+                        <option value="pending">{{ get_text('parcel_filter_pending', lang) or 'รอรับ (Pending)' }}</option>
+                        <option value="received">{{ get_text('parcel_filter_received', lang) or 'รับแล้ว (Received)' }}</option>
+                        <option value="overdue">{{ get_text('parcel_filter_overdue', lang) or 'ตกค้าง > 7 วัน' }}</option>
+                        <option value="all">{{ get_text('parcel_filter_all', lang) or 'พัสดุทั้งหมด' }}</option>
+                    </select>
+                </div>
+                <div style="flex: 1; min-width: 140px;">
+                    <select id="parcel_filter_building" onchange="loadParcels(1)">
+                        <option value="all">{{ get_text('all_buildings', lang) or 'ทุกอาคาร' }}</option>
+                        {% for b in all_buildings %}
+                        <option value="{{ b.id }}">{{ b.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button class="btn btn-outline" onclick="loadParcels(1)" title="Refresh">
+                    <i class="fa-solid fa-rotate"></i>
+                </button>
+            </div>
+
+            <!-- Table of Parcels -->
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 130px;">วันเวลามาถึง</th>
+                            <th style="width: 90px;">ห้องพัก</th>
+                            <th style="width: 140px;">บริษัทขนส่ง</th>
+                            <th style="width: 150px;">Tracking No.</th>
+                            <th style="width: 80px; text-align: center;">รูปพัสดุ</th>
+                            <th style="width: 140px;">ผู้เช่า / ผู้รับ</th>
+                            <th style="width: 110px;">สถานะ</th>
+                            <th style="width: 160px; text-align: center;">จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="parcelTableBody">
+                        <tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 30px;"><i class="fa-solid fa-spinner fa-spin"></i> กำลังโหลดข้อมูล...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div id="parcelPagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding-top: 10px; border-top: 1px solid var(--border);">
+                <div id="parcelPageInfo" style="font-size: 0.85rem; color: var(--text-muted);"></div>
+                <div style="display: flex; gap: 5px;" id="parcelPageButtons"></div>
             </div>
         </div>
 
@@ -2333,6 +2439,145 @@
         </div>
     </div>
 
+    <!-- Modal: New Parcel Registration -->
+    <div id="newParcelModal" class="modal">
+        <div class="modal-content" style="max-width: 520px; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.15);">
+            <div class="modal-header" style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); color: white; padding: 18px 22px;">
+                <h3 style="margin:0; font-size: 1.2rem; display: flex; align-items: center; gap: 10px;">
+                    <i class="fa-solid fa-boxes-packing"></i> {{ get_text('add_parcel', lang) or 'บันทึกรับพัสดุเข้า' }}
+                </h3>
+                <button class="btn btn-outline" style="padding: 4px 8px; color: white; border-color: rgba(255,255,255,0.4);" onclick="closeNewParcelModal()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="newParcelForm" onsubmit="submitNewParcel(event)">
+                <div class="modal-body" style="padding: 24px; max-height: 75vh; overflow-y: auto;">
+                    <!-- Building & Room -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 16px;">
+                        <div>
+                            <label style="font-weight: 600; font-size: 0.85rem; margin-bottom: 5px; display: block;">{{ get_text('building', lang) or 'อาคาร' }}</label>
+                            <select id="new_parcel_building" onchange="updateNewParcelRooms()" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1;">
+                                <option value="all">ทุกอาคาร</option>
+                                {% for b in all_buildings %}
+                                <option value="{{ b.id }}">{{ b.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label style="font-weight: 600; font-size: 0.85rem; margin-bottom: 5px; display: block;">{{ get_text('room', lang) or 'ห้องพัก' }} *</label>
+                            <select id="new_parcel_room" name="room_id" required style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1;">
+                                <option value="">-- เลือกห้อง --</option>
+                                {% for r in all_rooms %}
+                                <option value="{{ r.id }}" data-building="{{ r.building_id }}">{{ r.room_number }} {% if r.tenant %}({{ r.tenant.full_name }}){% endif %}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Carrier Quick Select & Custom -->
+                    <div style="margin-bottom: 16px;">
+                        <label style="font-weight: 600; font-size: 0.85rem; margin-bottom: 6px; display: block;">{{ get_text('carrier', lang) or 'บริษัทขนส่ง' }} *</label>
+                        <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px;">
+                            <button type="button" class="btn btn-outline carrier-btn" onclick="selectCarrier('Flash Express')" style="padding: 4px 10px; font-size: 0.8rem;">Flash</button>
+                            <button type="button" class="btn btn-outline carrier-btn" onclick="selectCarrier('Kerry Express')" style="padding: 4px 10px; font-size: 0.8rem;">Kerry</button>
+                            <button type="button" class="btn btn-outline carrier-btn" onclick="selectCarrier('SPX Express')" style="padding: 4px 10px; font-size: 0.8rem;">SPX</button>
+                            <button type="button" class="btn btn-outline carrier-btn" onclick="selectCarrier('J&T Express')" style="padding: 4px 10px; font-size: 0.8rem;">J&T</button>
+                            <button type="button" class="btn btn-outline carrier-btn" onclick="selectCarrier('ไปรษณีย์ไทย')" style="padding: 4px 10px; font-size: 0.8rem;">ไปรษณีย์ไทย</button>
+                            <button type="button" class="btn btn-outline carrier-btn" onclick="selectCarrier('Lazada')" style="padding: 4px 10px; font-size: 0.8rem;">Lazada</button>
+                            <button type="button" class="btn btn-outline carrier-btn" onclick="selectCarrier('DHL')" style="padding: 4px 10px; font-size: 0.8rem;">DHL</button>
+                        </div>
+                        <input type="text" id="new_parcel_carrier" name="carrier" placeholder="ระบุบริษัทขนส่ง เช่น Flash, Kerry, SPX" required style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1;">
+                    </div>
+
+                    <!-- Tracking Number -->
+                    <div style="margin-bottom: 16px;">
+                        <label style="font-weight: 600; font-size: 0.85rem; margin-bottom: 5px; display: block;">{{ get_text('tracking_number', lang) or 'เลขพัสดุ / Tracking No.' }}</label>
+                        <input type="text" id="new_parcel_tracking" name="tracking_number" placeholder="เช่น TH0123456789 (ไม่บังคับ)" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1; font-family: monospace;">
+                    </div>
+
+                    <!-- Notes -->
+                    <div style="margin-bottom: 16px;">
+                        <label style="font-weight: 600; font-size: 0.85rem; margin-bottom: 5px; display: block;">{{ get_text('parcel_notes', lang) or 'หมายเหตุ / ตำแหน่งวาง' }}</label>
+                        <textarea id="new_parcel_notes" name="notes" placeholder="เช่น วางไว้ที่ชั้นวาง A, กล่องขนาดใหญ่..." rows="2" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1; font-family: inherit;"></textarea>
+                    </div>
+
+                    <!-- Photo Upload -->
+                    <div style="margin-bottom: 16px;">
+                        <label style="font-weight: 600; font-size: 0.85rem; margin-bottom: 5px; display: block;">{{ get_text('parcel_photo', lang) or 'รูปถ่ายพัสดุ' }} (ถ่ายจากมือถือหรืออัปโหลด)</label>
+                        <input type="file" id="new_parcel_image" accept="image/*" capture="environment" onchange="previewParcelImage(this)" style="width: 100%; padding: 8px; border: 1px dashed #94a3b8; border-radius: 8px; background: #f8fafc;">
+                        <div id="new_parcel_preview_box" style="display: none; margin-top: 10px; text-align: center;">
+                            <img id="new_parcel_preview_img" src="" style="max-height: 140px; border-radius: 8px; border: 1px solid #cbd5e1;">
+                        </div>
+                    </div>
+
+                    <div style="background: #f0fdf4; border-left: 3px solid #22c55e; padding: 10px 14px; border-radius: 0 8px 8px 0; font-size: 0.8rem; color: #15803d;">
+                        <i class="fa-brands fa-line" style="font-size: 1rem;"></i> เมื่อกดบันทึก ระบบจะส่ง Flex Message แจ้งเตือนไปยัง LINE ของผู้เช่าอัตโนมัติ
+                    </div>
+                </div>
+                <div class="modal-footer" style="padding: 16px 24px; background: #f8fafc; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e2e8f0;">
+                    <button type="button" class="btn btn-outline" onclick="closeNewParcelModal()">{{ get_text('cancel', lang) or 'ยกเลิก' }}</button>
+                    <button type="submit" id="btn_save_parcel" class="btn btn-primary" style="background: #0284c7; padding: 10px 20px;">
+                        <i class="fa-solid fa-paper-plane"></i> บันทึกรับเข้า & แจ้งเตือน LINE
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Mark as Received (Simplified Pickup Flow) -->
+    <div id="receiveParcelModal" class="modal">
+        <div class="modal-content" style="max-width: 480px; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.15);">
+            <div class="modal-header" style="background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); color: white; padding: 18px 22px;">
+                <h3 style="margin:0; font-size: 1.15rem; display: flex; align-items: center; gap: 10px;">
+                    <i class="fa-solid fa-circle-check"></i> {{ get_text('confirm_received', lang) or 'ยืนยันการส่งมอบพัสดุ' }}
+                </h3>
+                <button class="btn btn-outline" style="padding: 4px 8px; color: white; border-color: rgba(255,255,255,0.4);" onclick="closeReceiveParcelModal()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="receiveParcelForm" onsubmit="submitReceiveParcel(event)">
+                <input type="hidden" id="receive_parcel_id">
+                <div class="modal-body" style="padding: 22px;">
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin-bottom: 20px; text-align: center;">
+                        <div style="font-size: 0.85rem; color: var(--text-muted);">ส่งมอบพัสดุให้ห้อง</div>
+                        <div id="receive_modal_room" style="font-size: 1.6rem; font-weight: 800; color: #0284c7; margin: 4px 0;">101</div>
+                        <div id="receive_modal_tenant" style="font-size: 0.95rem; font-weight: 600; color: #1e293b;">สมชาย ใจดี</div>
+                        <div id="receive_modal_carrier" style="font-size: 0.82rem; color: #64748b; margin-top: 4px;">Flash Express</div>
+                    </div>
+
+                    <!-- 1-Click Primary Action -->
+                    <button type="submit" id="btn_confirm_receive_instant" class="btn btn-primary" style="width: 100%; padding: 14px; font-size: 1.05rem; font-weight: 700; background: #16a34a; justify-content: center; box-shadow: 0 4px 12px rgba(22, 163, 74, 0.3); margin-bottom: 15px;">
+                        <i class="fa-solid fa-check"></i> {{ get_text('confirm_received_now', lang) or 'ยืนยันรับทันที (1-Click)' }}
+                    </button>
+
+                    <!-- Optional Extra Proof Section Toggle -->
+                    <div style="border-top: 1px dashed #cbd5e1; padding-top: 12px; margin-top: 10px;">
+                        <a href="javascript:void(0)" onclick="toggleReceiveExtraFields()" style="font-size: 0.82rem; color: #64748b; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 5px;">
+                            <i class="fa-solid fa-chevron-down" id="extra_fields_icon"></i> หลักฐานเสริม (จะใส่หรือไม่ใส่ก็ได้ - Optional)
+                        </a>
+                        <div id="receive_extra_fields" style="display: none; margin-top: 12px;">
+                            <div style="margin-bottom: 12px;">
+                                <label style="font-size: 0.82rem; font-weight: 600; margin-bottom: 4px; display: block;">ชื่อผู้มารับมอบ / ผู้รับแทน (Optional)</label>
+                                <input type="text" id="receive_by_name" placeholder="ระบุชื่อผู้มารับ (ถ้าไม่ใช่ผู้เช่าหลัก)" style="width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 0.88rem;">
+                            </div>
+                            <div>
+                                <label style="font-size: 0.82rem; font-weight: 600; margin-bottom: 4px; display: block;">รูปถ่ายหลักฐานการรับ (Optional)</label>
+                                <input type="file" id="receive_proof_img" accept="image/*" capture="environment" style="width: 100%; padding: 6px; border: 1px dashed #cbd5e1; border-radius: 8px; font-size: 0.82rem; background: #f8fafc;">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer" style="padding: 12px 22px; background: #f8fafc; display: flex; justify-content: flex-end; border-top: 1px solid #e2e8f0;">
+                    <button type="button" class="btn btn-outline" onclick="closeReceiveParcelModal()">{{ get_text('cancel', lang) or 'ยกเลิก' }}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Image Lightbox Modal for Admin -->
+    <div id="adminImageModal" class="modal" onclick="closeAdminImageModal()" style="background: rgba(0,0,0,0.85); justify-content: center; align-items: center;">
+        <div style="position: relative; max-width: 90%; max-height: 85vh;">
+            <img id="adminImageModalImg" src="" alt="Full Preview" style="max-width: 100%; max-height: 85vh; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+            <button type="button" onclick="closeAdminImageModal()" style="position: absolute; top: -15px; right: -15px; background: white; border: none; border-radius: 50%; width: 32px; height: 32px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">&times;</button>
+        </div>
+    </div>
+
     <!-- Bulk Recurring Charges Modal -->
     <div id="bulkRecurringModal" class="modal">
         <div class="modal-content" style="max-width: 600px;">
@@ -2759,6 +3004,7 @@
             if (sectionId === 'receiptSection') loadReceipts();
             if (sectionId === 'historySection') { loadMeterHistory(); loadTenantHistory(); }
             if (sectionId === 'logsSection') loadActivityLogs(1);
+            if (sectionId === 'parcelSection') { loadParcels(1); loadParcelStats(); }
             document.querySelectorAll('.menu-item').forEach(m => {
                 m.classList.remove('active');
                 if (m.getAttribute('href') === '#' + sectionId || (sectionId === 'overview' && m.getAttribute('href') === '#overview')) {
@@ -4673,6 +4919,363 @@
                 loadLogPolicy();
             }
         };
+
+        // ==========================================
+        // PARCEL MANAGEMENT SYSTEM JS
+        // ==========================================
+        let currentParcelPage = 1;
+        let debounceParcelTimer = null;
+
+        function debounceLoadParcels() {
+            clearTimeout(debounceParcelTimer);
+            debounceParcelTimer = setTimeout(() => {
+                loadParcels(1);
+            }, 300);
+        }
+
+        function filterParcelStatus(status) {
+            const selectEl = document.getElementById('parcel_filter_status');
+            if (selectEl) {
+                selectEl.value = status;
+                loadParcels(1);
+            }
+        }
+
+        async function loadParcelStats() {
+            try {
+                const res = await fetch('/admin/parcels/stats');
+                if (!res.ok) return;
+                const stats = await res.json();
+                
+                const pendingEl = document.getElementById('stat_parcel_pending');
+                const todayEl = document.getElementById('stat_parcel_today');
+                const overdueEl = document.getElementById('stat_parcel_overdue');
+                const overviewEl = document.getElementById('overview_pending_parcels');
+
+                if (pendingEl) pendingEl.innerText = stats.pending;
+                if (todayEl) todayEl.innerText = stats.received_today;
+                if (overdueEl) overdueEl.innerText = stats.overdue;
+                if (overviewEl) overviewEl.innerText = stats.pending;
+            } catch (err) {
+                console.error("Error loading parcel stats:", err);
+            }
+        }
+
+        async function loadParcels(page = 1) {
+            currentParcelPage = page;
+            const status = document.getElementById('parcel_filter_status') ? document.getElementById('parcel_filter_status').value : 'pending';
+            const buildingId = document.getElementById('parcel_filter_building') ? document.getElementById('parcel_filter_building').value : 'all';
+            const query = document.getElementById('parcel_search_query') ? document.getElementById('parcel_search_query').value.trim() : '';
+
+            const tbody = document.getElementById('parcelTableBody');
+            if (!tbody) return;
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 30px;"><i class="fa-solid fa-spinner fa-spin"></i> กำลังโหลดข้อมูล...</td></tr>';
+
+            try {
+                const res = await fetch(`/admin/parcels/list?status=${encodeURIComponent(status)}&building_id=${encodeURIComponent(buildingId)}&q=${encodeURIComponent(query)}&page=${page}&page_size=15`);
+                if (!res.ok) throw new Error("Failed to fetch parcels");
+                const data = await res.json();
+
+                if (!data.items || data.items.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 35px;"><i class="fa-solid fa-box-open" style="font-size: 2rem; margin-bottom: 8px; display: block; color: #cbd5e1;"></i>ไม่พบข้อมูลพัสดุ</td></tr>';
+                    renderParcelPagination(0, 1, 15, 1);
+                    return;
+                }
+
+                tbody.innerHTML = data.items.map(p => {
+                    const statusBadge = p.status === 'pending'
+                        ? (p.is_overdue
+                            ? '<span class="badge badge-danger" style="background:#fee2e2; color:#dc2626;"><i class="fa-solid fa-triangle-exclamation"></i> ตกค้าง > 7 วัน</span>'
+                            : '<span class="badge badge-warning" style="background:#fef3c7; color:#d97706;"><i class="fa-solid fa-hourglass-half"></i> รอรับ</span>')
+                        : '<span class="badge badge-success" style="background:#dcfce7; color:#16a34a;"><i class="fa-solid fa-check-double"></i> รับแล้ว</span>';
+
+                    const photoThumbnail = p.parcel_image_url
+                        ? `<img src="${p.parcel_image_url}" onclick="openAdminImageModal('${p.parcel_image_url}')" style="width: 44px; height: 44px; object-fit: cover; border-radius: 6px; cursor: pointer; border: 1px solid #cbd5e1;" title="คลิกดูรูปใหญ่">`
+                        : '<span style="color: #cbd5e1; font-size: 0.8rem;">-</span>';
+
+                    const proofThumbnail = p.proof_image_url
+                        ? `<br><a href="javascript:void(0)" onclick="openAdminImageModal('${p.proof_image_url}')" style="font-size: 0.75rem; color: #0284c7;"><i class="fa-solid fa-camera"></i> รูปหลักฐาน</a>`
+                        : '';
+
+                    const receivedInfo = p.status === 'received'
+                        ? `<div style="font-size: 0.82rem;">
+                            <strong>${p.received_by_name || '-'}</strong>
+                            <div style="color: var(--text-muted); font-size: 0.75rem;">${p.received_at_formatted}</div>
+                            ${proofThumbnail}
+                           </div>`
+                        : '<span style="color: var(--text-muted); font-size: 0.8rem;">-</span>';
+
+                    const safeTenantName = (p.tenant_name || '-').replace(/'/g, "\\'");
+                    const safeCarrier = (p.carrier || '').replace(/'/g, "\\'");
+                    const safeRoomNumber = (p.room_number || '').replace(/'/g, "\\'");
+
+                    const actionButtons = p.status === 'pending'
+                        ? `<div style="display: flex; gap: 6px; justify-content: center;">
+                            <button class="btn btn-success" onclick="openReceiveParcelModal(${p.id}, '${safeRoomNumber}', '${safeCarrier}', '${safeTenantName}')" style="background: #16a34a; padding: 6px 12px; font-size: 0.82rem; color: white;">
+                                <i class="fa-solid fa-check"></i> รับพัสดุแล้ว
+                            </button>
+                            <button class="btn btn-outline" onclick="deleteParcel(${p.id})" style="padding: 6px 8px; color: #ef4444; border-color: #fee2e2;" title="ลบรายการ">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                           </div>`
+                        : `<div style="display: flex; gap: 6px; justify-content: center;">
+                            <button class="btn btn-outline" onclick="deleteParcel(${p.id})" style="padding: 4px 8px; color: #94a3b8; font-size: 0.75rem;" title="ลบรายการ">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                           </div>`;
+
+                    const trackingHtml = p.tracking_number
+                        ? `<div style="font-family: monospace; font-size: 0.85rem; color: #334155; font-weight: 600;">${p.tracking_number}</div>`
+                        : '<span style="color: var(--text-muted); font-size: 0.8rem;">-</span>';
+
+                    const notesHtml = p.notes
+                        ? `<div style="font-size: 0.75rem; color: #64748b; margin-top: 2px;">💬 ${p.notes}</div>`
+                        : '';
+
+                    return `
+                        <tr>
+                            <td>
+                                <div style="font-size: 0.85rem; font-weight: 600;">${p.arrived_at_formatted}</div>
+                            </td>
+                            <td>
+                                <span class="badge badge-primary" style="background: #e0f2fe; color: #0284c7; font-weight: 700; font-size: 0.9rem;">
+                                    ${p.room_number}
+                                </span>
+                                ${p.building_name && p.building_name !== 'อาคารหลัก' ? `<div style="font-size: 0.7rem; color: var(--text-muted);">${p.building_name}</div>` : ''}
+                            </td>
+                            <td>
+                                <div style="font-weight: 600; color: #0f172a; font-size: 0.88rem;">${p.carrier}</div>
+                                ${notesHtml}
+                            </td>
+                            <td>${trackingHtml}</td>
+                            <td style="text-align: center;">${photoThumbnail}</td>
+                            <td>
+                                <div style="font-weight: 600; font-size: 0.88rem;">${p.tenant_name}</div>
+                                <div style="font-size: 0.78rem; color: var(--text-muted);">${p.tenant_phone !== '-' ? p.tenant_phone : ''}</div>
+                            </td>
+                            <td>${statusBadge}</td>
+                            <td style="text-align: center;">${actionButtons}</td>
+                        </tr>
+                    `;
+                }).join('');
+
+                renderParcelPagination(data.total, data.page, data.page_size, data.total_pages);
+            } catch (err) {
+                console.error("Error loading parcels:", err);
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--danger); padding: 25px;">เกิดข้อผิดพลาดในการโหลดข้อมูลพัสดุ</td></tr>';
+            }
+        }
+
+        function renderParcelPagination(total, page, pageSize, totalPages) {
+            const pageInfo = document.getElementById('parcelPageInfo');
+            const pageButtons = document.getElementById('parcelPageButtons');
+            if (!pageInfo || !pageButtons) return;
+
+            if (total === 0) {
+                pageInfo.innerText = 'ทั้งหมด 0 รายการ';
+                pageButtons.innerHTML = '';
+                return;
+            }
+
+            const start = (page - 1) * pageSize + 1;
+            const end = Math.min(page * pageSize, total);
+            pageInfo.innerText = `แสดง ${start}-${end} จากทั้งหมด ${total} รายการ`;
+
+            let buttonsHtml = '';
+            if (page > 1) {
+                buttonsHtml += `<button class="btn btn-outline" style="padding: 4px 10px; font-size: 0.8rem;" onclick="loadParcels(${page - 1})"><i class="fa-solid fa-chevron-left"></i> ก่อนหน้า</button>`;
+            }
+            if (page < totalPages) {
+                buttonsHtml += `<button class="btn btn-outline" style="padding: 4px 10px; font-size: 0.8rem;" onclick="loadParcels(${page + 1})">ถัดไป <i class="fa-solid fa-chevron-right"></i></button>`;
+            }
+            pageButtons.innerHTML = buttonsHtml;
+        }
+
+        function openNewParcelModal() {
+            document.getElementById('newParcelForm').reset();
+            document.getElementById('new_parcel_preview_box').style.display = 'none';
+            document.getElementById('new_parcel_preview_img').src = '';
+            updateNewParcelRooms();
+            document.getElementById('newParcelModal').style.display = 'flex';
+        }
+
+        function closeNewParcelModal() {
+            document.getElementById('newParcelModal').style.display = 'none';
+        }
+
+        function updateNewParcelRooms() {
+            const bSelect = document.getElementById('new_parcel_building');
+            const rSelect = document.getElementById('new_parcel_room');
+            if (!bSelect || !rSelect) return;
+            const bid = bSelect.value;
+
+            for (let i = 0; i < rSelect.options.length; i++) {
+                const opt = rSelect.options[i];
+                if (opt.value === '') continue;
+                if (bid === 'all' || opt.getAttribute('data-building') === bid) {
+                    opt.style.display = 'block';
+                } else {
+                    opt.style.display = 'none';
+                }
+            }
+        }
+
+        function selectCarrier(carrierName) {
+            document.getElementById('new_parcel_carrier').value = carrierName;
+        }
+
+        function previewParcelImage(input) {
+            const previewBox = document.getElementById('new_parcel_preview_box');
+            const previewImg = document.getElementById('new_parcel_preview_img');
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    previewImg.src = e.target.result;
+                    previewBox.style.display = 'block';
+                };
+                reader.readAsDataURL(input.files[0]);
+            } else {
+                previewBox.style.display = 'none';
+                previewImg.src = '';
+            }
+        }
+
+        async function submitNewParcel(e) {
+            e.preventDefault();
+            const btn = document.getElementById('btn_save_parcel');
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังบันทึก...';
+
+            const formData = new FormData();
+            formData.append('room_id', document.getElementById('new_parcel_room').value);
+            formData.append('carrier', document.getElementById('new_parcel_carrier').value);
+            formData.append('tracking_number', document.getElementById('new_parcel_tracking').value);
+            formData.append('notes', document.getElementById('new_parcel_notes').value);
+
+            const fileInput = document.getElementById('new_parcel_image');
+            if (fileInput.files && fileInput.files[0]) {
+                formData.append('parcel_image', fileInput.files[0]);
+            }
+
+            try {
+                const res = await fetch('/admin/parcels/create', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    alert("บันทึกรับพัสดุเข้าเรียบร้อยแล้ว และส่ง LINE แจ้งเตือนไปยังผู้เช่า");
+                    closeNewParcelModal();
+                    loadParcels(1);
+                    loadParcelStats();
+                } else {
+                    alert("เกิดข้อผิดพลาด: " + (data.detail || data.message || "ไม่สามารถบันทึกได้"));
+                }
+            } catch (err) {
+                console.error("Error submitting parcel:", err);
+                alert("เกิดข้อผิดพลาดในการเชื่อมต่อ");
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
+        }
+
+        function openReceiveParcelModal(id, roomNumber, carrier, tenantName) {
+            document.getElementById('receive_parcel_id').value = id;
+            document.getElementById('receive_modal_room').innerText = roomNumber;
+            document.getElementById('receive_modal_tenant').innerText = tenantName;
+            document.getElementById('receive_modal_carrier').innerText = carrier;
+            document.getElementById('receive_by_name').value = '';
+            document.getElementById('receive_proof_img').value = '';
+            document.getElementById('receive_extra_fields').style.display = 'none';
+            document.getElementById('receiveParcelModal').style.display = 'flex';
+        }
+
+        function closeReceiveParcelModal() {
+            document.getElementById('receiveParcelModal').style.display = 'none';
+        }
+
+        function toggleReceiveExtraFields() {
+            const fields = document.getElementById('receive_extra_fields');
+            const icon = document.getElementById('extra_fields_icon');
+            if (fields.style.display === 'none') {
+                fields.style.display = 'block';
+                icon.className = 'fa-solid fa-chevron-up';
+            } else {
+                fields.style.display = 'none';
+                icon.className = 'fa-solid fa-chevron-down';
+            }
+        }
+
+        async function submitReceiveParcel(e) {
+            e.preventDefault();
+            const parcelId = document.getElementById('receive_parcel_id').value;
+            const btn = document.getElementById('btn_confirm_receive_instant');
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังบันทึก...';
+
+            const formData = new FormData();
+            const receiverName = document.getElementById('receive_by_name').value.trim();
+            if (receiverName) {
+                formData.append('received_by_name', receiverName);
+            }
+            const proofInput = document.getElementById('receive_proof_img');
+            if (proofInput.files && proofInput.files[0]) {
+                formData.append('proof_image', proofInput.files[0]);
+            }
+
+            try {
+                const res = await fetch(`/admin/parcels/${parcelId}/receive`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    closeReceiveParcelModal();
+                    loadParcels(currentParcelPage);
+                    loadParcelStats();
+                } else {
+                    alert("เกิดข้อผิดพลาด: " + (data.detail || data.message || "ไม่สามารถบันทึกได้"));
+                }
+            } catch (err) {
+                console.error("Error receiving parcel:", err);
+                alert("เกิดข้อผิดพลาดในการเชื่อมต่อ");
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
+        }
+
+        async function deleteParcel(id) {
+            if (!confirm("คุณแน่ใจหรือไม่ว่าต้องการลบรายการพัสดุนี้?")) return;
+            try {
+                const res = await fetch(`/admin/parcels/${id}/delete`, { method: 'POST' });
+                if (res.ok) {
+                    loadParcels(currentParcelPage);
+                    loadParcelStats();
+                } else {
+                    alert("ไม่สามารถลบรายการได้");
+                }
+            } catch (err) {
+                alert("เกิดข้อผิดพลาดในการเชื่อมต่อ");
+            }
+        }
+
+        function openAdminImageModal(url) {
+            const modal = document.getElementById('adminImageModal');
+            const img = document.getElementById('adminImageModalImg');
+            if (modal && img) {
+                img.src = url;
+                modal.style.display = 'flex';
+            }
+        }
+
+        function closeAdminImageModal() {
+            const modal = document.getElementById('adminImageModal');
+            if (modal) modal.style.display = 'none';
+        }
     </script>
 </body>
 </html>

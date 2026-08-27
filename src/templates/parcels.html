@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="{{ lang or 'th' }}">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ get_text('my_parcels', lang) }} - Roomy</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Prompt', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 15px;
+            background: #f0f4f8;
+            color: #1e293b;
+        }
+        .container {
+            max-width: 540px;
+            margin: 0 auto;
+        }
+        .header {
+            background: linear-gradient(135deg, #0284c7, #0369a1);
+            color: white;
+            padding: 20px;
+            border-radius: 18px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 14px rgba(2, 132, 199, 0.25);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 1.35rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .header-sub {
+            font-size: 0.85rem;
+            opacity: 0.9;
+            margin-top: 4px;
+        }
+        .room-badge {
+            background: rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(4px);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 0.95rem;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            background: #e2e8f0;
+            padding: 4px;
+            border-radius: 12px;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 10px 8px;
+            text-align: center;
+            border: none;
+            background: transparent;
+            font-family: inherit;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #64748b;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .tab-btn.active {
+            background: white;
+            color: #0284c7;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+        }
+        .badge-count {
+            background: #ef4444;
+            color: white;
+            font-size: 0.72rem;
+            padding: 2px 7px;
+            border-radius: 10px;
+            font-weight: 700;
+        }
+
+        /* Cards */
+        .parcel-card {
+            background: white;
+            border-radius: 16px;
+            padding: 18px;
+            margin-bottom: 14px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            transition: transform 0.15s ease;
+        }
+        .parcel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            border-bottom: 1px solid #f1f5f9;
+            padding-bottom: 10px;
+        }
+        .carrier-tag {
+            font-weight: 700;
+            font-size: 0.95rem;
+            color: #0284c7;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .status-pill {
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 20px;
+        }
+        .status-pill.pending {
+            background: #fef3c7;
+            color: #b45309;
+        }
+        .status-pill.received {
+            background: #dcfce7;
+            color: #15803d;
+        }
+
+        .parcel-body {
+            display: grid;
+            gap: 8px;
+            font-size: 0.88rem;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .info-label {
+            color: #64748b;
+        }
+        .info-value {
+            font-weight: 600;
+            color: #1e293b;
+        }
+        .tracking-box {
+            background: #f8fafc;
+            border: 1px dashed #cbd5e1;
+            padding: 6px 10px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.88rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .copy-btn {
+            background: none;
+            border: none;
+            color: #0284c7;
+            cursor: pointer;
+            padding: 2px 4px;
+            font-size: 0.85rem;
+        }
+
+        .parcel-img-wrap {
+            margin-top: 12px;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+            max-height: 180px;
+            position: relative;
+            cursor: pointer;
+        }
+        .parcel-img {
+            width: 100%;
+            height: 180px;
+            object-fit: cover;
+            display: block;
+            transition: transform 0.2s ease;
+        }
+        .parcel-img:hover {
+            transform: scale(1.02);
+        }
+        .img-overlay {
+            position: absolute;
+            bottom: 6px;
+            right: 6px;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            font-size: 0.72rem;
+            padding: 3px 8px;
+            border-radius: 6px;
+        }
+
+        .pickup-notice {
+            background: #eff6ff;
+            border-left: 4px solid #3b82f6;
+            padding: 12px 14px;
+            border-radius: 0 10px 10px 0;
+            font-size: 0.82rem;
+            color: #1e40af;
+            margin-top: 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 45px 20px;
+            color: #94a3b8;
+            background: white;
+            border-radius: 16px;
+            border: 1px dashed #cbd5e1;
+            margin-top: 10px;
+        }
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 12px;
+            color: #cbd5e1;
+        }
+
+        /* Lightbox Modal */
+        .lightbox {
+            display: none;
+            position: fixed;
+            z-index: 999;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.85);
+            justify-content: center;
+            align-items: center;
+            padding: 15px;
+        }
+        .lightbox.active {
+            display: flex;
+        }
+        .lightbox img {
+            max-width: 95%;
+            max-height: 85vh;
+            border-radius: 10px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+        .lightbox-close {
+            position: absolute;
+            top: 20px;
+            right: 25px;
+            color: white;
+            font-size: 2rem;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div>
+                <h1><i class="fa-solid fa-box-archive"></i> {{ get_text('my_parcels', lang) }}</h1>
+                <div class="header-sub">{{ owner.display_name if owner and owner.display_name else "SukAnan Apartment" }}</div>
+            </div>
+            <div class="room-badge">
+                <i class="fa-solid fa-door-open"></i> {{ tenant.room.room_number if tenant.room else "N/A" }}
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="tabs">
+            <button class="tab-btn active" id="tab-pending-btn" onclick="switchTab('pending')">
+                <i class="fa-solid fa-box-open"></i> {{ get_text('pending_parcels', lang) }}
+                {% if pending_parcels|length > 0 %}
+                <span class="badge-count">{{ pending_parcels|length }}</span>
+                {% endif %}
+            </button>
+            <button class="tab-btn" id="tab-history-btn" onclick="switchTab('history')">
+                <i class="fa-solid fa-clock-rotate-left"></i> {{ get_text('history', lang) }}
+            </button>
+        </div>
+
+        <!-- Tab 1: Pending Parcels -->
+        <div id="section-pending">
+            {% if pending_parcels|length > 0 %}
+                {% for p in pending_parcels %}
+                <div class="parcel-card">
+                    <div class="parcel-header">
+                        <div class="carrier-tag">
+                            <i class="fa-solid fa-truck-fast"></i> {{ p.carrier }}
+                        </div>
+                        <span class="status-pill pending">
+                            <i class="fa-solid fa-hourglass-half"></i> {{ get_text('pending_parcels', lang) }}
+                        </span>
+                    </div>
+                    <div class="parcel-body">
+                        {% if p.tracking_number %}
+                        <div class="info-row">
+                            <span class="info-label">Tracking No.:</span>
+                            <div class="tracking-box">
+                                <span id="track-{{ p.id }}">{{ p.tracking_number }}</span>
+                                <button class="copy-btn" onclick="copyText('{{ p.tracking_number }}')" title="Copy">
+                                    <i class="fa-regular fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                        {% endif %}
+                        <div class="info-row">
+                            <span class="info-label">{{ get_text('parcel_arrived_date', lang) }}:</span>
+                            <span class="info-value">
+                                <i class="fa-regular fa-calendar"></i> {{ p.arrived_at.strftime('%d/%m/%Y %H:%M') if p.arrived_at else '-' }}
+                            </span>
+                        </div>
+                        {% if p.notes %}
+                        <div class="info-row" style="align-items: flex-start;">
+                            <span class="info-label">{{ get_text('parcel_notes', lang) }}:</span>
+                            <span class="info-value" style="max-width: 65%; text-align: right; word-break: break-word;">{{ p.notes }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    {% if p.parcel_image_url %}
+                    <div class="parcel-img-wrap" onclick="openLightbox('{{ p.parcel_image_url }}')">
+                        <img src="{{ p.parcel_image_url }}" alt="{{ get_text('parcel_photo', lang) }}" class="parcel-img">
+                        <div class="img-overlay"><i class="fa-solid fa-magnifying-glass-plus"></i> แตะเพื่อดูรูปเต็ม</div>
+                    </div>
+                    {% endif %}
+
+                    <div class="pickup-notice">
+                        <i class="fa-solid fa-circle-info" style="font-size: 1.2rem;"></i>
+                        <div>
+                            <strong>ขั้นตอนการรับ:</strong> แจ้งเลขห้องที่เคาน์เตอร์นิติบุคคลเพื่อรับพัสดุได้ทันที (ไม่ต้องใช้ QR หรือ PIN)
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <i class="fa-solid fa-box-open"></i>
+                    <h3>{{ get_text('no_pending_parcels', lang) }}</h3>
+                    <p style="font-size: 0.85rem; margin-top: 5px;">เมื่อมีพัสดุมาส่ง ระบบจะแจ้งเตือนผ่าน LINE ทันที</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Tab 2: Received History -->
+        <div id="section-history" style="display: none;">
+            {% if received_parcels|length > 0 %}
+                {% for p in received_parcels %}
+                <div class="parcel-card" style="opacity: 0.95;">
+                    <div class="parcel-header">
+                        <div class="carrier-tag" style="color: #475569;">
+                            <i class="fa-solid fa-box-check"></i> {{ p.carrier }}
+                        </div>
+                        <span class="status-pill received">
+                            <i class="fa-solid fa-check"></i> {{ get_text('received_parcels', lang) }}
+                        </span>
+                    </div>
+                    <div class="parcel-body">
+                        {% if p.tracking_number %}
+                        <div class="info-row">
+                            <span class="info-label">Tracking No.:</span>
+                            <span class="info-value" style="font-family: monospace;">{{ p.tracking_number }}</span>
+                        </div>
+                        {% endif %}
+                        <div class="info-row">
+                            <span class="info-label">{{ get_text('parcel_arrived_date', lang) }}:</span>
+                            <span class="info-value">{{ p.arrived_at.strftime('%d/%m/%Y %H:%M') if p.arrived_at else '-' }}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">{{ get_text('parcel_received_date', lang) }}:</span>
+                            <span class="info-value" style="color: #16a34a;">
+                                <i class="fa-solid fa-check-double"></i> {{ p.received_at.strftime('%d/%m/%Y %H:%M') if p.received_at else '-' }}
+                            </span>
+                        </div>
+                        {% if p.received_by_name %}
+                        <div class="info-row">
+                            <span class="info-label">{{ get_text('received_by', lang) }}:</span>
+                            <span class="info-value">{{ p.received_by_name }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    {% if p.proof_image_url %}
+                    <div class="parcel-img-wrap" style="max-height: 120px;" onclick="openLightbox('{{ p.proof_image_url }}')">
+                        <img src="{{ p.proof_image_url }}" alt="Proof" class="parcel-img" style="height: 120px;">
+                        <div class="img-overlay"><i class="fa-solid fa-camera"></i> รูปหลักฐานการรับ</div>
+                    </div>
+                    {% elif p.parcel_image_url %}
+                    <div class="parcel-img-wrap" style="max-height: 120px;" onclick="openLightbox('{{ p.parcel_image_url }}')">
+                        <img src="{{ p.parcel_image_url }}" alt="Parcel" class="parcel-img" style="height: 120px;">
+                        <div class="img-overlay"><i class="fa-solid fa-image"></i> รูปพัสดุตอนรับเข้า</div>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                    <h3>{{ get_text('no_parcels', lang) }}</h3>
+                    <p style="font-size: 0.85rem; margin-top: 5px;">ยังไม่มีประวัติการรับพัสดุย้อนหลัง</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Lightbox Modal -->
+    <div id="lightbox" class="lightbox" onclick="closeLightbox()">
+        <span class="lightbox-close">&times;</span>
+        <img id="lightbox-img" src="" alt="Zoom Preview">
+    </div>
+
+    <script>
+        function switchTab(tab) {
+            const pendingBtn = document.getElementById('tab-pending-btn');
+            const historyBtn = document.getElementById('tab-history-btn');
+            const pendingSec = document.getElementById('section-pending');
+            const historySec = document.getElementById('section-history');
+
+            if (tab === 'pending') {
+                pendingBtn.classList.add('active');
+                historyBtn.classList.remove('active');
+                pendingSec.style.display = 'block';
+                historySec.style.display = 'none';
+            } else {
+                historyBtn.classList.add('active');
+                pendingBtn.classList.remove('active');
+                historySec.style.display = 'block';
+                pendingSec.style.display = 'none';
+            }
+        }
+
+        function copyText(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                alert("คัดลอกเลขพัสดุเรียบร้อยแล้ว: " + text);
+            }).catch(err => {
+                console.error('Copy failed', err);
+            });
+        }
+
+        function openLightbox(url) {
+            document.getElementById('lightbox-img').src = url;
+            document.getElementById('lightbox').classList.add('active');
+        }
+
+        function closeLightbox() {
+            document.getElementById('lightbox').classList.remove('active');
+        }
+    </script>
+</body>
+</html>

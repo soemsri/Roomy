@@ -34,3 +34,13 @@
 - [x] DEV: Database Migration & Schema Alignment
 - [ ] DEV: Final UI/UX Polish
 - [ ] PM: Final Handover Documentation
+
+## Phase 7: Parcel Management System (Simplified Flow) (Completed)
+- [x] PM: Redesign User Stories & Flow without QR/PIN scan requirement
+- [x] CTO: Database Schema Alignment for `Parcels` entity with optional proof
+- [x] DEV: Parcel Database Model (`Parcel` SQLAlchemy model) & Migrations (SQLite & PostgreSQL)
+- [x] DEV: Admin Parcel Inward Entry UI (Room, Carrier, Tracking, Photo upload) & Backend API
+- [x] DEV: LINE Push Notification to Tenants (Flex Message with Parcel Details & Photo)
+- [x] DEV: Simplified Pickup Button in Admin Panel ("รับพัสดุแล้ว / Mark as Received") with Optional Proof modal
+- [x] DEV: Tenant Parcel Tracking View on LINE Web View (Pending & History)
+- [x] QA: Unit & Integration Testing for Parcel Reception and Pickup Workflows

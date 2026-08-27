@@ -535,3 +535,258 @@ def send_booking_rejected_flex(booking, owner = None, bot_api = None):
         )
     except Exception as e:
         logger.error(f"Failed to send booking rejected message: {e}")
+
+def send_parcel_arrived_flex(parcel, room_number: str = "N/A", building_name: str = "", tenant = None, bot_api = None, owner = None):
+    """Sends a notification Flex Message when a new parcel arrives at the dorm counter."""
+    if not bot_api or not tenant or not tenant.line_user_id:
+        return
+    
+    lang = tenant.language or "th"
+    apt_name = owner.display_name if (owner and owner.display_name) else "SukAnan Apartment"
+    
+    # Format arrival time
+    if parcel.arrived_at:
+        try:
+            arrival_str = parcel.arrived_at.strftime("%d/%m/%Y %H:%M")
+        except Exception:
+            arrival_str = str(parcel.arrived_at)[:16]
+    else:
+        arrival_str = "-"
+
+    # Build image URL
+    img_full_url = None
+    if parcel.parcel_image_url:
+        if parcel.parcel_image_url.startswith("http"):
+            img_full_url = parcel.parcel_image_url
+        else:
+            base = str(BASE_URL).rstrip("/")
+            img_full_url = f"{base}{parcel.parcel_image_url}"
+
+    carrier_text = parcel.carrier or "พัสดุทั่วไป"
+    tracking_text = parcel.tracking_number if parcel.tracking_number else "-"
+    location_desc = f"{building_name} - ห้อง {room_number}" if (building_name and building_name != "อาคารหลัก") else f"ห้อง {room_number}"
+
+    # Flex message
+    flex_contents = {
+        "type": "bubble",
+        "header": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {"type": "text", "text": "📦 " + ("Parcel Arrived!" if lang == "en" else "荷物が到着しました" if lang == "jp" else "พัสดุมาถึงแล้ว!"), "weight": "bold", "size": "xl", "color": "#FFFFFF", "align": "center"},
+                {"type": "text", "text": apt_name, "size": "xs", "color": "#E0F2FE", "align": "center", "margin": "xs"}
+            ],
+            "backgroundColor": "#0284C7",
+            "paddingAll": "16px"
+        },
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {
+                    "type": "box",
+                    "layout": "vertical",
+                    "spacing": "sm",
+                    "contents": [
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "contents": [
+                                {"type": "text", "text": "🚪 " + get_text('room', lang), "size": "sm", "color": "#64748B", "flex": 2},
+                                {"type": "text", "text": location_desc, "size": "sm", "color": "#0F172A", "weight": "bold", "flex": 3, "align": "end"}
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "contents": [
+                                {"type": "text", "text": "🚚 " + (get_text('carrier', lang) or "ขนส่ง"), "size": "sm", "color": "#64748B", "flex": 2},
+                                {"type": "text", "text": carrier_text, "size": "sm", "color": "#0284C7", "weight": "bold", "flex": 3, "align": "end"}
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "contents": [
+                                {"type": "text", "text": "🔖 Tracking", "size": "sm", "color": "#64748B", "flex": 2},
+                                {"type": "text", "text": tracking_text, "size": "sm", "color": "#334155", "weight": "bold", "flex": 3, "align": "end", "wrap": True}
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "contents": [
+                                {"type": "text", "text": "🕒 " + ("Arrived At" if lang == "en" else "到着日時" if lang == "jp" else "เวลาที่มาถึง"), "size": "sm", "color": "#64748B", "flex": 2},
+                                {"type": "text", "text": arrival_str, "size": "sm", "color": "#334155", "flex": 3, "align": "end"}
+                            ]
+                        }
+                    ]
+                }
+            ],
+            "paddingAll": "16px"
+        }
+    }
+
+    if parcel.notes:
+        flex_contents["body"]["contents"].append({"type": "separator", "margin": "md"})
+        flex_contents["body"]["contents"].append({
+            "type": "box",
+            "layout": "vertical",
+            "margin": "md",
+            "contents": [
+                {"type": "text", "text": "📝 " + ("Notes: " if lang == "en" else "หมายเหตุ: ") + parcel.notes, "size": "xs", "color": "#64748B", "wrap": True}
+            ]
+        })
+
+    if img_full_url:
+        flex_contents["hero"] = {
+            "type": "image",
+            "url": img_full_url,
+            "size": "full",
+            "aspectRatio": "20:13",
+            "aspectMode": "cover"
+        }
+
+    # Footer button linking to tenant parcel page
+    view_url = f"{BASE_URL}/parcels/{tenant.uuid}?lang={lang}"
+    flex_contents["footer"] = {
+        "type": "box",
+        "layout": "vertical",
+        "spacing": "xs",
+        "contents": [
+            {
+                "type": "button",
+                "style": "primary",
+                "color": "#0284C7",
+                "height": "sm",
+                "action": {
+                    "type": "uri",
+                    "label": "📦 " + ("View My Parcels" if lang == "en" else "荷物一覧を見る" if lang == "jp" else "ดูพัสดุของฉัน"),
+                    "uri": view_url
+                }
+            },
+            {
+                "type": "text",
+                "text": "📌 " + ("Contact counter to pick up" if lang == "en" else "フロントでお受け取りください" if lang == "jp" else "ติดต่อรับพัสดุได้ที่เคาน์เตอร์นิติบุคคล"),
+                "size": "xxs",
+                "color": "#94A3B8",
+                "align": "center",
+                "margin": "sm"
+            }
+        ],
+        "paddingAll": "14px"
+    }
+
+    try:
+        bot_api.push_message(
+            PushMessageRequest(
+                to=tenant.line_user_id,
+                messages=[FlexMessage(
+                    alt_text=f"📦 มีพัสดุมาถึงห้อง {room_number} ({carrier_text})",
+                    contents=FlexContainer.from_dict(flex_contents)
+                )]
+            )
+        )
+    except Exception as e:
+        logger.error(f"Failed to send parcel arrived flex: {e}")
+        # Fallback text
+        try:
+            fallback_msg = f"📦 มีพัสดุมาถึงห้อง {room_number}\nขนส่ง: {carrier_text}\nTracking: {tracking_text}\nดูรายการพัสดุ: {view_url}"
+            bot_api.push_message(
+                PushMessageRequest(
+                    to=tenant.line_user_id,
+                    messages=[TextMessage(text=fallback_msg)]
+                )
+            )
+        except Exception:
+            pass
+
+def send_parcel_received_flex(parcel, room_number: str = "N/A", tenant = None, bot_api = None, owner = None):
+    """Sends an optional confirmation notification when a parcel is picked up."""
+    if not bot_api or not tenant or not tenant.line_user_id:
+        return
+    
+    lang = tenant.language or "th"
+    if parcel.received_at:
+        try:
+            received_str = parcel.received_at.strftime("%d/%m/%Y %H:%M")
+        except Exception:
+            received_str = str(parcel.received_at)[:16]
+    else:
+        received_str = "-"
+
+    carrier_text = parcel.carrier or "พัสดุ"
+    tracking_text = parcel.tracking_number if parcel.tracking_number else "-"
+    receiver_text = parcel.received_by_name if parcel.received_by_name else (tenant.full_name or "ผู้เช่า")
+
+    flex_contents = {
+        "type": "bubble",
+        "header": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {"type": "text", "text": "✅ " + ("Parcel Received" if lang == "en" else "受取完了" if lang == "jp" else "รับพัสดุเรียบร้อยแล้ว"), "weight": "bold", "size": "lg", "color": "#FFFFFF", "align": "center"}
+            ],
+            "backgroundColor": "#16A34A",
+            "paddingAll": "16px"
+        },
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {
+                    "type": "box",
+                    "layout": "vertical",
+                    "spacing": "sm",
+                    "contents": [
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "contents": [
+                                {"type": "text", "text": "🚪 " + get_text('room', lang), "size": "sm", "color": "#64748B", "flex": 2},
+                                {"type": "text", "text": f"ห้อง {room_number}", "size": "sm", "color": "#0F172A", "weight": "bold", "flex": 3, "align": "end"}
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "contents": [
+                                {"type": "text", "text": "🚚 ขนส่ง", "size": "sm", "color": "#64748B", "flex": 2},
+                                {"type": "text", "text": carrier_text, "size": "sm", "color": "#0F172A", "flex": 3, "align": "end"}
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "contents": [
+                                {"type": "text", "text": "👤 ผู้รับมอบ", "size": "sm", "color": "#64748B", "flex": 2},
+                                {"type": "text", "text": receiver_text, "size": "sm", "color": "#16A34A", "weight": "bold", "flex": 3, "align": "end"}
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "contents": [
+                                {"type": "text", "text": "🕒 วันเวลารับ", "size": "sm", "color": "#64748B", "flex": 2},
+                                {"type": "text", "text": received_str, "size": "sm", "color": "#334155", "flex": 3, "align": "end"}
+                            ]
+                        }
+                    ]
+                }
+            ],
+            "paddingAll": "16px"
+        }
+    }
+
+    try:
+        bot_api.push_message(
+            PushMessageRequest(
+                to=tenant.line_user_id,
+                messages=[FlexMessage(
+                    alt_text=f"✅ พัสดุห้อง {room_number} ถูกรับมอบเรียบร้อยแล้ว",
+                    contents=FlexContainer.from_dict(flex_contents)
+                )]
+            )
+        )
+    except Exception as e:
+        logger.error(f"Failed to send parcel received flex: {e}")

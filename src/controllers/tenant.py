@@ -636,3 +636,82 @@ async def view_history(request: Request, tenant_uuid: str, db: Session = Depends
         invoices = db.query(models.Invoice).filter(models.Invoice.tenant_id == tenant.id).order_by(models.Invoice.id.desc()).all()
 
     return templates.TemplateResponse("history.html", {"request": request, "tenant": tenant, "invoices": invoices, "lang": lang})
+
+@router.get("/parcels/{tenant_uuid}", response_class=HTMLResponse)
+async def view_parcels(request: Request, tenant_uuid: str, db: Session = Depends(get_db)):
+    tenant = db.query(models.Tenant).filter(models.Tenant.uuid == tenant_uuid).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    lang = request.query_params.get("lang") or tenant.language or "th"
+    owner = db.query(models.Owner).first()
+
+    room_id = tenant.current_room_id
+    if room_id:
+        pending_parcels = db.query(models.Parcel).filter(
+            models.Parcel.room_id == room_id,
+            models.Parcel.status == "pending"
+        ).order_by(models.Parcel.id.desc()).all()
+        received_parcels = db.query(models.Parcel).filter(
+            models.Parcel.room_id == room_id,
+            models.Parcel.status == "received"
+        ).order_by(models.Parcel.received_at.desc(), models.Parcel.id.desc()).limit(30).all()
+    else:
+        pending_parcels = db.query(models.Parcel).filter(
+            models.Parcel.tenant_id == tenant.id,
+            models.Parcel.status == "pending"
+        ).order_by(models.Parcel.id.desc()).all()
+        received_parcels = db.query(models.Parcel).filter(
+            models.Parcel.tenant_id == tenant.id,
+            models.Parcel.status == "received"
+        ).order_by(models.Parcel.received_at.desc(), models.Parcel.id.desc()).limit(30).all()
+
+    return templates.TemplateResponse("parcels.html", {
+        "request": request,
+        "tenant": tenant,
+        "owner": owner,
+        "pending_parcels": pending_parcels,
+        "received_parcels": received_parcels,
+        "lang": lang
+    })
+
+@router.get("/api/tenant/{tenant_uuid}/parcels")
+async def get_tenant_parcels_api(tenant_uuid: str, db: Session = Depends(get_db)):
+    tenant = db.query(models.Tenant).filter(models.Tenant.uuid == tenant_uuid).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    room_id = tenant.current_room_id
+    query_filter = (models.Parcel.room_id == room_id) if room_id else (models.Parcel.tenant_id == tenant.id)
+
+    pending = db.query(models.Parcel).filter(query_filter, models.Parcel.status == "pending").order_by(models.Parcel.id.desc()).all()
+    received = db.query(models.Parcel).filter(query_filter, models.Parcel.status == "received").order_by(models.Parcel.received_at.desc(), models.Parcel.id.desc()).limit(30).all()
+
+    def serialize_parcel(p):
+        return {
+            "id": p.id,
+            "carrier": p.carrier,
+            "tracking_number": p.tracking_number,
+            "parcel_image_url": p.parcel_image_url,
+            "status": p.status,
+            "arrived_at": p.arrived_at.strftime("%d/%m/%Y %H:%M") if p.arrived_at else "-",
+            "received_at": p.received_at.strftime("%d/%m/%Y %H:%M") if p.received_at else "-",
+            "received_by_name": p.received_by_name,
+            "notes": p.notes
+        }
+
+    return {
+        "room_number": tenant.room.room_number if tenant.room else "N/A",
+        "pending": [serialize_parcel(p) for p in pending],
+        "received": [serialize_parcel(p) for p in received]
+    }
+
+@router.get("/tenant/parcels")
+async def tenant_parcels_route(request: Request, uid: str = None, uuid: str = None, lang: str = "th", db: Session = Depends(get_db)):
+    if uuid:
+        return RedirectResponse(url=f"/parcels/{uuid}?lang={lang}")
+    if uid:
+        tenant = db.query(models.Tenant).filter(models.Tenant.line_user_id == uid, models.Tenant.status == "Active").first()
+        if tenant:
+            return RedirectResponse(url=f"/parcels/{tenant.uuid}?lang={lang}")
+    raise HTTPException(status_code=400, detail="Missing tenant identifier")
+
