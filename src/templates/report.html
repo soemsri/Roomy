@@ -221,63 +221,151 @@
             color: var(--text-muted);
         }
 
-        @media (max-width: 1200px) {
+        .mobile-menu-toggle {
+            align-items: center;
+            background: #ffffff;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text-main);
+            cursor: pointer;
+            display: none;
+            flex: 0 0 44px;
+            font-size: 1.2rem;
+            height: 44px;
+            justify-content: center;
+            padding: 0;
+            width: 44px;
+        }
+        .sidebar-overlay {
+            background: rgba(15, 23, 42, 0.55);
+            display: none;
+            inset: 0;
+            position: fixed;
+            z-index: 99;
+        }
+
+        @media (max-width: 992px) {
             .span-8, .span-4 { grid-column: span 12; }
-            .sidebar { transform: translateX(-100%); transition: transform 0.3s; }
-            .main-content { margin-left: 0; padding: 20px; }
+            .sidebar {
+                box-shadow: 12px 0 30px rgba(15, 23, 42, 0.18);
+                transform: translateX(-100%);
+                transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                z-index: 101;
+            }
+            .sidebar.active { transform: translateX(0); }
+            .sidebar-overlay.active { display: block; }
+            .mobile-menu-toggle { display: inline-flex; }
+            body.sidebar-open { overflow: hidden; }
+            .main-content { margin-left: 0; padding: 15px; }
+            .stat-group { grid-template-columns: 1fr; }
+            .header-top { flex-direction: column; gap: 15px; }
         }
     </style>
 </head>
 <body>
     <!-- Sidebar -->
-    <aside class="sidebar">
+    <aside class="sidebar" id="adminSidebar" aria-label="Admin navigation">
         <div class="sidebar-brand">
-            <i class="fa-solid fa-house-chimney-window"></i>
-            <span>{{ get_text('app_name', lang) }}.</span>
+            <i class="fa-solid fa-house-chimney-window" style="color: #ef4444;"></i>
+            <span>{{ get_text('app_name', lang) or 'Roomy' }}.</span>
         </div>
 
         <div class="menu-section">
-            <div class="menu-label">Language / ภาษา</div>
+            <div class="menu-label">{{ get_text('language_label', lang) or 'Language / ภาษา' }}</div>
             <div style="display: flex; gap: 8px; padding-left: 10px;">
-                <button onclick="setLanguage('th')" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.7em; {{ 'background: var(--primary); color: white;' if lang == 'th' else '' }}">TH</button>
-                <button onclick="setLanguage('en')" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.7em; {{ 'background: var(--primary); color: white;' if lang == 'en' else '' }}">EN</button>
-                <button onclick="setLanguage('jp')" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.7em; {{ 'background: var(--primary); color: white;' if lang == 'jp' else '' }}">JP</button>
+                <button onclick="setLanguage('th')" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.7em; cursor: pointer; {{ 'background: var(--primary); color: white;' if lang == 'th' else '' }}">TH</button>
+                <button onclick="setLanguage('en')" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.7em; cursor: pointer; {{ 'background: var(--primary); color: white;' if lang == 'en' else '' }}">EN</button>
+                <button onclick="setLanguage('jp')" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.7em; cursor: pointer; {{ 'background: var(--primary); color: white;' if lang == 'jp' else '' }}">JP</button>
             </div>
         </div>
         
+        {% set user_role = current_user.role if current_user and current_user.role else 'Admin' %}
+
         <div class="menu-section">
             <div class="menu-label">Menu</div>
-            <a href="/admin/dashboard#overview" class="menu-item"><i class="fa-solid fa-grid-2"></i> {{ get_text('dashboard', lang) }}</a>
-            <a href="/admin/report" class="menu-item active"><i class="fa-solid fa-chart-pie"></i> {{ get_text('analytics', lang) }}</a>
-            <a href="/admin/dashboard#roomSection" class="menu-item"><i class="fa-solid fa-door-open"></i> {{ get_text('rooms', lang) }}</a>
-            <a href="/admin/dashboard#tenantSection" class="menu-item"><i class="fa-solid fa-users"></i> {{ get_text('tenants', lang) }}</a>
+            <a href="/admin/dashboard#overview" class="menu-item"><i class="fa-solid fa-chart-line"></i> <span>{{ get_text('system_overview', lang) }}</span></a>
+            {% if user_role in ['Admin', 'Accountant'] %}
+            <a href="/admin/report" class="menu-item active"><i class="fa-solid fa-file-invoice-dollar"></i> <span>{{ get_text('analytics', lang) }}</span></a>
+            {% endif %}
+            {% if user_role in ['Admin', 'Clerk'] %}
+            <a href="/admin/dashboard#meterSection" class="menu-item"><i class="fa-solid fa-gauge-high"></i> <span>{{ get_text('meter_reading', lang) }}</span></a>
+            {% endif %}
         </div>
 
         <div class="menu-section">
-            <div class="menu-label">Settings</div>
-            <a href="/admin/dashboard#settingsSection" class="menu-item"><i class="fa-solid fa-sliders"></i> {{ get_text('configuration', lang) }}</a>
+            <div class="menu-label">Records</div>
+            {% if user_role in ['Admin', 'Clerk'] %}
+            <a href="/admin/dashboard#bookingSection" class="menu-item"><i class="fa-solid fa-calendar-check"></i> <span>{{ get_text('booking_screening', lang) }}</span></a>
+            <a href="/admin/dashboard#pendingSection" class="menu-item"><i class="fa-solid fa-user-clock"></i> <span>{{ get_text('pending_registrations', lang) }}</span></a>
+            {% endif %}
+            <a href="/admin/dashboard#roomSection" class="menu-item"><i class="fa-solid fa-door-open"></i> <span>{{ get_text('manage_rooms', lang) }}</span></a>
+            {% if user_role in ['Admin', 'Clerk'] %}
+            <a href="/admin/dashboard#leaseSection" class="menu-item"><i class="fa-solid fa-file-contract"></i> <span>{{ get_text('manage_leases', lang) }}</span></a>
+            {% endif %}
+            {% if user_role in ['Admin', 'Accountant', 'Clerk'] %}
+            <a href="/admin/dashboard#billSection" class="menu-item"><i class="fa-solid fa-file-invoice-dollar"></i> <span>{{ get_text('latest_bills', lang) }}</span></a>
+            {% endif %}
+            <a href="/admin/dashboard#historySection" class="menu-item"><i class="fa-solid fa-clock-rotate-left"></i> <span>{{ get_text('history', lang) }}</span></a>
+            {% if user_role in ['Admin', 'Accountant', 'Clerk'] %}
+            <a href="/admin/dashboard#receiptSection" class="menu-item"><i class="fa-solid fa-receipt"></i> <span>{{ get_text('manage_receipts', lang) }}</span></a>
+            {% endif %}
+            {% if user_role in ['Admin', 'Clerk', 'Technician'] %}
+            <a href="/admin/dashboard#repairSection" class="menu-item"><i class="fa-solid fa-screwdriver-wrench"></i> <span>{{ get_text('repairs', lang) }}</span></a>
+            {% endif %}
+            {% if user_role in ['Admin', 'Clerk', 'Housekeeper', 'Technician', 'Accountant'] %}
+            <a href="/admin/dashboard#parcelSection" class="menu-item"><i class="fa-solid fa-boxes-packing"></i> <span>{{ get_text('parcel_management', lang) or 'จัดการพัสดุ' }}</span></a>
+            {% endif %}
+        </div>
+
+        {% if user_role in ['Admin', 'Clerk'] %}
+        <div class="menu-section">
+            <div class="menu-label">Management</div>
+            <a href="/admin/dashboard#tenantSection" class="menu-item"><i class="fa-solid fa-users"></i> <span>{{ get_text('tenants', lang) }}</span></a>
+        </div>
+        {% endif %}
+
+        <div class="menu-section" style="margin-top: auto;">
+            <div class="menu-label">System</div>
+            {% if user_role == 'Admin' %}
+            <a href="/admin/dashboard#settingsSection" class="menu-item"><i class="fa-solid fa-gears"></i> <span>{{ get_text('settings', lang) }}</span></a>
+            <a href="/admin/dashboard#logsSection" class="menu-item"><i class="fa-solid fa-list-check"></i> <span>{{ get_text('setting_tab_logs', lang) }}</span></a>
+            {% endif %}
             <a href="javascript:void(0)" onclick="if(confirm('{{ get_text('confirm_logout', lang) or 'Logout?' }}')) document.getElementById('logout-form').submit();" class="menu-item" style="color: #ef4444;">
-                <i class="fa-solid fa-arrow-right-from-bracket"></i> {{ get_text('logout', lang) }}
+                <i class="fa-solid fa-right-from-bracket"></i> <span>{{ get_text('logout', lang) }}</span>
             </a>
             <form id="logout-form" action="/admin/logout" method="POST" style="display: none;"></form>
         </div>
     </aside>
+    <div class="sidebar-overlay" id="sidebarOverlay" aria-hidden="true" onclick="toggleMobileSidebar()"></div>
 
     <main class="main-content">
         <div class="header-top">
-            <div class="greeting">
-                {% set display_name = current_user.full_name if current_user and current_user.full_name else (owner.display_name if owner else 'Admin') %}
-                {% set display_role = get_text(current_user.role, lang) if current_user and current_user.role else get_text('admin_profile', lang) %}
-                <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-                    <h1>{{ get_text('hello', lang) }}, {{ display_name }}!</h1>
-                    <div style="display: flex; align-items: center; gap: 6px; background: rgba(59, 130, 246, 0.1); color: var(--primary); padding: 6px 14px; border-radius: 20px; font-size: 0.85em; font-weight: 600;">
-                        <i class="fa-solid fa-circle-user"></i>
-                        <span>{{ display_role }}</span>
+            <div style="display: flex; align-items: center; gap: 14px;">
+                <button
+                    type="button"
+                    class="mobile-menu-toggle"
+                    id="mobileMenuToggle"
+                    aria-label="เปิดเมนู"
+                    aria-controls="adminSidebar"
+                    aria-expanded="false"
+                    onclick="toggleMobileSidebar()"
+                >
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+                <div class="greeting">
+                    {% set display_name = current_user.full_name if current_user and current_user.full_name else (owner.display_name if owner else 'Admin') %}
+                    {% set display_role = get_text(current_user.role, lang) if current_user and current_user.role else get_text('admin_profile', lang) %}
+                    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                        <h1 style="font-size: 1.8em; margin: 0;">{{ get_text('hello', lang) }}, {{ display_name }}!</h1>
+                        <div style="display: flex; align-items: center; gap: 6px; background: rgba(59, 130, 246, 0.1); color: var(--primary); padding: 6px 14px; border-radius: 20px; font-size: 0.85em; font-weight: 600;">
+                            <i class="fa-solid fa-circle-user"></i>
+                            <span>{{ display_role }}</span>
+                        </div>
                     </div>
+                    <p>{{ get_text('financial_overview', lang) }}</p>
                 </div>
-                <p>{{ get_text('financial_overview', lang) }}</p>
             </div>
-            <div style="display: flex; gap: 12px;">
+            <div style="display: flex; gap: 12px; align-items: center;">
                 <button class="btn btn-secondary" onclick="window.print()"><i class="fa-solid fa-print"></i> {{ get_text('export', lang) }}</button>
                 <button class="btn btn-primary" onclick="toggleExpenseForm()"><i class="fa-solid fa-plus"></i> {{ get_text('add_expense', lang) }}</button>
             </div>
@@ -875,6 +963,24 @@
                     else alert('{{ get_text("error_saving_expense", lang) }}');
                 } catch (e) { alert('{{ get_text("network_error", lang) }}'); }
             };
+        }
+
+        function setMobileSidebar(open) {
+            const sidebar = document.getElementById('adminSidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            const toggle = document.getElementById('mobileMenuToggle');
+            if (!sidebar || !overlay || !toggle) return;
+
+            sidebar.classList.toggle('active', open);
+            overlay.classList.toggle('active', open);
+            document.body.classList.toggle('sidebar-open', open);
+            toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+            overlay.setAttribute('aria-hidden', open ? 'false' : 'true');
+        }
+
+        function toggleMobileSidebar() {
+            const sidebar = document.getElementById('adminSidebar');
+            setMobileSidebar(!sidebar.classList.contains('active'));
         }
 
         // Initialize
