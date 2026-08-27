@@ -363,6 +363,40 @@
             -webkit-overflow-scrolling: touch;
         }
 
+        #receiveParcelModal {
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+            padding: 12px;
+            overflow: hidden;
+        }
+        #receiveParcelModal .modal-content {
+            display: flex;
+            flex-direction: column;
+            width: min(480px, 100%);
+            max-height: calc(100vh - 24px);
+            max-height: calc(100dvh - 24px);
+            margin: 0;
+        }
+        #receiveParcelModal form {
+            display: flex;
+            flex: 1 1 auto;
+            flex-direction: column;
+            min-height: 0;
+        }
+        #receiveParcelModal .modal-header,
+        #receiveParcelModal .modal-footer {
+            flex: 0 0 auto;
+        }
+        #receiveParcelModal .modal-body {
+            flex: 1 1 auto;
+            min-height: 0;
+            max-height: none !important;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch;
+        }
+
         .tabs { display: flex; background: #f8f9fa; padding: 5px; border-radius: 10px; margin-bottom: 25px; }
         .tab { flex: 1; padding: 10px; text-align: center; cursor: pointer; border-radius: 8px; font-weight: 600; font-size: 0.9em; color: var(--secondary); transition: all 0.2s; }
         .tab.active { background: white; color: var(--primary); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
@@ -458,6 +492,24 @@
                 flex: 1 1 auto;
                 justify-content: center;
                 padding: 10px 8px !important;
+            }
+            #receiveParcelModal { padding: 8px; }
+            #receiveParcelModal .modal-content {
+                max-height: calc(100vh - 16px);
+                max-height: calc(100dvh - 16px);
+                border-radius: 12px !important;
+            }
+            #receiveParcelModal .modal-header { padding: 13px 15px !important; }
+            #receiveParcelModal .modal-header h3 { font-size: 1rem !important; }
+            #receiveParcelModal .modal-body { padding: 16px !important; }
+            #receiveParcelModal .modal-footer {
+                padding: 10px 12px max(10px, env(safe-area-inset-bottom)) !important;
+                gap: 8px !important;
+            }
+            #receiveParcelModal .modal-footer .btn {
+                flex: 1 1 auto;
+                justify-content: center;
+                padding: 11px 8px !important;
             }
         }
     </style>
@@ -2596,11 +2648,6 @@
                         <div id="receive_modal_carrier" style="font-size: 0.82rem; color: #64748b; margin-top: 4px;">Flash Express</div>
                     </div>
 
-                    <!-- 1-Click Primary Action -->
-                    <button type="submit" id="btn_confirm_receive_instant" class="btn btn-primary" style="width: 100%; padding: 14px; font-size: 1.05rem; font-weight: 700; background: #16a34a; justify-content: center; box-shadow: 0 4px 12px rgba(22, 163, 74, 0.3); margin-bottom: 15px;">
-                        <i class="fa-solid fa-check"></i> {{ get_text('confirm_received_now', lang) or 'ยืนยันรับทันที (1-Click)' }}
-                    </button>
-
                     <!-- Optional Extra Proof Section Toggle -->
                     <div style="border-top: 1px dashed #cbd5e1; padding-top: 12px; margin-top: 10px;">
                         <a href="javascript:void(0)" onclick="toggleReceiveExtraFields()" style="font-size: 0.82rem; color: #64748b; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 5px;">
@@ -2618,8 +2665,11 @@
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer" style="padding: 12px 22px; background: #f8fafc; display: flex; justify-content: flex-end; border-top: 1px solid #e2e8f0;">
+                <div class="modal-footer" style="padding: 12px 22px; background: #f8fafc; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e2e8f0;">
                     <button type="button" class="btn btn-outline" onclick="closeReceiveParcelModal()">{{ get_text('cancel', lang) or 'ยกเลิก' }}</button>
+                    <button type="submit" id="btn_confirm_receive_instant" class="btn btn-primary" style="padding: 11px 18px; font-weight: 700; background: #16a34a; justify-content: center; box-shadow: 0 3px 10px rgba(22, 163, 74, 0.25);">
+                        <i class="fa-solid fa-check"></i> {{ get_text('confirm_received_now', lang) or 'ยืนยันรับพัสดุ' }}
+                    </button>
                 </div>
             </form>
         </div>

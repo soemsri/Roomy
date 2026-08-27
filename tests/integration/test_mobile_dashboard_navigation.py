@@ -16,3 +16,6 @@ def test_dashboard_has_mobile_navigation_controls(client):
     assert "#newParcelModal .modal-content" in response.text
     assert "max-height: calc(100dvh - 16px)" in response.text
     assert "max-height: none !important" in response.text
+    assert "#receiveParcelModal .modal-content" in response.text
+    assert "#receiveParcelModal .modal-footer .btn" in response.text
+    assert 'id="btn_confirm_receive_instant"' in response.text
